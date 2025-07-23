@@ -1,0 +1,169 @@
+/* style.css */
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #f9f9f9;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.number-display {
+  font-size: 120px;
+  background-color: black;
+  color: white;
+  padding: 20px 40px;
+  border-radius: 12px;
+}
+
+.status-log {
+  margin-top: 12px;
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 8px;
+  min-height: 48px;
+}
+
+.status-success {
+  background-color: #d4f5dc;
+  color: #0b3d1c;
+}
+
+.status-fail {
+  background-color: #f8d7da;
+  color: #842029;
+}
+
+.topbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.job-title,
+.process-name {
+  font-size: 18px;
+  font-weight: 500;
+  margin-top: 10px;
+}
+
+.hidden {
+  display: none;
+}
+
+.btn {
+  font-size: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.btn-warning {
+  font-size: 20px;
+  font-weight: bold;
+}
+.time-box .col {
+  padding: 10px;
+}
+.main-layout {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.number-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.number-display {
+  font-size: 100px;
+  background-color: black;
+  color: white;
+  padding: 20px 40px;
+  border-radius: 12px;
+  min-width: 200px;
+}
+
+.arrow-buttons button {
+  font-size: 24px;
+  padding: 10px 20px;
+}
+.btn-lg-custom {
+  min-height: 160px;
+  font-size: 1.25rem;
+  padding: 16px 24px;
+}
+
+.side-button-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.btn-lg-custom {
+  width: 180px;
+  padding: 16px;
+  font-size: 1.25rem;
+}
+.arrow-buttons button {
+  font-size: 40px;
+}
+
+.start-btn, .stop-btn {
+  height: 220px; /* หรือความสูงของ .number-display */
+  font-size: 1.5rem;
+}
+
+.full-height-btn {
+  min-height: 160px;  /* ปรับจาก 300px */
+  padding: 10px;
+  font-size: 1.25rem;
+}
+.custom-button-layout {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.control-panel {
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+}
+
+.action-btn {
+  min-height: 300px;
+  min-width: 90px;
+  font-size: 1.25rem;
+  padding: 20px 28px;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .action-btn {
+    width: 100%;
+    min-height: auto;
+  }
+
+  .number-display {
+    font-size: 64px;
+    padding: 12px 24px;
+  }
+
+  .arrow-buttons button {
+    font-size: 20px;
+    padding: 8px 16px;
+  }
+}

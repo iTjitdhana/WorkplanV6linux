@@ -1,0 +1,30 @@
+.job-table th,
+.job-table td {
+  vertical-align: middle;
+  text-align: center;
+  padding: 0.25rem;
+}
+
+.job-table input {
+  width: 100%;
+}
+
+.col-job-number {
+  width: 4%;
+}
+
+.col-product-name {
+  width: 22%;
+}
+
+.col-operator {
+  width: 12%;
+}
+
+.col-time {
+  width: 10%;
+}
+
+.col-remove {
+  width: 5%;
+}

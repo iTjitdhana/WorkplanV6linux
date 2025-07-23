@@ -1,0 +1,240 @@
+/* Reset */
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f9fafb;
+  color: #333;
+  margin: 0;
+  padding: 1.5rem;
+}
+
+/* Header */
+h1,
+h5 {
+  color: #1f2937;
+}
+
+/* Select Dropdown */
+#device-select {
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+}
+
+/* Main Card */
+.control-panel {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Number Display */
+.number-display {
+  font-size: 5rem;
+  font-weight: 300;
+  background-color: #1f2937;
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 1rem;
+  min-width: 200px;
+}
+
+.arrow-buttons button {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+/* Buttons */
+button.btn {
+  border-radius: 0.5rem;
+  font-size: 1.1rem;
+  padding: 0.75rem 2rem;
+}
+
+button.btn-success {
+  background-color: #16a34a;
+  border: none;
+}
+
+button.btn-danger {
+  background-color: #dc2626;
+  border: none;
+}
+
+button.btn-warning {
+  background-color: #f59e0b;
+  border: none;
+  color: #111827;
+}
+
+button.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Status Box */
+.status-log {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  background-color: #f3f4f6;
+  margin-top: 1rem;
+  min-height: 48px;
+}
+
+.status-success {
+  background-color: #d1fae5;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.status-fail {
+  background-color: #fee2e2;
+  border-color: #ef4444;
+  color: #991b1b;
+}
+
+/* Time Boxes */
+.time-box {
+  max-width: 600px;
+  margin-top: 2rem;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.03);
+}
+
+.time-box .text-muted {
+  color: #6b7280;
+}
+
+.time-box .fw-bold {
+  color: #111827;
+}
+
+/* Process Step */
+#current-process-name {
+  font-size: 1.25rem;
+}
+
+.btn-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: grayscale(50%);
+}
+
+/* ปุ่มเริ่มงาน */
+.btn-start {
+  background-color: #22c55e !important;  /* เขียวสด */
+  color: white !important;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-start:disabled {
+  background-color: #bbf7d0 !important;  /* เขียวจาง */
+  color: #166534 !important;
+  opacity: 1;
+}
+
+/* ปุ่มหยุดงาน */
+.btn-stop {
+  background-color: #ef4444 !important;  /* แดงสด */
+  color: white !important;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-stop:disabled {
+  background-color: #fecaca !important;  /* แดงจาง */
+  color: #991b1b !important;
+  opacity: 1;
+}
+.process-item.finished {
+  background-color: #f9fafb;
+  color: #6b7280;
+}
+
+.process-item.active {
+  background-color: #28a745 !important;
+  color: #fff !important;
+  border-color: #28a745 !important;
+}
+
+.process-item.active span,
+.process-item.active .badge {
+  color: #fff !important;
+}
+
+/* … (โค้ดเดิมทั้งหมดอยู่เหมือนเดิม) … */
+
+/* --------- NEW / UPDATED STYLES ----------------------------------*/
+
+/* ให้ขนาด 60-40 ทำงานใน bootstrap grid ได้เสมอ */
+@media (min-width: 992px) {
+  .col-lg-7 { flex: 0 0 58.333333%; max-width: 58.333333%; }
+  .col-lg-5 { flex: 0 0 41.666667%; max-width: 41.666667%; }
+}
+
+/* กล่องเวลาในฝั่งซ้าย */
+.time-card{
+  background:#f8fafc;
+  border:1px solid #e2e8f0;
+  border-radius:.75rem;
+  padding:.5rem;
+  text-align:center;
+  min-height:72px;
+}
+.bg-start   {background:#ecfdf5;border-color:#d1fae5;}
+.bg-end     {background:#fef2f2;border-color:#fecaca;}
+.bg-used    {background:#eff6ff;border-color:#bfdbfe;}
+
+/* รายการขั้นตอนการผลิต – scroll ได้หลัง 6 รายการ (~400px) */
+.process-scroll { max-height:400px; overflow-y:auto; }
+.process-item   { transition:background .2s; }
+.process-item.active         { background:#ecfdf5; }
+.process-item.finished       { background:#f9fafb; color:#6b7280; }
+.process-item:not(.active):hover { background:#f1f5f9; }
+
+/* สีปุ่ม & state (คงเดิม) */
+.btn-start{ background:#22c55e!important;color:#fff!important; }
+.btn-stop { background:#ef4444!important;color:#fff!important; }
+.btn-start:disabled{ background:#bbf7d0!important;color:#166534!important; }
+.btn-stop:disabled { background:#fecaca!important;color:#991b1b!important; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .d-flex.flex-wrap.gap-4 {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .number-display {
+    font-size: 3rem;
+    padding: 1rem;
+    min-width: unset;
+  }
+}
+
+.list-group-item.active,
+.process-item.active,
+.list-group-item.active:focus,
+.list-group-item.active:active {
+  background-color: #28a745 !important;
+  color: #fff !important;
+  border-color: #28a745 !important;
+}
+
+.list-group-item.active span,
+.list-group-item.active .badge,
+.process-item.active span,
+.process-item.active .badge {
+  color: #fff !important;
+}
