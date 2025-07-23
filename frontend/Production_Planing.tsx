@@ -348,8 +348,8 @@ export default function MedicalAppointmentDashboard() {
                      selectedRoom.trim() !== "";
       
       // ใช้ค่าเริ่มต้นหากไม่มีการใส่เวลา
-      const finalStartTime = startTime.trim() || "08:00";
-      const finalEndTime = endTime.trim() || "17:00";
+      const finalStartTime = startTime.trim() || "00:00";
+      const finalEndTime = endTime.trim() || "00:00";
       
       // คำนวณลำดับงาน
       const workOrder = calculateWorkOrder(selectedDate, finalStartTime, operators.filter(Boolean).join(", "));
@@ -654,25 +654,33 @@ export default function MedicalAppointmentDashboard() {
 
   // Prefill ข้อมูลเมื่อเปิด modal
   useEffect(() => {
-    if (editDraftModalOpen && editDraftData) {
+    if (editDraftModalOpen && editDraftData && users.length > 0) {
       setEditJobName(editDraftData.job_name || "");
       // operators อาจเป็น string หรือ array
       let operatorNames = ["", "", "", ""];
       if (Array.isArray(editDraftData.operators)) {
         operatorNames = [
-          editDraftData.operators[0]?.name || editDraftData.operators[0] || "",
-          editDraftData.operators[1]?.name || editDraftData.operators[1] || "",
-          editDraftData.operators[2]?.name || editDraftData.operators[2] || "",
-          editDraftData.operators[3]?.name || editDraftData.operators[3] || "",
+          typeof editDraftData.operators[0] === "object"
+            ? editDraftData.operators[0]?.name || ""
+            : editDraftData.operators[0] || "",
+          typeof editDraftData.operators[1] === "object"
+            ? editDraftData.operators[1]?.name || ""
+            : editDraftData.operators[1] || "",
+          typeof editDraftData.operators[2] === "object"
+            ? editDraftData.operators[2]?.name || ""
+            : editDraftData.operators[2] || "",
+          typeof editDraftData.operators[3] === "object"
+            ? editDraftData.operators[3]?.name || ""
+            : editDraftData.operators[3] || "",
         ];
       } else if (typeof editDraftData.operators === "string") {
         try {
           const ops = JSON.parse(editDraftData.operators);
           operatorNames = [
-            ops[0]?.name || ops[0] || "",
-            ops[1]?.name || ops[1] || "",
-            ops[2]?.name || ops[2] || "",
-            ops[3]?.name || ops[3] || "",
+            typeof ops[0] === "object" ? ops[0]?.name || "" : ops[0] || "",
+            typeof ops[1] === "object" ? ops[1]?.name || "" : ops[1] || "",
+            typeof ops[2] === "object" ? ops[2]?.name || "" : ops[2] || "",
+            typeof ops[3] === "object" ? ops[3]?.name || "" : ops[3] || "",
           ];
         } catch {
           operatorNames = ["", "", "", ""];
@@ -709,7 +717,7 @@ export default function MedicalAppointmentDashboard() {
       setEditNote(editDraftData.notes || editDraftData.note || "");
       setEditDate(editDraftData.production_date ? (editDraftData.production_date.split("T")[0]) : "");
     }
-  }, [editDraftModalOpen, editDraftData, machines, rooms]);
+  }, [editDraftModalOpen, editDraftData, users, machines, rooms]);
 
   const handleEditDraft = (draftItem: any) => {
     console.log('✏️ Opening edit modal for draft item:', draftItem);
