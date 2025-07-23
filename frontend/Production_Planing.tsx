@@ -61,8 +61,7 @@ export default function MedicalAppointmentDashboard() {
   const [jobName, setJobName] = useState("");
   const [selectedMachine, setSelectedMachine] = useState("");
 
-  // เพิ่ม state
-  const [onlySendGoogleSheet, setOnlySendGoogleSheet] = useState(false);
+
 
   // set วันปัจจุบันเมื่อเข้าเว็บ
   useEffect(() => {
@@ -862,13 +861,11 @@ export default function MedicalAppointmentDashboard() {
     setIsSubmitting(true);
     setMessage("");
     try {
-      if (!onlySendGoogleSheet) {
-        await fetch("http://192.168.0.94:3101/api/work-plans/sync-drafts-to-plans", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ targetDate: selectedDate })
-        });
-      }
+      await fetch("http://192.168.0.94:3101/api/work-plans/sync-drafts-to-plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetDate: selectedDate })
+      });
       // 1. เตรียมข้อมูล summaryRows สำหรับ 1.ใบสรุปงาน v.4 (ไม่เอา A, B, C, D)
       const defaultCodes = ['A', 'B', 'C', 'D'];
           // ฟังก์ชันแปลงรหัส/ID ห้องเป็นชื่อห้อง
@@ -1457,16 +1454,6 @@ export default function MedicalAppointmentDashboard() {
                       </Button>
                     </div>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="onlySendGoogleSheet"
-                        checked={onlySendGoogleSheet}
-                        onChange={e => setOnlySendGoogleSheet(e.target.checked)}
-                        className="accent-green-600 w-4 h-4"
-                      />
-                      <label htmlFor="onlySendGoogleSheet" className="text-xs text-gray-600 select-none cursor-pointer">
-                        ทดสอบส่ง Google Sheet (ไม่ sync draft)
-                      </label>
                       <Button
                         variant="outline"
                         size="sm"
