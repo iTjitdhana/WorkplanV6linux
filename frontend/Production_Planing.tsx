@@ -1333,29 +1333,29 @@ export default function MedicalAppointmentDashboard() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">เวลาเริ่ม</Label>
-                      <div className="relative">
-                        <Input 
-                          type="text" 
-                          value={startTime} 
-                          onChange={e => setStartTime(e.target.value)} 
-                          className="pl-8 sm:pl-10 text-sm" 
-                          placeholder="08:00" 
-                        />
-                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
-                      </div>
+                      <Select value={startTime} onValueChange={setStartTime}>
+                        <SelectTrigger className="text-sm">
+                          <SelectValue placeholder="เลือกเวลาเริ่ม..." />
+                        </SelectTrigger>
+                        <SelectContent className={notoSansThai.className}>
+                          {timeOptions.map(t => (
+                            <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">เวลาสิ้นสุด</Label>
-                      <div className="relative">
-                        <Input 
-                          type="text" 
-                          value={endTime} 
-                          onChange={e => setEndTime(e.target.value)} 
-                          className="pl-8 sm:pl-10 text-sm" 
-                          placeholder="17:00" 
-                        />
-                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
-                      </div>
+                      <Select value={endTime} onValueChange={setEndTime}>
+                        <SelectTrigger className="text-sm">
+                          <SelectValue placeholder="เลือกเวลาสิ้นสุด..." />
+                        </SelectTrigger>
+                        <SelectContent className={notoSansThai.className}>
+                          {timeOptions.map(t => (
+                            <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
