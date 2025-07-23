@@ -61,7 +61,20 @@ export default function MedicalAppointmentDashboard() {
   const [jobName, setJobName] = useState("");
   const [selectedMachine, setSelectedMachine] = useState("");
 
-
+  // ฟังก์ชันสร้าง array ของเวลา 08:00-18:00 ทีละ 15 นาที
+  const generateTimeOptions = (start = "08:00", end = "18:00", step = 15) => {
+    const pad = n => n.toString().padStart(2, "0");
+    const result = [];
+    let [h, m] = start.split(":").map(Number);
+    const [endH, endM] = end.split(":").map(Number);
+    while (h < endH || (h === endH && m <= endM)) {
+      result.push(`${pad(h)}:${pad(m)}`);
+      m += step;
+      if (m >= 60) { h++; m = m - 60; }
+    }
+    return result;
+  };
+  const timeOptions = generateTimeOptions();
 
   // set วันปัจจุบันเมื่อเข้าเว็บ
   useEffect(() => {
@@ -2093,23 +2106,29 @@ export default function MedicalAppointmentDashboard() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs font-bold text-gray-700">เวลาเริ่ม</Label>
-                  <Input 
-                    type="text" 
-                    value={editStartTime} 
-                    onChange={e => setEditStartTime(e.target.value)} 
-                    className="text-sm h-8" 
-                    placeholder="08:00" 
-                  />
+                  <Select value={editStartTime} onValueChange={setEditStartTime}>
+                    <SelectTrigger className="text-sm h-8">
+                      <SelectValue placeholder="เลือกเวลาเริ่ม..." />
+                    </SelectTrigger>
+                    <SelectContent className={notoSansThai.className}>
+                      {timeOptions.map(t => (
+                        <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs font-bold text-gray-700">เวลาสิ้นสุด</Label>
-                  <Input 
-                    type="text" 
-                    value={editEndTime} 
-                    onChange={e => setEditEndTime(e.target.value)} 
-                    className="text-sm h-8" 
-                    placeholder="17:00" 
-                  />
+                  <Select value={editEndTime} onValueChange={setEditEndTime}>
+                    <SelectTrigger className="text-sm h-8">
+                      <SelectValue placeholder="เลือกเวลาสิ้นสุด..." />
+                    </SelectTrigger>
+                    <SelectContent className={notoSansThai.className}>
+                      {timeOptions.map(t => (
+                        <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               {/* หมายเหตุ */}
