@@ -645,6 +645,13 @@ export default function MedicalAppointmentDashboard() {
   const [editNote, setEditNote] = useState("");
   const [editDate, setEditDate] = useState("");
 
+  // ฟังก์ชัน normalize เวลาให้เป็น HH:mm
+  const normalizeTime = (t) => {
+    if (!t) return "";
+    const [h, m] = t.split(":");
+    return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+  };
+
   // Prefill ข้อมูลเมื่อเปิด modal
   useEffect(() => {
     if (editDraftModalOpen && editDraftData) {
@@ -653,27 +660,27 @@ export default function MedicalAppointmentDashboard() {
       let operatorNames = ["", "", "", ""];
       if (Array.isArray(editDraftData.operators)) {
         operatorNames = [
-          editDraftData.operators[0]?.name || "",
-          editDraftData.operators[1]?.name || "",
-          editDraftData.operators[2]?.name || "",
-          editDraftData.operators[3]?.name || "",
+          editDraftData.operators[0]?.name || editDraftData.operators[0] || "",
+          editDraftData.operators[1]?.name || editDraftData.operators[1] || "",
+          editDraftData.operators[2]?.name || editDraftData.operators[2] || "",
+          editDraftData.operators[3]?.name || editDraftData.operators[3] || "",
         ];
       } else if (typeof editDraftData.operators === "string") {
         try {
           const ops = JSON.parse(editDraftData.operators);
           operatorNames = [
-            ops[0]?.name || "",
-            ops[1]?.name || "",
-            ops[2]?.name || "",
-            ops[3]?.name || "",
+            ops[0]?.name || ops[0] || "",
+            ops[1]?.name || ops[1] || "",
+            ops[2]?.name || ops[2] || "",
+            ops[3]?.name || ops[3] || "",
           ];
         } catch {
           operatorNames = ["", "", "", ""];
         }
       }
       setEditOperators(operatorNames);
-      setEditStartTime(editDraftData.start_time || "");
-      setEditEndTime(editDraftData.end_time || "");
+      setEditStartTime(normalizeTime(editDraftData.start_time) || "");
+      setEditEndTime(normalizeTime(editDraftData.end_time) || "");
       setEditRoom(editDraftData.production_room || editDraftData.production_room_id || "");
       setEditMachine(editDraftData.machine || editDraftData.machine_id || "");
       setEditNote(editDraftData.notes || editDraftData.note || "");
@@ -1407,7 +1414,6 @@ export default function MedicalAppointmentDashboard() {
                         {isSubmitting ? "กำลังบันทึก..." : "บันทึกเสร็จสิ้น"}
                       </Button>
                     </div>
-                    {message && <div className="text-green-700 text-sm mt-2">{message}</div>}
                   </div>
                 </CardContent>
               )}
