@@ -681,12 +681,35 @@ export default function MedicalAppointmentDashboard() {
       setEditOperators(operatorNames);
       setEditStartTime(normalizeTime(editDraftData.start_time) || "");
       setEditEndTime(normalizeTime(editDraftData.end_time) || "");
-      setEditRoom(editDraftData.production_room || editDraftData.production_room_id || "");
-      setEditMachine(editDraftData.machine || editDraftData.machine_id || "");
+
+      // Prefill เครื่องบันทึกข้อมูลการผลิต (machine)
+      let machineCode = "";
+      if (editDraftData.machine_code) {
+        machineCode = editDraftData.machine_code;
+      } else if (editDraftData.machine_id) {
+        const m = machines.find(m => m.id === editDraftData.machine_id || m.id?.toString() === editDraftData.machine_id?.toString());
+        machineCode = m?.machine_code || "";
+      } else if (editDraftData.machine) {
+        machineCode = editDraftData.machine;
+      }
+      setEditMachine(machineCode);
+
+      // Prefill ห้องผลิต (room)
+      let roomCode = "";
+      if (editDraftData.room_code) {
+        roomCode = editDraftData.room_code;
+      } else if (editDraftData.production_room_id) {
+        const r = rooms.find(r => r.id === editDraftData.production_room_id || r.id?.toString() === editDraftData.production_room_id?.toString());
+        roomCode = r?.room_code || "";
+      } else if (editDraftData.production_room) {
+        roomCode = editDraftData.production_room;
+      }
+      setEditRoom(roomCode);
+
       setEditNote(editDraftData.notes || editDraftData.note || "");
       setEditDate(editDraftData.production_date ? (editDraftData.production_date.split("T")[0]) : "");
     }
-  }, [editDraftModalOpen, editDraftData]);
+  }, [editDraftModalOpen, editDraftData, machines, rooms]);
 
   const handleEditDraft = (draftItem: any) => {
     console.log('✏️ Opening edit modal for draft item:', draftItem);
