@@ -14,15 +14,20 @@ const dbConfig = {
   database: process.env.DB_NAME || 'esp_tracker',
   port: process.env.DB_PORT || 3306,
   connectionLimit: 10,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true,
+  // ลบ invalid options ที่ทำให้เกิด warnings
+  // acquireTimeout: 60000,  // ไม่ support ใน mysql2
+  // timeout: 60000,         // ไม่ support ใน mysql2  
+  // reconnect: true,        // ไม่ support ใน mysql2
+  // ใช้ options ที่ถูกต้องแทน
+  idleTimeout: 60000,
+  queueLimit: 0,
   // เพิ่ม options สำหรับแก้ปัญหา connection
   ssl: false,
-  authSwitchHandler: function (data, cb) {
-    if (data.pluginName === 'mysql_native_password') {
+  // ใช้ authPlugins API ใหม่แทน authSwitchHandler ที่ deprecated
+  authPlugins: {
+    mysql_native_password: () => {
       console.log('🔄 Using mysql_native_password authentication');
-      cb(null, Buffer.from(dbConfig.password + '\0'));
+      return Buffer.from(dbConfig.password + '\0');
     }
   }
 };
@@ -47,6 +52,11 @@ const testConnection = async () => {
     console.log('✅ Database connected successfully');
     console.log('🏠 Connected to host:', connection.config.host);
     console.log('👤 Connected as user:', connection.config.user);
+    
+    // ทดสอบ query พื้นฐาน
+    const [rows] = await connection.execute('SELECT 1 as test');
+    console.log('🧪 Database query test:', rows[0].test === 1 ? 'PASSED' : 'FAILED');
+    
     connection.release();
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
@@ -66,6 +76,10 @@ const testConnection = async () => {
       console.log('4. Run this MySQL command as root:');
       console.log(`   GRANT ALL PRIVILEGES ON ${dbConfig.database}.* TO "${dbConfig.user}"@"%" IDENTIFIED BY "${dbConfig.password}";`);
       console.log('   FLUSH PRIVILEGES;');
+      console.log('5. Check if MySQL allows remote connections:');
+      console.log('   Edit /etc/mysql/mysql.conf.d/mysqld.cnf');
+      console.log('   Set: bind-address = 0.0.0.0');
+      console.log('   Then: sudo systemctl restart mysql');
     } else {
       console.log('🚀 PRODUCTION MODE SOLUTIONS:');
       console.log('1. Check if MySQL server is running locally on the server');
@@ -85,6 +99,10 @@ const testConnection = async () => {
     console.log('   DB_PASSWORD=your_mysql_root_password');
     console.log('   DB_NAME=esp_tracker');
     console.log('   NODE_ENV=production');
+    
+    console.log('\n🔧 Quick test commands:');
+    console.log(`   mysql -h ${dbConfig.host} -u ${dbConfig.user} -p ${dbConfig.database}`);
+    console.log(`   telnet ${dbConfig.host} ${dbConfig.port}`);
   }
 };
 
