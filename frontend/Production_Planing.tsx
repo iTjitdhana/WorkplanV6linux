@@ -365,18 +365,7 @@ export default function MedicalAppointmentDashboard() {
       const data = await res.json();
       if (data.success) {
         setMessage(isValid ? "บันทึกเสร็จสิ้น" : "บันทึกแบบร่าง");
-        // reset ฟอร์ม
-        setJobName("");
-        setOperators(["", "", "", ""]);
-        setStartTime("");
-        setEndTime("");
-        setNote("");
-        setSelectedMachine("");
-        setSelectedRoom("");
-        setJobQuery("");
-        setJobCode("");
-        
-        // reload ข้อมูลทั้งหมด
+        resetForm(); // ล้างค่าฟอร์มหลังบันทึกสำเร็จ
         await loadAllProductionData();
       } else {
         setMessage(data.message || "เกิดข้อผิดพลาด");
@@ -387,7 +376,7 @@ export default function MedicalAppointmentDashboard() {
     setIsSubmitting(false);
   };
 
-  // ฟังก์ชันโหลดข้อมูลทั้งหมด
+  // เพิ่มฟังก์ชันโหลดข้อมูลทั้งหมด
   const loadAllProductionData = async () => {
     try {
       if (selectedDate) {
@@ -546,11 +535,9 @@ export default function MedicalAppointmentDashboard() {
         body: JSON.stringify(requestBody),
       });
       const data = await res.json();
-      console.log('📅 Response data:', data);
-      
       setMessage(data.success ? 'บันทึกแบบร่างสำเร็จ' : 'เกิดข้อผิดพลาด');
-      // reload ข้อมูลทั้งหมด
       if (data.success) {
+        resetForm(); // ล้างค่าฟอร์มหลังบันทึกแบบร่างสำเร็จ
         await loadAllProductionData();
       }
     } catch (err) {
@@ -650,28 +637,28 @@ export default function MedicalAppointmentDashboard() {
     if (editDraftModalOpen && editDraftData) {
       setEditJobName(editDraftData.job_name || "");
       // operators อาจเป็น string หรือ array
+      let operatorNames = ["", "", "", ""];
       if (Array.isArray(editDraftData.operators)) {
-        setEditOperators([
+        operatorNames = [
           editDraftData.operators[0]?.name || "",
           editDraftData.operators[1]?.name || "",
           editDraftData.operators[2]?.name || "",
           editDraftData.operators[3]?.name || "",
-        ]);
+        ];
       } else if (typeof editDraftData.operators === "string") {
         try {
           const ops = JSON.parse(editDraftData.operators);
-          setEditOperators([
+          operatorNames = [
             ops[0]?.name || "",
             ops[1]?.name || "",
             ops[2]?.name || "",
             ops[3]?.name || "",
-          ]);
+          ];
         } catch {
-          setEditOperators(["", "", "", ""]);
+          operatorNames = ["", "", "", ""];
         }
-      } else {
-        setEditOperators(["", "", "", ""]);
       }
+      setEditOperators(operatorNames);
       setEditStartTime(editDraftData.start_time || "");
       setEditEndTime(editDraftData.end_time || "");
       setEditRoom(editDraftData.production_room || editDraftData.production_room_id || "");
@@ -1120,6 +1107,19 @@ export default function MedicalAppointmentDashboard() {
     } catch (err) {
       console.warn('Failed to sync work order:', err);
     }
+  };
+
+  // เพิ่มฟังก์ชัน resetForm สำหรับล้างค่าฟอร์ม
+  const resetForm = () => {
+    setJobName("");
+    setOperators(["", "", "", ""]);
+    setStartTime("");
+    setEndTime("");
+    setNote("");
+    setSelectedMachine("");
+    setSelectedRoom("");
+    setJobQuery("");
+    setJobCode("");
   };
 
   return (
@@ -2127,16 +2127,7 @@ export default function MedicalAppointmentDashboard() {
           <DialogFooter className="flex justify-between">
             {/* แสดงปุ่มลบเฉพาะแบบร่างเท่านั้น */}
             {(() => {
-              console.log('🔍 Checking delete button visibility:');
-              console.log('  - editDraftData:', editDraftData);
-              console.log('  - editDraftData?.isDraft:', editDraftData?.isDraft);
-              console.log('  - editDraftData?.id:', editDraftData?.id);
-              console.log('  - editDraftData?.id?.startsWith("draft_"):', editDraftData?.id?.startsWith('draft_'));
-              console.log('  - editDraftId:', editDraftId);
-              
               const shouldShowDelete = editDraftData && (editDraftData.isDraft || editDraftData.id?.startsWith('draft_'));
-              console.log('  - shouldShowDelete:', shouldShowDelete);
-              
               return shouldShowDelete ? (
                 <Button 
                   variant="destructive" 
