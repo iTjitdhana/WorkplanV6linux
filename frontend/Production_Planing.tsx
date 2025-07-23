@@ -331,6 +331,7 @@ export default function MedicalAppointmentDashboard() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setMessage("");
+    console.log("[DEBUG] handleSubmit called");
     try {
       // map operators เป็น object { id_code, name }
       const operatorsToSend = operators
@@ -339,21 +340,18 @@ export default function MedicalAppointmentDashboard() {
           const user = users.find(u => u.name === name);
           return user ? { id_code: user.id_code, name: user.name } : { name };
         });
-      
       // ตรวจสอบว่าข้อมูลครบถ้วนหรือไม่ (เครื่องบันทึกข้อมูลการผลิตไม่เป็น required)
       const isValid = jobName.trim() !== "" && 
                      operators.filter(Boolean).length > 0 && 
                      startTime.trim() !== "" && 
                      endTime.trim() !== "" && 
                      selectedRoom.trim() !== "";
-      
+      console.log("[DEBUG] isValid:", isValid);
       // ใช้ค่าเริ่มต้นหากไม่มีการใส่เวลา
       const finalStartTime = startTime.trim() || "00:00";
       const finalEndTime = endTime.trim() || "00:00";
-      
       // คำนวณลำดับงาน
       const workOrder = calculateWorkOrder(selectedDate, finalStartTime, operators.filter(Boolean).join(", "));
-      
       const requestBody = {
         production_date: selectedDate,
         job_code: jobCode || jobName,
@@ -367,24 +365,22 @@ export default function MedicalAppointmentDashboard() {
         operators: operatorsToSend,
         work_order: workOrder // เพิ่มลำดับงาน
       };
-      
-      console.log('💾 Saving with workflow_status_id:', requestBody.workflow_status_id, 'work_order:', workOrder);
-      
+      console.log("[DEBUG] requestBody:", requestBody);
       const res = await fetch("http://192.168.0.94:3101/api/work-plans/drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
       const data = await res.json();
+      console.log("[DEBUG] API response:", data);
       if (data.success) {
-        setMessage(isValid ? "บันทึกเสร็จสิ้น" : "บันทึกแบบร่าง");
-        resetForm(); // ล้างค่าฟอร์มหลังบันทึกสำเร็จ
+        resetForm();
         await loadAllProductionData();
       } else {
-        setMessage(data.message || "เกิดข้อผิดพลาด");
+        console.warn("[DEBUG] API error message:", data.message);
       }
     } catch (err) {
-      setMessage("เกิดข้อผิดพลาดในการเชื่อมต่อ API");
+      console.error("[DEBUG] API error:", err);
     }
     setIsSubmitting(false);
   };
