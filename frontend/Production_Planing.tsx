@@ -1413,20 +1413,31 @@ export default function MedicalAppointmentDashboard() {
                           ) : (
                             <div className="px-3 py-2 text-gray-500 text-sm">ไม่พบงานผลิตนี้</div>
                           )}
-                          {jobQuery.length > 0 && (
-                            <div className="px-3 py-2 bg-gray-50 border-t">
-                              <button
-                                className="text-green-700 hover:underline text-sm"
-                                onMouseDown={e => { 
-                                  e.preventDefault(); 
-                                  justSelectedFromDropdownRef.current = true;
-                                  handleAddNewJob(); 
-                                }}
-                              >
-                                + เพิ่มรายการใหม่ "{jobQuery}"
-                              </button>
-                            </div>
-                          )}
+                          {(() => {
+                            // ตรวจสอบว่ามีงานที่ตรงกับ jobQuery หรือไม่
+                            const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, "");
+                            const isExactMatch = jobOptions.some(
+                              (opt) =>
+                                normalize(opt.job_name) === normalize(jobQuery) ||
+                                normalize(opt.job_code) === normalize(jobQuery)
+                            );
+                            
+                            // แสดงปุ่มเพิ่มรายการใหม่เฉพาะเมื่อไม่มีงานที่ตรงกัน
+                            return jobQuery.length > 0 && !isExactMatch ? (
+                              <div className="px-3 py-2 bg-gray-50 border-t">
+                                <button
+                                  className="text-green-700 hover:underline text-sm"
+                                  onMouseDown={e => { 
+                                    e.preventDefault(); 
+                                    justSelectedFromDropdownRef.current = true;
+                                    handleAddNewJob(); 
+                                  }}
+                                >
+                                  + เพิ่มรายการใหม่ "{jobQuery}"
+                                </button>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       )}
                     </div>
