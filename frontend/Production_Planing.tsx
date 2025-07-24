@@ -121,17 +121,20 @@ export default function MedicalAppointmentDashboard() {
     }
   }, [jobQuery]);
 
-  // ฟังก์ชันสร้าง job_code ใหม่ (TempXXX)
+  // ฟังก์ชันสร้าง job_code ใหม่ (เลขงานอัตโนมัติ)
   const handleAddNewJob = () => {
-    // หา TempXXX ที่ยังไม่ซ้ำ
-    let idx = 1;
-    let tempCode = "Temp001";
+    // หาเลขงานที่ยังไม่ซ้ำ (เริ่มจาก 1)
+    let jobNumber = 1;
     const allCodes = jobOptions.map(j => j.job_code.toLowerCase());
-    while (allCodes.includes(tempCode.toLowerCase())) {
-      idx++;
-      tempCode = `Temp${idx.toString().padStart(3, "0")}`;
+    
+    // หาเลขงานที่ยังไม่ซ้ำ
+    while (allCodes.includes(jobNumber.toString())) {
+      jobNumber++;
     }
-    setJobCode(tempCode);
+    
+    // สร้าง job_code เป็นเลขงาน
+    const newJobCode = jobNumber.toString();
+    setJobCode(newJobCode);
     setJobName(jobQuery);
     setShowJobDropdown(false);
   };
@@ -199,7 +202,7 @@ export default function MedicalAppointmentDashboard() {
     // กรองงาน A B C D ออกจาก Weekly View
     const defaultCodes = ['A', 'B', 'C', 'D'];
 
-    return productionData
+    const filteredData = productionData
       .filter((item) => {
         const isInWeekRange = item.production_date >= weekStart && item.production_date <= weekEnd;
         const isNotDefaultDraft = !(item.isDraft && defaultCodes.includes(item.job_code));
@@ -223,6 +226,14 @@ export default function MedicalAppointmentDashboard() {
         if (indexB === 0 && indexA !== 0) return 1;
         return operatorA.localeCompare(operatorB);
       });
+    
+    // เพิ่มเลขงานนำหน้าชื่องาน
+    return filteredData.map(item => ({
+      ...item,
+      job_name: item.job_code && !item.job_name.startsWith(item.job_code + ' ')
+        ? `${item.job_code} ${item.job_name}`
+        : item.job_name
+    }));
   }
 
   // Get production data for selected day
@@ -244,8 +255,17 @@ export default function MedicalAppointmentDashboard() {
         ? `${draft.job_code} ${draft.job_name}`
         : draft.job_name
     }));
+    
+    // เพิ่มเลขงานนำหน้าชื่องานอื่นๆ
+    const displayOtherJobs = otherJobs.map(job => ({
+      ...job,
+      job_name: job.job_code && !job.job_name.startsWith(job.job_code + ' ')
+        ? `${job.job_code} ${job.job_name}`
+        : job.job_name
+    }));
+    
     // sort งานอื่นตาม logic เดิม
-    otherJobs.sort((a, b) => {
+    displayOtherJobs.sort((a, b) => {
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
       const timeComparison = timeA.localeCompare(timeB);
@@ -258,7 +278,7 @@ export default function MedicalAppointmentDashboard() {
       if (indexB === 0 && indexA !== 0) return 1;
       return operatorA.localeCompare(operatorB);
     });
-    return [...displayDefaultDrafts, ...otherJobs];
+    return [...displayDefaultDrafts, ...displayOtherJobs];
   };
 
   const weekProduction = getWeekProduction()
@@ -330,6 +350,24 @@ export default function MedicalAppointmentDashboard() {
     return sortedJobs.length + 1;
   }
 
+  // ฟังก์ชันสร้างเลขงานอัตโนมัติ
+  const generateJobCode = () => {
+    // หาเลขงานที่ยังไม่ซ้ำในวันนั้น
+    const dayJobs = productionData.filter(item => 
+      item.production_date === selectedDate
+    );
+    
+    let jobNumber = 1;
+    const existingCodes = dayJobs.map(job => job.job_code);
+    
+    // หาเลขงานที่ยังไม่ซ้ำ
+    while (existingCodes.includes(jobNumber.toString())) {
+      jobNumber++;
+    }
+    
+    return jobNumber.toString();
+  };
+
   // ฟังก์ชัน handle submit
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -353,11 +391,15 @@ export default function MedicalAppointmentDashboard() {
       // ใช้ค่าเริ่มต้นหากไม่มีการใส่เวลา
       const finalStartTime = startTime.trim() || "00:00";
       const finalEndTime = endTime.trim() || "00:00";
+      
+      // สร้างเลขงานอัตโนมัติถ้าไม่มี job_code
+      const finalJobCode = jobCode || generateJobCode();
+      
       // คำนวณลำดับงาน
       const workOrder = calculateWorkOrder(selectedDate, finalStartTime, operators.filter(Boolean).join(", "));
       const requestBody = {
         production_date: selectedDate,
-        job_code: jobCode || jobName,
+        job_code: finalJobCode,
         job_name: jobName || jobQuery,
         start_time: finalStartTime,
         end_time: finalEndTime,
@@ -523,9 +565,12 @@ export default function MedicalAppointmentDashboard() {
       const finalStartTime = startTime.trim();
       const finalEndTime = endTime.trim();
       
+      // สร้างเลขงานอัตโนมัติถ้าไม่มี job_code
+      const finalJobCode = jobCode || generateJobCode();
+      
       const requestBody = {
         production_date: selectedDate,
-        job_code: jobCode || jobName,
+        job_code: finalJobCode,
         job_name: jobName || jobQuery,
         start_time: finalStartTime,
         end_time: finalEndTime,
@@ -1296,6 +1341,17 @@ export default function MedicalAppointmentDashboard() {
                   {/* Autocomplete Job Name/Code */}
                   <div className="space-y-2 relative">
                     <Label className="text-xs sm:text-sm font-bold text-gray-700">เพิ่มงานผลิต (ค้นหาชื่องาน/รหัสงาน)</Label>
+                    
+                    {/* แสดงเลขงานที่สร้างอัตโนมัติ */}
+                    {jobCode && (
+                      <div className="flex items-center space-x-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                        <span className="text-xs sm:text-sm font-medium text-green-700">เลขงาน:</span>
+                        <span className="text-sm sm:text-base font-bold text-green-800 bg-green-100 px-2 py-1 rounded">
+                          {jobCode}
+                        </span>
+                      </div>
+                    )}
+                    
                     <div className="relative">
                       <Input
                         ref={jobInputRef}
