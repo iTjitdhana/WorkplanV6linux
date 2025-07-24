@@ -1457,10 +1457,10 @@ export default function MedicalAppointmentDashboard() {
                         <div key={position} className="space-y-1 sm:space-y-2">
                           <Label className="text-xs text-gray-600">ผู้ปฏิบัติงาน {position}</Label>
                           <Select
-                            value={operators[position - 1]}
+                            value={operators[position - 1] || "__none__"}
                             onValueChange={(val) => {
                               const newOps = [...operators];
-                              newOps[position - 1] = val;
+                              newOps[position - 1] = val === "__none__" ? "" : val;
                               setOperators(newOps);
                             }}
                           >
@@ -1468,7 +1468,7 @@ export default function MedicalAppointmentDashboard() {
                               <SelectValue placeholder="เลือก" />
                             </SelectTrigger>
                             <SelectContent className={notoSansThai.className}>
-                              <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
+                              <SelectItem value="__none__" className={notoSansThai.className}>== เลือก ==</SelectItem>
                               {users.map(u => (
                                 <SelectItem key={u.id_code} value={u.name} className={notoSansThai.className}>{u.name}</SelectItem>
                               ))}
@@ -1483,14 +1483,14 @@ export default function MedicalAppointmentDashboard() {
                   <div className="space-y-3 sm:space-y-4">
                     <Label className="text-xs sm:text-sm font-bold text-gray-700">เครื่องบันทึกข้อมูลการผลิต</Label>
                     <Select
-                      value={selectedMachine}
-                      onValueChange={val => setSelectedMachine(val)}
+                      value={selectedMachine || "__none__"}
+                      onValueChange={val => setSelectedMachine(val === "__none__" ? "" : val)}
                     >
                       <SelectTrigger className="text-sm">
                         <SelectValue placeholder="เลือก..." />
                       </SelectTrigger>
                       <SelectContent className={notoSansThai.className}>
-                        <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
+                        <SelectItem value="__none__" className={notoSansThai.className}>== เลือก ==</SelectItem>
                         {machines.map(m => (
                           <SelectItem key={m.machine_code} value={m.machine_code} className={notoSansThai.className}>{m.machine_name}</SelectItem>
                         ))}
@@ -1543,14 +1543,14 @@ export default function MedicalAppointmentDashboard() {
                   <div className="space-y-2 mt-2">
                     <Label className="text-xs sm:text-sm font-bold text-gray-700">ห้องผลิต</Label>
                     <Select
-                      value={selectedRoom}
-                      onValueChange={val => setSelectedRoom(val)}
+                      value={selectedRoom || "__none__"}
+                      onValueChange={val => setSelectedRoom(val === "__none__" ? "" : val)}
                     >
                       <SelectTrigger className="text-sm">
                         <SelectValue placeholder="เลือกห้องผลิต..." />
                       </SelectTrigger>
                       <SelectContent className={notoSansThai.className}>
-                        <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
+                        <SelectItem value="__none__" className={notoSansThai.className}>== เลือก ==</SelectItem>
                         {rooms.map(r => (
                           <SelectItem key={r.room_code} value={r.room_code} className={notoSansThai.className}>{r.room_name}</SelectItem>
                         ))}
@@ -2182,14 +2182,14 @@ export default function MedicalAppointmentDashboard() {
               <div className="space-y-1">
                 <Label className="text-xs font-bold text-gray-700">เครื่องบันทึกข้อมูลการผลิต</Label>
                 <Select
-                  value={editMachine}
-                  onValueChange={val => setEditMachine(val)}
+                  value={editMachine || "__none__"}
+                  onValueChange={val => setEditMachine(val === "__none__" ? "" : val)}
                 >
                   <SelectTrigger className="text-sm h-8">
                     <SelectValue placeholder="เลือก..." />
                   </SelectTrigger>
                   <SelectContent className={notoSansThai.className}>
-                    <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
+                    <SelectItem value="__none__" className={notoSansThai.className}>== เลือก ==</SelectItem>
                     {machines.map(m => (
                       <SelectItem key={m.machine_code} value={m.machine_code} className={notoSansThai.className}>{m.machine_name}</SelectItem>
                     ))}
@@ -2200,14 +2200,14 @@ export default function MedicalAppointmentDashboard() {
               <div className="space-y-1">
                 <Label className="text-xs font-bold text-gray-700">ห้องผลิต</Label>
                 <Select
-                  value={editRoom}
-                  onValueChange={val => setEditRoom(val)}
+                  value={editRoom || "__none__"}
+                  onValueChange={val => setEditRoom(val === "__none__" ? "" : val)}
                 >
                   <SelectTrigger className="text-sm h-8">
                     <SelectValue placeholder="เลือกห้องผลิต..." />
                   </SelectTrigger>
                   <SelectContent className={notoSansThai.className}>
-                    <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
+                    <SelectItem value="__none__" className={notoSansThai.className}>== เลือก ==</SelectItem>
                     {rooms.map(r => (
                       <SelectItem key={r.room_code} value={r.room_code} className={notoSansThai.className}>{r.room_name}</SelectItem>
                     ))}
@@ -2226,10 +2226,10 @@ export default function MedicalAppointmentDashboard() {
                     <div key={position} className="space-y-1">
                       <Label className="text-xs text-gray-600">ผู้ปฏิบัติงาน {position}</Label>
                       <Select
-                        value={editOperators[position - 1]}
+                        value={editOperators[position - 1] || "__none__"}
                         onValueChange={val => {
                           const newOps = [...editOperators];
-                          newOps[position - 1] = val;
+                          newOps[position - 1] = val === "__none__" ? "" : val;
                           setEditOperators(newOps);
                         }}
                       >
@@ -2237,7 +2237,7 @@ export default function MedicalAppointmentDashboard() {
                           <SelectValue placeholder="เลือก" />
                         </SelectTrigger>
                         <SelectContent className={notoSansThai.className}>
-                          <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
+                          <SelectItem value="__none__" className={notoSansThai.className}>== เลือก ==</SelectItem>
                           {users.map(u => (
                             <SelectItem key={u.id_code} value={u.name} className={notoSansThai.className}>{u.name}</SelectItem>
                           ))}
