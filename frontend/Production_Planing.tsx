@@ -410,11 +410,39 @@ export default function MedicalAppointmentDashboard() {
     return jobNumber.toString();
   };
 
-  // ฟังก์ชัน handle submit
+  const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, "");
+
+  const isJobNameDuplicate = (name: string) => {
+    return jobOptions.some(opt => normalize(opt.job_name) === normalize(name));
+  };
+
+  const isEndTimeAfterStartTime = (start: string, end: string) => {
+    if (!start || !end) return true;
+    return end > start;
+  };
+
   const handleSubmit = async () => {
+    if (isSubmitting) return; // ป้องกัน submit ซ้ำ
     setIsSubmitting(true);
     setMessage("");
-    console.log("[DEBUG] handleSubmit called");
+
+    // Validation
+    if (!jobName.trim()) {
+      setMessage("กรุณากรอกชื่องาน");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!isEndTimeAfterStartTime(startTime, endTime)) {
+      setMessage("เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม");
+      setIsSubmitting(false);
+      return;
+    }
+    if (isJobNameDuplicate(jobName)) {
+      setMessage("ชื่องานนี้มีอยู่แล้ว");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       // map operators เป็น object { id_code, name }
       const operatorsToSend = operators
@@ -472,132 +500,28 @@ export default function MedicalAppointmentDashboard() {
     setIsSubmitting(false);
   };
 
-  // เพิ่มฟังก์ชันโหลดข้อมูลทั้งหมด
-  const loadAllProductionData = async () => {
-    try {
-      if (selectedDate) {
-        await syncWorkOrder(selectedDate);
-      }
-      const [plans, drafts] = await Promise.all([
-        fetch('http://192.168.0.94:3101/api/work-plans').then(res => res.json()),
-        fetch('http://192.168.0.94:3101/api/work-plans/drafts').then(res => res.json())
-      ]);
-      
-      console.log('📋 Loaded drafts:', drafts.data);
-      console.log('📋 Loaded plans:', plans.data);
-      
-      // ตรวจสอบวันที่ใน drafts
-      if (drafts.data && drafts.data.length > 0) {
-        drafts.data.forEach((draft: any, index: number) => {
-          console.log(`📅 Draft ${index + 1}:`, {
-            id: draft.id,
-            production_date: draft.production_date,
-            production_date_type: typeof draft.production_date,
-            job_name: draft.job_name,
-            workflow_status_id: draft.workflow_status_id,
-            workflow_status_id_type: typeof draft.workflow_status_id
-          });
-        });
-      }
-      
-      let allData = [
-        ...(drafts.data || []).map((d: any) => {
-          // Parse operators จาก JSON string
-          let operatorNames = '';
-          try {
-            if (d.operators) {
-              const operators = typeof d.operators === 'string' ? JSON.parse(d.operators) : d.operators;
-              if (Array.isArray(operators)) {
-                operatorNames = operators.map((o: any) => o.name || o).join(', ');
-              }
-            }
-          } catch (e) {
-            console.warn('Error parsing operators:', e);
-            operatorNames = '';
-          }
-          
-          // กำหนดสถานะตาม workflow_status_id
-          let status = 'แบบร่าง';
-          let recordStatus = 'แบบร่าง';
-          
-          if (d.workflow_status_id === 2) {
-            status = 'บันทึกเสร็จสิ้น';
-            recordStatus = 'บันทึกเสร็จสิ้น';
-          } else if (d.workflow_status_id === 1) {
-            status = 'แบบร่าง';
-            recordStatus = 'แบบร่าง';
-          }
-          
-          console.log(`📋 Draft ${d.id} status mapping:`, {
-            workflow_status_id: d.workflow_status_id,
-            status: status,
-            recordStatus: recordStatus
-          });
-          
-          return {
-            ...d,
-            id: `draft_${d.id}`, // เพิ่ม prefix เพื่อแยกจาก plans
-            isDraft: true,
-            production_date: d.production_date,
-            job_name: d.job_name,
-            start_time: d.start_time,
-            end_time: d.end_time,
-            operators: operatorNames,
-            status: status,
-            recordStatus: recordStatus,
-            production_room: d.production_room_id || d.production_room || 'ไม่ระบุ'
-          };
-        }),
-        ...(plans.data || []).map((p: any) => ({
-          ...p,
-          isDraft: false,
-          status: p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status,
-          recordStatus: p.recordStatus === 'แผนจริง' || !p.recordStatus ? 'บันทึกสำเร็จ' : p.recordStatus
-        }))
-      ];
-
-      // === เพิ่มส่วนนี้: ตรวจสอบว่างานไหนมี process step ที่ start อยู่ ===
-      // เฉพาะงานที่ไม่ใช่ draft และมี id จริง
-      console.log('📋 [DEBUG] Checking logs for status updates...');
-      await Promise.all(
-        allData.map(async (item: any) => {
-          if (!item.isDraft && item.id) {
-            try {
-              const logsRes = await fetch(`http://192.168.0.94:3101/api/logs/work-plan/${item.id}`);
-              const logsData = await logsRes.json();
-              const logs = logsData.data || [];
-              // เช็คว่ามี log ไหนที่ start_time มีค่า (ไม่ต้องสนใจ stop_time)
-              const hasStarted = logs.some((log: any) => !!log.start_time);
-              console.log(`📋 [DEBUG] Item ${item.id} (${item.job_name}):`, {
-                originalStatus: item.status_name,
-                hasStarted,
-                logsCount: logs.length
-              });
-              if (hasStarted) {
-                item.status_name = 'กำลังดำเนินการ';
-                item.status_color = '#FFD600'; // สีเหลือง
-              } else {
-                item.status_name = 'รอดำเนินการ';
-                item.status_color = '#BDBDBD'; // สีเทา
-              }
-            } catch (e) {
-              // ignore error
-            }
-          }
-        })
-      );
-      console.log('📋 [DEBUG] Final production data:', allData.map(item => ({ id: item.id, job_name: item.job_name, status_name: item.status_name })));
-      // === END ===
-
-      setProductionData(allData);
-    } catch (error) {
-      console.error('Error loading production data:', error);
-    }
-  };
-
   const handleSaveDraft = async () => {
+    if (isSubmitting) return; // ป้องกัน submit ซ้ำ
     setIsSubmitting(true);
-    setMessage('');
+    setMessage("");
+
+    // Validation
+    if (!jobName.trim()) {
+      setMessage("กรุณากรอกชื่องาน");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!isEndTimeAfterStartTime(startTime, endTime)) {
+      setMessage("เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม");
+      setIsSubmitting(false);
+      return;
+    }
+    if (isJobNameDuplicate(jobName)) {
+      setMessage("ชื่องานนี้มีอยู่แล้ว");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       console.log('📅 Saving draft with date:', selectedDate);
       console.log('📅 selectedDate type:', typeof selectedDate);
@@ -1288,6 +1212,66 @@ export default function MedicalAppointmentDashboard() {
     setSelectedRoom("");
     setJobQuery("");
     setJobCode("");
+  };
+
+  // เพิ่มฟังก์ชันโหลดข้อมูลทั้งหมด
+  const loadAllProductionData = async () => {
+    try {
+      if (selectedDate) {
+        await syncWorkOrder(selectedDate);
+      }
+      const [plans, drafts] = await Promise.all([
+        fetch('http://192.168.0.94:3101/api/work-plans').then(res => res.json()),
+        fetch('http://192.168.0.94:3101/api/work-plans/drafts').then(res => res.json())
+      ]);
+      let allData = [
+        ...(drafts.data || []).map((d: any) => {
+          // Parse operators จาก JSON string
+          let operatorNames = '';
+          try {
+            if (d.operators) {
+              const operators = typeof d.operators === 'string' ? JSON.parse(d.operators) : d.operators;
+              if (Array.isArray(operators)) {
+                operatorNames = operators.map((o: any) => o.name || o).join(', ');
+              }
+            }
+          } catch (e) {
+            operatorNames = '';
+          }
+          let status = 'แบบร่าง';
+          let recordStatus = 'แบบร่าง';
+          if (d.workflow_status_id === 2) {
+            status = 'บันทึกเสร็จสิ้น';
+            recordStatus = 'บันทึกเสร็จสิ้น';
+          } else if (d.workflow_status_id === 1) {
+            status = 'แบบร่าง';
+            recordStatus = 'แบบร่าง';
+          }
+          return {
+            ...d,
+            id: `draft_${d.id}`,
+            isDraft: true,
+            production_date: d.production_date,
+            job_name: d.job_name,
+            start_time: d.start_time,
+            end_time: d.end_time,
+            operators: operatorNames,
+            status: status,
+            recordStatus: recordStatus,
+            production_room: d.production_room_id || d.production_room || 'ไม่ระบุ'
+          };
+        }),
+        ...(plans.data || []).map((p: any) => ({
+          ...p,
+          isDraft: false,
+          status: p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status,
+          recordStatus: p.recordStatus === 'แผนจริง' || !p.recordStatus ? 'บันทึกสำเร็จ' : p.recordStatus
+        }))
+      ];
+      setProductionData(allData);
+    } catch (error) {
+      console.error('Error loading production data:', error);
+    }
   };
 
   return (
