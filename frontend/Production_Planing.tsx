@@ -1313,6 +1313,22 @@ export default function MedicalAppointmentDashboard() {
     });
   };
 
+  // ฟังก์ชันสำหรับ Daily View: แยก defaultDrafts ขึ้นก่อน
+  const getSortedDailyProduction = (jobs: any[]) => {
+    const defaultCodes = ['A', 'B', 'C', 'D'];
+    const defaultDrafts = jobs.filter(j => defaultCodes.includes(j.job_code));
+    const otherJobs = jobs.filter(j => !defaultCodes.includes(j.job_code));
+    return [
+      ...defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code)),
+      ...sortJobsForDisplay(otherJobs)
+    ];
+  };
+  // ฟังก์ชันสำหรับ Weekly View: filter งาน A, B, C, D ออก
+  const getSortedWeeklyProduction = (jobs: any[]) => {
+    const defaultCodes = ['A', 'B', 'C', 'D'];
+    return sortJobsForDisplay(jobs.filter(j => !defaultCodes.includes(j.job_code)));
+  };
+
   return (
     <div className={`min-h-screen bg-green-50/30 ${notoSansThai.className} flex flex-col`}>
       {/* Header */}
@@ -1792,7 +1808,7 @@ export default function MedicalAppointmentDashboard() {
 
                       {(selectedWeekDay ? selectedDayProduction : weekProduction).length > 0 ? (
                         <div className="space-y-1 sm:space-y-2">
-                          {sortJobsForDisplay(selectedWeekDay ? selectedDayProduction : weekProduction).map((item) => (
+                          {getSortedWeeklyProduction(weekProduction).map((item) => (
                             <div
                               key={item.id}
                               className={`border-l-4 ${
@@ -1994,7 +2010,7 @@ export default function MedicalAppointmentDashboard() {
                             งานผลิตวันที่ {formatFullDate(new Date(selectedDate))} จำนวน {dailyProduction.length} งาน
                           </h4>
 
-                          {sortJobsForDisplay(dailyProduction).map((item) => (
+                          {getSortedDailyProduction(dailyProduction).map((item) => (
                             <div
                               key={item.id}
                               className={`border-l-4 ${
