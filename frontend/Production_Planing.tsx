@@ -1129,49 +1129,53 @@ export default function MedicalAppointmentDashboard() {
     setIsSubmitting(false);
   };
 
-  // เพิ่ม useEffect สำหรับ auto-create draft jobs
+  // เพิ่ม useEffect สำหรับ auto-create draft jobs (A, B, C, D) แบบละเอียด
   useEffect(() => {
     if (viewMode !== "daily") return;
     if (!selectedDate || !productionData) return;
-    if (isCreatingRef.current) return; // ป้องกัน trigger ซ้ำ
-    // job list ที่ต้องสร้าง
+    if (isCreatingRef.current) return;
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
       { job_code: 'B', job_name: 'เบิกของส่งสาขา  - สด' },
       { job_code: 'C', job_name: 'เบิกของส่งสาขา  - แห้ง' },
       { job_code: 'D', job_name: 'ตวงสูตร' },
     ];
-    // หาเฉพาะ draft ของวันนั้น
-    const dayDrafts = productionData.filter(
-      item => item.production_date === selectedDate && item.isDraft
-    );
-    // หา draft ที่ยังไม่มีในวันนั้น
-    const missingDrafts = defaultDrafts.filter(draft =>
-      !dayDrafts.some(item => item.job_code === draft.job_code)
-    );
-    if (missingDrafts.length === 0) return;
-    isCreatingRef.current = true;
-    Promise.all(missingDrafts.map(draft =>
-      fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          production_date: selectedDate,
-          job_code: draft.job_code,
-          job_name: draft.job_name,
-          workflow_status_id: 1,
-          operators: [],
-          start_time: '',
-          end_time: '',
-          machine_id: null,
-          production_room_id: null,
-          notes: '',
-        })
-      })
-    )).then(() => {
-      // หลังสร้างเสร็จ reload ข้อมูลใหม่
-      loadAllProductionData();
-    });
+    const createMissingDrafts = async () => {
+      isCreatingRef.current = true;
+      let latestData = productionData;
+      for (const draft of defaultDrafts) {
+        // reload ข้อมูลล่าสุดทุกครั้ง
+        try {
+          await loadAllProductionData();
+        } catch {}
+        latestData = productionData;
+        const dayDrafts = latestData.filter(
+          item => item.production_date === selectedDate && item.isDraft
+        );
+        const exists = dayDrafts.some(item => item.job_code === draft.job_code);
+        if (!exists) {
+          await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              production_date: selectedDate,
+              job_code: draft.job_code,
+              job_name: draft.job_name,
+              workflow_status_id: 1,
+              operators: [],
+              start_time: '',
+              end_time: '',
+              machine_id: null,
+              production_room_id: null,
+              notes: '',
+            })
+          });
+        }
+      }
+      await loadAllProductionData();
+      isCreatingRef.current = false;
+    };
+    createMissingDrafts();
   }, [selectedDate, productionData, viewMode]);
 
   // เพิ่มฟังก์ชัน syncWorkOrder
