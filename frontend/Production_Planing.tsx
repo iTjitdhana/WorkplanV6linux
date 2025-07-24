@@ -592,19 +592,20 @@ export default function MedicalAppointmentDashboard() {
     );
   };
 
-  // Staff image mapping
+  // Staff image mapping (ใช้ id_code เป็น key)
   const staffImages: { [key: string]: string } = {
-    "จรัญ": "/images/จรัญ.jpg",
-    "แมน": "/images/แมน.jpg",
-    "แจ็ค": "/images/แจ็ค.jpg",
-    "ป้าน้อย": "/images/ป้าน้อย.jpg",
-    "พี่ตุ่น": "/images/พี่ตุ่น.jpg",
-    "เอ": "/images/เอ.jpg",
-    "โอเล่": "/images/โอเล่.jpg",
-    "พี่ภา": "/images/พี่ภา.jpg",
-    "อาร์ม": "/images/อาร์ม.jpg",
-    "สาม": "/images/สาม.jpg",
-    // ... เพิ่มชื่ออื่นๆ ตามต้องการ
+    arm: "/images/staff/อาร์ม.jpg",
+    saam: "/images/staff/สาม.jpg",
+    toon: "/images/staff/พี่ตุ่น.jpg",
+    man: "/images/staff/แมน.jpg",
+    sanya: "/images/staff/พี่สัญญา.jpg",
+    noi: "/images/staff/ป้าน้อย.jpg",
+    pha: "/images/staff/พี่ภา.jpg",
+    ae: "/images/staff/เอ.jpg",
+    rd: "/images/staff/RD.jpg",
+    Ola: "/images/staff/โอเล่.jpg",
+    JJ: "/images/staff/จรัญ.jpg",
+    Jak: "/images/staff/แจ็ค.jpg",
   };
 
   // Helper function to render staff avatars
@@ -621,21 +622,26 @@ export default function MedicalAppointmentDashboard() {
     return (
       <div className="flex items-center space-x-2 sm:space-x-3">
         <div className="flex -space-x-2">
-          {staffList.map((person, index) => (
-            <Avatar
-              key={index}
-              className={`${isFormCollapsed ? "w-6 h-6 sm:w-8 sm:h-8" : "w-5 h-5 sm:w-6 sm:h-6"} border-2 border-white`}
-            >
-              <AvatarImage
-                src={staffImages[person] || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
-                alt={person}
-                className="object-cover avatar-image"
-              />
-              <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
-                {person.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
-          ))}
+          {staffList.map((person, index) => {
+            // หา id_code จาก name
+            const user = users.find(u => u.name === person);
+            const idCode = user?.id_code;
+            return (
+              <Avatar
+                key={index}
+                className={`${isFormCollapsed ? "w-6 h-6 sm:w-8 sm:h-8" : "w-5 h-5 sm:w-6 sm:h-6"} border-2 border-white`}
+              >
+                <AvatarImage
+                  src={idCode && staffImages[idCode] ? staffImages[idCode] : `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
+                  alt={person}
+                  className="object-cover avatar-image"
+                />
+                <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
+                  {person.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            );
+          })}
         </div>
         <span className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} text-gray-600 truncate`}>
           ผู้ปฏิบัติงาน: {staff}
