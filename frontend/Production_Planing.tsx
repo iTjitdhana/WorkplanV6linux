@@ -1198,6 +1198,12 @@ export default function MedicalAppointmentDashboard() {
         fetch('http://192.168.0.94:3101/api/work-plans').then(res => res.json()),
         fetch('http://192.168.0.94:3101/api/work-plans/drafts').then(res => res.json())
       ]);
+      // สร้าง map สำหรับ lookup draft ตาม job_code+job_name+production_date
+      const draftMap = new Map();
+      (drafts.data || []).forEach((d: any) => {
+        const key = `${d.production_date}__${d.job_code}__${d.job_name}`;
+        draftMap.set(key, d);
+      });
       let allData = [
         ...(drafts.data || []).map((d: any) => {
           // Parse operators จาก JSON string
@@ -1232,15 +1238,25 @@ export default function MedicalAppointmentDashboard() {
             operators: operatorNames,
             status: status,
             recordStatus: recordStatus,
-            production_room: d.production_room_id || d.production_room || 'ไม่ระบุ'
+            production_room: d.production_room_id || d.production_room || 'ไม่ระบุ',
+            machine_id: d.machine_id || '',
+            notes: d.notes || '',
           };
         }),
-        ...(plans.data || []).map((p: any) => ({
-          ...p,
-          isDraft: false,
-          status: p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status,
-          recordStatus: p.recordStatus === 'แผนจริง' || !p.recordStatus ? 'บันทึกสำเร็จ' : p.recordStatus
-        }))
+        ...(plans.data || []).map((p: any) => {
+          // Workaround: หา draft ที่ตรงกันมาเติมข้อมูลห้อง/เครื่อง/หมายเหตุ
+          const key = `${p.production_date}__${p.job_code}__${p.job_name}`;
+          const draft = draftMap.get(key);
+          return {
+            ...p,
+            isDraft: false,
+            status: p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status,
+            recordStatus: p.recordStatus === 'แผนจริง' || !p.recordStatus ? 'บันทึกสำเร็จ' : p.recordStatus,
+            production_room: (draft && (draft.production_room_id || draft.production_room)) || p.production_room || 'ไม่ระบุ',
+            machine_id: (draft && draft.machine_id) || p.machine_id || '',
+            notes: (draft && draft.notes) || p.notes || '',
+          };
+        })
       ];
       setProductionData(allData);
       isCreatingRef.current = false; // reset flag หลังโหลดข้อมูลเสร็จ
