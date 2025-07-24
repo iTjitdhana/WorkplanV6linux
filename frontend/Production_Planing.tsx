@@ -32,6 +32,9 @@ const notoSansThai = Noto_Sans_Thai({
   weight: ["300", "400", "500", "600", "700"],
 })
 
+// ===== ฟังก์ชันช่วยเช็ค prefix เลขงาน (ต้องอยู่บนสุดของไฟล์) =====
+const hasJobNumberPrefix = (name: string) => /^([A-D]|\d+)\s/.test(name);
+
 export default function MedicalAppointmentDashboard() {
   const [selectedDate, setSelectedDate] = useState("2025-07-16")
   const [searchTerm, setSearchTerm] = useState("")
@@ -1273,9 +1276,6 @@ export default function MedicalAppointmentDashboard() {
 
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
-
-  // ===== ฟังก์ชันช่วยเช็ค prefix เลขงาน (ต้องอยู่บนสุดของ component) =====
-  const hasJobNumberPrefix = (name: string) => /^([A-D]|\d+)\s/.test(name);
 
   return (
     <div className={`min-h-screen bg-green-50/30 ${notoSansThai.className} flex flex-col`}>
