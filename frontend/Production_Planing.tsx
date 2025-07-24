@@ -61,6 +61,7 @@ export default function MedicalAppointmentDashboard() {
   const [jobName, setJobName] = useState("");
   const [selectedMachine, setSelectedMachine] = useState("");
   const justSelectedFromDropdownRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isCreatingRef = useRef(false); // <--- ย้ายมาอยู่นอก useEffect
 
@@ -126,21 +127,40 @@ export default function MedicalAppointmentDashboard() {
       return;
     }
 
+    // ยกเลิก request เก่า
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
     const timeoutId = setTimeout(() => {
-      fetch(`http://192.168.0.94:3101/api/process-steps/search?query=${encodeURIComponent(jobQuery)}`)
+      // สร้าง AbortController ใหม่
+      abortControllerRef.current = new AbortController();
+      
+      fetch(`http://192.168.0.94:3101/api/process-steps/search?query=${encodeURIComponent(jobQuery)}`, {
+        signal: abortControllerRef.current.signal
+      })
         .then(res => res.json())
         .then(data => {
           setJobOptions(data.data || []);
           setShowJobDropdown(true);
         })
         .catch(err => {
-          console.error('Error fetching job options:', err);
-          setJobOptions([]);
-          setShowJobDropdown(false);
+          // ไม่ log error ถ้าเป็น AbortError
+          if (err.name !== 'AbortError') {
+            console.error('Error fetching job options:', err);
+            setJobOptions([]);
+            setShowJobDropdown(false);
+          }
         });
-    }, 100); // ลด debounce เป็น 100ms ให้เร็วขึ้น
+    }, 50); // ลด debounce เป็น 50ms ให้เร็วขึ้น
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      // ยกเลิก request เมื่อ component unmount หรือ dependency เปลี่ยน
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [jobQuery]);
 
   // ฟังก์ชันสร้าง job_code ใหม่ (เลขงานอัตโนมัติ)
