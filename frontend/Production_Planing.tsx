@@ -1468,6 +1468,7 @@ export default function MedicalAppointmentDashboard() {
                               <SelectValue placeholder="เลือก" />
                             </SelectTrigger>
                             <SelectContent className={notoSansThai.className}>
+                              <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
                               {users.map(u => (
                                 <SelectItem key={u.id_code} value={u.name} className={notoSansThai.className}>{u.name}</SelectItem>
                               ))}
@@ -1489,6 +1490,7 @@ export default function MedicalAppointmentDashboard() {
                         <SelectValue placeholder="เลือก..." />
                       </SelectTrigger>
                       <SelectContent className={notoSansThai.className}>
+                        <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
                         {machines.map(m => (
                           <SelectItem key={m.machine_code} value={m.machine_code} className={notoSansThai.className}>{m.machine_name}</SelectItem>
                         ))}
@@ -1548,6 +1550,7 @@ export default function MedicalAppointmentDashboard() {
                         <SelectValue placeholder="เลือกห้องผลิต..." />
                       </SelectTrigger>
                       <SelectContent className={notoSansThai.className}>
+                        <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
                         {rooms.map(r => (
                           <SelectItem key={r.room_code} value={r.room_code} className={notoSansThai.className}>{r.room_name}</SelectItem>
                         ))}
@@ -2186,6 +2189,7 @@ export default function MedicalAppointmentDashboard() {
                     <SelectValue placeholder="เลือก..." />
                   </SelectTrigger>
                   <SelectContent className={notoSansThai.className}>
+                    <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
                     {machines.map(m => (
                       <SelectItem key={m.machine_code} value={m.machine_code} className={notoSansThai.className}>{m.machine_name}</SelectItem>
                     ))}
@@ -2203,6 +2207,7 @@ export default function MedicalAppointmentDashboard() {
                     <SelectValue placeholder="เลือกห้องผลิต..." />
                   </SelectTrigger>
                   <SelectContent className={notoSansThai.className}>
+                    <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
                     {rooms.map(r => (
                       <SelectItem key={r.room_code} value={r.room_code} className={notoSansThai.className}>{r.room_name}</SelectItem>
                     ))}
@@ -2232,6 +2237,7 @@ export default function MedicalAppointmentDashboard() {
                           <SelectValue placeholder="เลือก" />
                         </SelectTrigger>
                         <SelectContent className={notoSansThai.className}>
+                          <SelectItem value="" className={notoSansThai.className}>== เลือก ==</SelectItem>
                           {users.map(u => (
                             <SelectItem key={u.id_code} value={u.name} className={notoSansThai.className}>{u.name}</SelectItem>
                           ))}
