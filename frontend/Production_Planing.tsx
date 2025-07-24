@@ -514,9 +514,9 @@ export default function MedicalAppointmentDashboard() {
       console.log('📅 selectedDate type:', typeof selectedDate);
       console.log('📅 selectedDate value:', selectedDate);
       
-      // ใช้ค่าเริ่มต้นหากไม่มีการใส่เวลา
-      const finalStartTime = startTime.trim() || "08:00";
-      const finalEndTime = endTime.trim() || "17:00";
+      // ไม่ใส่ค่า default ถ้าไม่ได้กรอก
+      const finalStartTime = startTime.trim();
+      const finalEndTime = endTime.trim();
       
       const requestBody = {
         production_date: selectedDate,
