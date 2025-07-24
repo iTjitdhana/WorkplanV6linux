@@ -592,6 +592,21 @@ export default function MedicalAppointmentDashboard() {
     );
   };
 
+  // Staff image mapping
+  const staffImages: { [key: string]: string } = {
+    "จรัญ": "/images/จรัญ.jpg",
+    "แมน": "/images/แมน.jpg",
+    "แจ็ค": "/images/แจ็ค.jpg",
+    "ป้าน้อย": "/images/ป้าน้อย.jpg",
+    "พี่ตุ่น": "/images/พี่ตุ่น.jpg",
+    "เอ": "/images/เอ.jpg",
+    "โอเล่": "/images/โอเล่.jpg",
+    "พี่ภา": "/images/พี่ภา.jpg",
+    "อาร์ม": "/images/อาร์ม.jpg",
+    "สาม": "/images/สาม.jpg",
+    // ... เพิ่มชื่ออื่นๆ ตามต้องการ
+  };
+
   // Helper function to render staff avatars
   const renderStaffAvatars = (staff: string, isFormCollapsed: boolean) => {
     if (!staff) {
@@ -604,14 +619,18 @@ export default function MedicalAppointmentDashboard() {
     const staffList = staff.split(", ");
 
     return (
-      <div className="flex items-center space-x-1 sm:space-x-2">
-        <div className="flex -space-x-1">
+      <div className="flex items-center space-x-2 sm:space-x-3">
+        <div className="flex -space-x-2">
           {staffList.map((person, index) => (
             <Avatar
               key={index}
               className={`${isFormCollapsed ? "w-6 h-6 sm:w-8 sm:h-8" : "w-5 h-5 sm:w-6 sm:h-6"} border-2 border-white`}
             >
-              <AvatarImage src={`/placeholder.svg?height=32&width=32&text=${person.charAt(0)}`} />
+              <AvatarImage
+                src={staffImages[person] || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
+                alt={person}
+                className="object-cover avatar-image"
+              />
               <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
                 {person.charAt(0)}
               </AvatarFallback>
