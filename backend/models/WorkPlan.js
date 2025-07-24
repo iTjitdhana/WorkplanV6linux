@@ -473,21 +473,31 @@ class DraftWorkPlan {
           
           // สร้าง work plan ใหม่
           let insertQuery, insertParams;
-          
-          // ตรวจสอบว่ามี status_id column หรือไม่
+          // ตรวจสอบว่ามี status_id และ is_special column หรือไม่
           const [columns] = await connection.execute(`
             SELECT COLUMN_NAME 
             FROM INFORMATION_SCHEMA.COLUMNS 
             WHERE TABLE_SCHEMA = DATABASE() 
             AND TABLE_NAME = 'work_plans' 
-            AND COLUMN_NAME = 'status_id'
+            AND COLUMN_NAME IN ('status_id', 'is_special')
           `);
-          
-          const hasStatusColumn = columns.length > 0;
-          console.log('🔄 Has status_id column:', hasStatusColumn);
-          
-          if (hasStatusColumn) {
-            // มี status_id column
+          const hasStatusColumn = columns.some(col => col.COLUMN_NAME === 'status_id');
+          const hasIsSpecialColumn = columns.some(col => col.COLUMN_NAME === 'is_special');
+          console.log('🔄 Has status_id column:', hasStatusColumn, 'Has is_special column:', hasIsSpecialColumn);
+          if (hasStatusColumn && hasIsSpecialColumn) {
+            // มี status_id และ is_special column
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special) VALUES (?, ?, ?, ?, ?, ?, ?)';
+            insertParams = [
+              draft.production_date, 
+              jobCode, 
+              jobName, 
+              draft.start_time, 
+              draft.end_time,
+              isSpecialJob ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialJob ? 1 : 0   // is_special
+            ];
+          } else if (hasStatusColumn) {
+            // มี status_id column อย่างเดียว
             insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id) VALUES (?, ?, ?, ?, ?, ?)';
             insertParams = [
               draft.production_date, 
