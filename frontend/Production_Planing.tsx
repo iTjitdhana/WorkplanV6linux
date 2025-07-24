@@ -1407,7 +1407,7 @@ export default function MedicalAppointmentDashboard() {
                                   jobInputRef.current?.blur();
                                 }}
                               >
-                                <span className="font-bold">{opt.job_code}</span> <span className="text-gray-600">{opt.job_name}</span>
+                                <span className="font-bold text-gray-800">{opt.job_name} {opt.job_code}</span>
                               </div>
                             ))
                           ) : (
