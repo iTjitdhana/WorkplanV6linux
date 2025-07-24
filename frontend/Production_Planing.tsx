@@ -1132,7 +1132,7 @@ export default function MedicalAppointmentDashboard() {
   // เพิ่ม useEffect สำหรับ auto-create draft jobs (A, B, C, D) แบบละเอียด
   useEffect(() => {
     if (viewMode !== "daily") return;
-    if (!selectedDate || !productionData) return;
+    if (!selectedDate) return;
     if (isCreatingRef.current) return;
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
@@ -1142,16 +1142,14 @@ export default function MedicalAppointmentDashboard() {
     ];
     const createMissingDrafts = async () => {
       isCreatingRef.current = true;
-      let latestData = productionData;
+      await loadAllProductionData(); // reload ข้อมูลล่าสุด 1 ครั้ง
+      const latestData = productionData;
+      const dayJobs = latestData.filter(item => item.production_date === selectedDate);
+      console.log('[AUTO-DRAFT] dayJobs:', dayJobs.map(j => `${j.job_code} ${j.job_name}`));
       for (const draft of defaultDrafts) {
-        try {
-          await loadAllProductionData();
-        } catch {}
-        latestData = productionData;
-        // เช็คซ้ำละเอียด: job_code และ job_name ต้องไม่ซ้ำในวันนั้น
-        const dayJobs = latestData.filter(item => item.production_date === selectedDate);
         const exists = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name);
         if (!exists) {
+          console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
           await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1168,13 +1166,15 @@ export default function MedicalAppointmentDashboard() {
               notes: '',
             })
           });
+        } else {
+          console.log(`[AUTO-DRAFT] Already exists: ${draft.job_code} ${draft.job_name}`);
         }
       }
       await loadAllProductionData();
       isCreatingRef.current = false;
     };
     createMissingDrafts();
-  }, [selectedDate, productionData, viewMode]);
+  }, [selectedDate, viewMode]); // ไม่ใส่ productionData ใน dependency
 
   // เพิ่มฟังก์ชัน syncWorkOrder
   const syncWorkOrder = async (date: string) => {
