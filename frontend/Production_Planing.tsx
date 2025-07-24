@@ -265,29 +265,19 @@ export default function MedicalAppointmentDashboard() {
         if (indexB === 0 && indexA !== 0) return 1;
         return operatorA.localeCompare(operatorB);
       });
-    // prefix เฉพาะถ้ายังไม่มี prefix
-    return filteredData.map((item, index) => ({
-      ...item,
-      job_name: hasJobNumberPrefix(item.job_name) ? item.job_name : `${index + 1} ${item.job_name}`
-    }));
+    // ไม่เติม prefix ใด ๆ
+    return filteredData;
   };
 
   // Get production data for selected day
   const getSelectedDayProduction = () => {
-    // ใช้ selectedDate สำหรับ Daily View และ selectedWeekDay สำหรับ Weekly View
     const targetDate = viewMode === "daily" ? selectedDate : selectedWeekDay;
     if (!targetDate) return [];
-    
-    // job list ที่ต้องขึ้นก่อน
     const defaultCodes = ['A', 'B', 'C', 'D'];
     const dayData = productionData.filter(item => item.production_date === targetDate);
-    // งาน draft 4 งานนี้
     let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
-    // งานอื่นๆ
     const otherJobs = dayData.filter(item => !(item.isDraft && defaultCodes.includes(item.job_code)));
-    // sort งาน draft 4 งานนี้ตามลำดับ code
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
-    // sort งานอื่นตาม logic เดิม
     otherJobs.sort((a, b) => {
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
@@ -301,20 +291,8 @@ export default function MedicalAppointmentDashboard() {
       if (indexB === 0 && indexA !== 0) return 1;
       return operatorA.localeCompare(operatorB);
     });
-    
-    // แสดงงาน Default เป็น A, B, C, D
-    const displayDefaultDrafts = defaultDrafts.map(draft => ({
-      ...draft,
-      job_name: hasJobNumberPrefix(draft.job_name) ? draft.job_name : `${draft.job_code} ${draft.job_name}`
-    }));
-    
-    // แสดงงานอื่นๆ เป็น 1, 2, 3, 4, 5...
-    const displayOtherJobs = otherJobs.map((job, index) => ({
-      ...job,
-      job_name: hasJobNumberPrefix(job.job_name) ? job.job_name : `${index + 1} ${job.job_name}`
-    }));
-    
-    return [...displayDefaultDrafts, ...displayOtherJobs];
+    // ไม่เติม prefix ใด ๆ
+    return [...defaultDrafts, ...otherJobs];
   };
 
   const weekProduction = getWeekProduction()
@@ -1274,39 +1252,9 @@ export default function MedicalAppointmentDashboard() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
 
-  // เพิ่มฟังก์ชันแปลงชื่อแสดงผลงาน
+  // ฟังก์ชันแปลงชื่อแสดงผลงาน (ลบ prefix เลขลำดับออก)
   const getDisplayJobName = (item: any, jobsOfDay: any[]) => {
-    const defaultCodes = ['A', 'B', 'C', 'D'];
-    if (defaultCodes.includes(item.job_code)) {
-      if (item.job_name && item.job_name.trim().startsWith(item.job_code + ' ')) {
-        return item.job_name;
-      }
-      return `${item.job_code} ${item.job_name}`;
-    }
-    const isSpecial = item.status_id === 10 || (typeof item.job_code === 'string' && item.job_code.includes('งานพิเศษ'));
-    let normalCount = 0, specialCount = 0, normalIndex = 0, specialIndex = 0;
-    jobsOfDay.forEach((j: any) => {
-      if (defaultCodes.includes(j.job_code)) return;
-      if (j.status_id === 10 || (typeof j.job_code === 'string' && j.job_code.includes('งานพิเศษ'))) {
-        specialCount++;
-        if (j.id === item.id) specialIndex = specialCount;
-      } else {
-        normalCount++;
-        if (j.id === item.id) normalIndex = normalCount;
-      }
-    });
-    // ป้องกัน prefix ซ้ำ
-    if (isSpecial) {
-      if (item.job_name && /^งานพิเศษที่ \d+ /.test(item.job_name)) {
-        return item.job_name;
-      }
-      return `งานพิเศษที่ ${specialIndex} ${item.job_name}`;
-    } else {
-      if (item.job_name && /^งานที่ \d+ /.test(item.job_name)) {
-        return item.job_name;
-      }
-      return `งานที่ ${normalIndex} ${item.job_name}`;
-    }
+    return item.job_name;
   };
 
   // เพิ่มฟังก์ชันเรียงลำดับงานแบบเดียวกับ Draft
