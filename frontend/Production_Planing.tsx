@@ -60,7 +60,7 @@ export default function MedicalAppointmentDashboard() {
   const jobInputRef = useRef<HTMLInputElement>(null);
   const [jobName, setJobName] = useState("");
   const [selectedMachine, setSelectedMachine] = useState("");
-
+  const justSelectedFromDropdownRef = useRef(false);
 
   const isCreatingRef = useRef(false); // <--- ย้ายมาอยู่นอก useEffect
 
@@ -113,6 +113,12 @@ export default function MedicalAppointmentDashboard() {
 
   // Autocomplete job name/code
   useEffect(() => {
+    // ไม่เรียก API ถ้าเพิ่งเลือกจาก dropdown
+    if (justSelectedFromDropdownRef.current) {
+      justSelectedFromDropdownRef.current = false;
+      return;
+    }
+
     // เพิ่ม debounce และ minimum length
     if (jobQuery.length < 1) {
       setShowJobDropdown(false);
@@ -1355,7 +1361,7 @@ export default function MedicalAppointmentDashboard() {
                           setJobQuery(e.target.value);
                         }}
                         onFocus={() => {
-                          if (jobQuery.length > 0 && jobOptions.length > 0) {
+                          if (jobQuery.length > 0 && jobOptions.length > 0 && !justSelectedFromDropdownRef.current) {
                             setShowJobDropdown(true);
                           }
                         }}
@@ -1372,6 +1378,7 @@ export default function MedicalAppointmentDashboard() {
                                 key={opt.job_code + idx}
                                 className="px-3 py-2 hover:bg-green-100 cursor-pointer text-sm"
                                 onClick={() => {
+                                  justSelectedFromDropdownRef.current = true;
                                   setJobCode(opt.job_code);
                                   setJobName(opt.job_name);
                                   setJobQuery(opt.job_name);
@@ -1392,6 +1399,7 @@ export default function MedicalAppointmentDashboard() {
                                 className="text-green-700 hover:underline text-sm"
                                 onMouseDown={e => { 
                                   e.preventDefault(); 
+                                  justSelectedFromDropdownRef.current = true;
                                   handleAddNewJob(); 
                                 }}
                               >
