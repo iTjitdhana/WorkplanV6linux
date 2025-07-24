@@ -195,10 +195,15 @@ export default function MedicalAppointmentDashboard() {
   const getWeekProduction = () => {
     const weekStart = weekDates[0].toISOString().split("T")[0]
     const weekEnd = weekDates[6].toISOString().split("T")[0]
+    
+    // กรองงาน A B C D ออกจาก Weekly View
+    const defaultCodes = ['A', 'B', 'C', 'D'];
 
     return productionData
       .filter((item) => {
-        return item.production_date >= weekStart && item.production_date <= weekEnd
+        const isInWeekRange = item.production_date >= weekStart && item.production_date <= weekEnd;
+        const isNotDefaultDraft = !(item.isDraft && defaultCodes.includes(item.job_code));
+        return isInWeekRange && isNotDefaultDraft;
       })
       .sort((a, b) => {
         // เรียงตามวันที่ก่อน
@@ -1126,6 +1131,10 @@ export default function MedicalAppointmentDashboard() {
   useEffect(() => {
     if (viewMode !== "daily") return;
     if (!selectedDate || !productionData) return;
+    
+    // ป้องกันการสร้างซ้ำโดยใช้ ref
+    const isCreatingRef = { current: false };
+    
     // job list ที่ต้องสร้าง
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
@@ -1133,15 +1142,22 @@ export default function MedicalAppointmentDashboard() {
       { job_code: 'C', job_name: 'เบิกของส่งสาขา  - แห้ง' },
       { job_code: 'D', job_name: 'ตวงสูตร' },
     ];
+    
     // หาเฉพาะ draft ของวันนั้น
     const dayDrafts = productionData.filter(
       item => item.production_date === selectedDate && item.isDraft
     );
+    
     // หา draft ที่ยังไม่มีในวันนั้น
     const missingDrafts = defaultDrafts.filter(draft =>
       !dayDrafts.some(item => item.job_code === draft.job_code)
     );
-    if (missingDrafts.length === 0) return;
+    
+    if (missingDrafts.length === 0 || isCreatingRef.current) return;
+    
+    // ป้องกันการสร้างซ้ำ
+    isCreatingRef.current = true;
+    
     // สร้าง draft ที่ขาด
     Promise.all(missingDrafts.map(draft =>
       fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
@@ -1163,6 +1179,9 @@ export default function MedicalAppointmentDashboard() {
     )).then(() => {
       // reload ข้อมูลใหม่หลังสร้าง
       loadAllProductionData();
+      isCreatingRef.current = false;
+    }).catch(() => {
+      isCreatingRef.current = false;
     });
   }, [viewMode, selectedDate, productionData]);
 
