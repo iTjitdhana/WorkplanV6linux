@@ -634,7 +634,7 @@ export default function MedicalAppointmentDashboard() {
             return (
               <Avatar
                 key={index}
-                className={`${isFormCollapsed ? "w-6 h-6 sm:w-8 sm:h-8" : "w-5 h-5 sm:w-6 sm:h-6"} border-2 border-white`}
+                className={`${isFormCollapsed ? "w-10 h-10 sm:w-14 sm:h-14" : "w-8 h-8 sm:w-10 sm:h-10"} border-2 border-white`}
               >
                 <AvatarImage
                   src={idCode && staffImages[idCode] ? staffImages[idCode] : `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
