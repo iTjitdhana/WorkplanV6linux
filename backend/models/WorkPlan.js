@@ -454,12 +454,11 @@ class DraftWorkPlan {
             [draft.production_date]
           );
           
-          const isSpecialJob = existingPlans[0].count > 0;
+          const isDefaultJob = ['A', 'B', 'C', 'D'].includes(draft.job_code);
+          const isSpecialJob = existingPlans[0].count > 0 && !isDefaultJob;
           let jobCode = draft.job_code;
           let jobName = draft.job_name;
-          
-          // ถ้ามีงานในวันนั้นแล้ว ให้เปลี่ยนเป็นงานพิเศษ
-          if (isSpecialJob) {
+          if (!isDefaultJob && isSpecialJob) {
             const specialJobNumber = existingPlans[0].count + 1;
             jobCode = `งานพิเศษ ${specialJobNumber}`;
             jobName = `${draft.job_name} (งานพิเศษ ${specialJobNumber})`;
