@@ -426,9 +426,12 @@ export default function MedicalAppointmentDashboard() {
     setIsSubmitting(true);
     setMessage("");
 
-    // Validation
-    if (!jobName.trim()) {
-      setMessage("กรุณากรอกชื่องาน");
+    // Validation เฉพาะบันทึกเสร็จสิ้น (workflow_status_id = 2)
+    const requiredFields = [jobName.trim(), startTime.trim(), endTime.trim(), selectedRoom && selectedRoom !== "__none__"];
+    const hasOperator = operators.filter(op => op && op !== "__none__").length > 0;
+    if (requiredFields.includes("") || !hasOperator) {
+      setErrorDialogMessage("กรุณาใส่ข้อมูล");
+      setShowErrorDialog(true);
       setIsSubmitting(false);
       return;
     }
@@ -1273,6 +1276,9 @@ export default function MedicalAppointmentDashboard() {
       console.error('Error loading production data:', error);
     }
   };
+
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorDialogMessage, setErrorDialogMessage] = useState("");
 
   return (
     <div className={`min-h-screen bg-green-50/30 ${notoSansThai.className} flex flex-col`}>
@@ -2293,6 +2299,18 @@ export default function MedicalAppointmentDashboard() {
                 {isSubmitting ? "กำลังบันทึก..." : "บันทึก"}
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+        <DialogContent className="max-w-xs text-center">
+          <DialogHeader>
+            <DialogTitle>ข้อผิดพลาด</DialogTitle>
+          </DialogHeader>
+          <div className="mb-4">{errorDialogMessage}</div>
+          <DialogFooter>
+            <Button onClick={() => setShowErrorDialog(false)} className="w-full">ตกลง</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
