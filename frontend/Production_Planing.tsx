@@ -113,7 +113,7 @@ export default function MedicalAppointmentDashboard() {
   // Autocomplete job name/code
   useEffect(() => {
     // เพิ่ม debounce และ minimum length
-    if (jobQuery.length < 2) {
+    if (jobQuery.length < 1) {
       setShowJobDropdown(false);
       setJobOptions([]);
       return;
@@ -131,7 +131,7 @@ export default function MedicalAppointmentDashboard() {
           setJobOptions([]);
           setShowJobDropdown(false);
         });
-    }, 300); // debounce 300ms
+    }, 150); // ลด debounce เป็น 150ms ให้เร็วขึ้น
 
     return () => clearTimeout(timeoutId);
   }, [jobQuery]);
@@ -1307,7 +1307,7 @@ export default function MedicalAppointmentDashboard() {
                   {!isFormCollapsed && (
                     <CardTitle className="flex items-center space-x-2 text-sm sm:text-base md:text-lg">
                       <User className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                      <span>เพิ่มงานที่ต้องการผลิต</span>
+                      <span>เพิ่มรายการใหม่</span>
                     </CardTitle>
                   )}
                   <Button
@@ -1343,12 +1343,12 @@ export default function MedicalAppointmentDashboard() {
 
                   {/* Autocomplete Job Name/Code */}
                   <div className="space-y-2 relative">
-                    <Label className="text-xs sm:text-sm font-bold text-gray-700">เพิ่มงานผลิต (ค้นหาชื่องาน/รหัสงาน)</Label>
+                    <Label className="text-xs sm:text-sm font-bold text-gray-700">ค้นหารายการ (พิมพ์เพื่อค้นหา)</Label>
                     
                     <div className="relative">
                       <Input
                         ref={jobInputRef}
-                        placeholder="ค้นหาชื่องานผลิต หรือรหัสงาน..."
+                        placeholder="พิมพ์เพื่อค้นหา..."
                         value={jobQuery}
                         onChange={e => {
                           setJobQuery(e.target.value);
@@ -1356,8 +1356,8 @@ export default function MedicalAppointmentDashboard() {
                           setJobCode("");
                         }}
                         onFocus={() => setShowJobDropdown(jobQuery.length > 0)}
-                        onBlur={() => setTimeout(() => setShowJobDropdown(false), 100)}
-                        className="pl-8 sm:pl-10 text-sm"
+                        onBlur={() => setTimeout(() => setShowJobDropdown(false), 150)}
+                        className="pl-8 sm:pl-10 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                         autoComplete="off"
                       />
                       <Search className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
@@ -1395,7 +1395,7 @@ export default function MedicalAppointmentDashboard() {
                                   className="text-green-700 hover:underline text-sm"
                                   onMouseDown={e => { e.preventDefault(); handleAddNewJob(); }}
                                 >
-                                  + เพิ่มสินค้าใหม่ "{jobQuery}"
+                                  + เพิ่มรายการใหม่ "{jobQuery}"
                                 </button>
                               </div>
                             ) : null;
