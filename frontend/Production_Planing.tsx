@@ -362,7 +362,7 @@ export default function MedicalAppointmentDashboard() {
     let jobNumber = 1;
     const existingCodes = dayJobs.map(job => job.job_code);
     
-    // หาเลขงานที่ยังไม่ซ้ำ
+    // หาเลขงานที่ยังไม่ซ้ำ (เริ่มจาก 1, 2, 3, 4, 5...)
     while (existingCodes.includes(jobNumber.toString())) {
       jobNumber++;
     }
@@ -1331,16 +1331,6 @@ export default function MedicalAppointmentDashboard() {
                   {/* Autocomplete Job Name/Code */}
                   <div className="space-y-2 relative">
                     <Label className="text-xs sm:text-sm font-bold text-gray-700">เพิ่มงานผลิต (ค้นหาชื่องาน/รหัสงาน)</Label>
-                    
-                    {/* แสดงเลขงานที่สร้างอัตโนมัติ */}
-                    {jobCode && (
-                      <div className="flex items-center space-x-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                        <span className="text-xs sm:text-sm font-medium text-green-700">เลขงาน:</span>
-                        <span className="text-sm sm:text-base font-bold text-green-800 bg-green-100 px-2 py-1 rounded">
-                          {jobCode}
-                        </span>
-                      </div>
-                    )}
                     
                     <div className="relative">
                       <Input
