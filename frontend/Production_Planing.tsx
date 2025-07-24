@@ -618,6 +618,9 @@ export default function MedicalAppointmentDashboard() {
       );
     }
     const staffList = staff.split(", ");
+    // DEBUG LOGS
+    console.log('users:', users);
+    console.log('staffList:', staffList);
 
     return (
       <div className="flex items-center space-x-2 sm:space-x-3">
@@ -626,6 +629,8 @@ export default function MedicalAppointmentDashboard() {
             // หา id_code จาก name
             const user = users.find(u => u.name === person);
             const idCode = user?.id_code;
+            console.log('user found:', user, 'idCode:', idCode);
+            console.log('image path:', idCode && staffImages[idCode]);
             return (
               <Avatar
                 key={index}
