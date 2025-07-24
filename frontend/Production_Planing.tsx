@@ -240,10 +240,13 @@ export default function MedicalAppointmentDashboard() {
 
   // Get production data for selected day
   const getSelectedDayProduction = () => {
-    if (!selectedWeekDay) return [];
+    // ใช้ selectedDate สำหรับ Daily View และ selectedWeekDay สำหรับ Weekly View
+    const targetDate = viewMode === "daily" ? selectedDate : selectedWeekDay;
+    if (!targetDate) return [];
+    
     // job list ที่ต้องขึ้นก่อน
     const defaultCodes = ['A', 'B', 'C', 'D'];
-    const dayData = productionData.filter(item => item.production_date === selectedWeekDay);
+    const dayData = productionData.filter(item => item.production_date === targetDate);
     // งาน draft 4 งานนี้
     let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
     // งานอื่นๆ
@@ -1904,35 +1907,8 @@ export default function MedicalAppointmentDashboard() {
 
                     {/* Get production data for selected date */}
                     {(() => {
-                      const dailyProduction = productionData
-                        .filter((item) => {
-                          // แปลง production_date ให้เป็น YYYY-MM-DD format
-                          const itemDate = item.production_date ? item.production_date.split('T')[0] : '';
-                          console.log('🔍 Daily View Filter:', {
-                            selectedDate,
-                            itemDate,
-                            rawProductionDate: item.production_date,
-                            jobName: item.job_name,
-                            match: itemDate === selectedDate
-                          });
-                          return itemDate === selectedDate;
-                        })
-                        .sort((a, b) => {
-                          // เรียงตามเวลาเริ่ม
-                          const timeA = a.start_time || "00:00"
-                          const timeB = b.start_time || "00:00"
-                          const timeComparison = timeA.localeCompare(timeB)
-                          if (timeComparison !== 0) return timeComparison
-                          
-                          // หากเวลาเริ่มเหมือนกัน เรียงตามผู้ปฏิบัติงานคนที่ 1 ที่มีตัวอักษร "อ" ตำแหน่งแรก
-                          const operatorA = (a.operators || "").split(", ")[0] || ""
-                          const operatorB = (b.operators || "").split(", ")[0] || ""
-                          const indexA = operatorA.indexOf("อ")
-                          const indexB = operatorB.indexOf("อ")
-                          if (indexA === 0 && indexB !== 0) return -1
-                          if (indexB === 0 && indexA !== 0) return 1
-                          return operatorA.localeCompare(operatorB)
-                        });
+                      // ใช้ getSelectedDayProduction() แทนการ filter โดยตรง เพื่อให้แสดงเลขงาน A B C D
+                      const dailyProduction = getSelectedDayProduction();
                       
                       console.log('📅 Daily Production Results:', {
                         selectedDate,
