@@ -145,13 +145,13 @@ export default function MedicalAppointmentDashboard() {
         .then(res => res.json())
         .then(data => {
           setJobOptions(data.data || []);
-          setShowJobDropdown(true);
+      setShowJobDropdown(true);
         })
         .catch(err => {
           // ไม่ log error ถ้าเป็น AbortError
           if (err.name !== 'AbortError') {
             console.error('Error fetching job options:', err);
-            setJobOptions([]);
+      setJobOptions([]);
             setShowJobDropdown(false);
           }
         });
@@ -645,8 +645,8 @@ export default function MedicalAppointmentDashboard() {
             console.log('user found:', user, 'idCode:', idCode);
             console.log('image path:', idCode && staffImages[idCode]);
             return (
-              <Avatar
-                key={index}
+            <Avatar
+              key={index}
                 className={`${isFormCollapsed ? "w-9 h-9 sm:w-12 h-12" : "w-7 h-7 sm:w-9 h-9"} border-2 border-white`}
               >
                 <AvatarImage
@@ -654,10 +654,10 @@ export default function MedicalAppointmentDashboard() {
                   alt={person}
                   className="object-cover avatar-image"
                 />
-                <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
-                  {person.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
+              <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
+                {person.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
             );
           })}
         </div>
@@ -1154,20 +1154,20 @@ export default function MedicalAppointmentDashboard() {
         const exists = dayJobs.some(item => item.job_code === draft.job_code);
         if (!exists) {
           await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              production_date: selectedDate,
-              job_code: draft.job_code,
-              job_name: draft.job_name,
-              workflow_status_id: 1,
-              operators: [],
-              start_time: '',
-              end_time: '',
-              machine_id: null,
-              production_room_id: null,
-              notes: '',
-            })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          production_date: selectedDate,
+          job_code: draft.job_code,
+          job_name: draft.job_name,
+          workflow_status_id: 1,
+          operators: [],
+          start_time: '',
+          end_time: '',
+          machine_id: null,
+          production_room_id: null,
+          notes: '',
+        })
           });
         }
       }
@@ -1270,6 +1270,34 @@ export default function MedicalAppointmentDashboard() {
 
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
+
+  // เพิ่มฟังก์ชันแปลงชื่อแสดงผลงาน
+  const getDisplayJobName = (item, jobsOfDay) => {
+    const defaultCodes = ['A', 'B', 'C', 'D'];
+    // งาน Default
+    if (defaultCodes.includes(item.job_code)) {
+      return `${item.job_code} ${item.job_name}`;
+    }
+    // งานพิเศษ (status_id == 10 หรือ job_code มีคำว่า 'งานพิเศษ')
+    const isSpecial = item.status_id === 10 || (typeof item.job_code === 'string' && item.job_code.includes('งานพิเศษ'));
+    // หา running number ของแต่ละประเภทในวันนั้น
+    let normalCount = 0, specialCount = 0, normalIndex = 0, specialIndex = 0;
+    jobsOfDay.forEach((j) => {
+      if (defaultCodes.includes(j.job_code)) return;
+      if (j.status_id === 10 || (typeof j.job_code === 'string' && j.job_code.includes('งานพิเศษ'))) {
+        specialCount++;
+        if (j.id === item.id) specialIndex = specialCount;
+      } else {
+        normalCount++;
+        if (j.id === item.id) normalIndex = normalCount;
+      }
+    });
+    if (isSpecial) {
+      return `งานพิเศษที่ ${specialIndex} ${item.job_name}`;
+    } else {
+      return `งานที่ ${normalIndex} ${item.job_name}`;
+    }
+  };
 
   return (
     <div className={`min-h-screen bg-green-50/30 ${notoSansThai.className} flex flex-col`}>
@@ -1785,7 +1813,7 @@ export default function MedicalAppointmentDashboard() {
                                           : "text-xs sm:text-sm md:text-base"
                                       } truncate`}
                                     >
-                                      {item.job_name}
+                                      {getDisplayJobName(item, selectedWeekDay ? selectedDayProduction : weekProduction)}
                                     </h3>
                                     <Badge
                                       variant="outline"
@@ -1987,7 +2015,7 @@ export default function MedicalAppointmentDashboard() {
                                           : "text-xs sm:text-sm md:text-base"
                                       } truncate`}
                                     >
-                                      {item.job_name}
+                                      {getDisplayJobName(item, selectedDayProduction)}
                                     </h3>
                                     <Badge
                                       variant="outline"
