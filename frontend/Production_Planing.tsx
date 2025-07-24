@@ -1149,10 +1149,9 @@ export default function MedicalAppointmentDashboard() {
           await loadAllProductionData();
         } catch {}
         latestData = productionData;
-        const dayDrafts = latestData.filter(
-          item => item.production_date === selectedDate && item.isDraft
-        );
-        const exists = dayDrafts.some(item => item.job_code === draft.job_code);
+        // เช็คซ้ำทั้งใน draft และ plan จริง (productionData ทั้งหมดในวันนั้น)
+        const dayJobs = latestData.filter(item => item.production_date === selectedDate);
+        const exists = dayJobs.some(item => item.job_code === draft.job_code);
         if (!exists) {
           await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
             method: 'POST',
