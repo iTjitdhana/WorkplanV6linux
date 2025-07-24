@@ -1270,7 +1270,7 @@ export default function MedicalAppointmentDashboard() {
                         onChange={(e) => setSelectedDate(e.target.value)}
                         className="pl-8 sm:pl-10 text-sm"
                       />
-                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                      {/* <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" /> */}
                     </div>
                   </div>
 
