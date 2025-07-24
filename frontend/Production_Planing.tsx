@@ -1291,9 +1291,16 @@ export default function MedicalAppointmentDashboard() {
         if (j.id === item.id) normalIndex = normalCount;
       }
     });
+    // ป้องกัน prefix ซ้ำ
     if (isSpecial) {
+      if (item.job_name && /^งานพิเศษที่ \d+ /.test(item.job_name)) {
+        return item.job_name;
+      }
       return `งานพิเศษที่ ${specialIndex} ${item.job_name}`;
     } else {
+      if (item.job_name && /^งานที่ \d+ /.test(item.job_name)) {
+        return item.job_name;
+      }
       return `งานที่ ${normalIndex} ${item.job_name}`;
     }
   };
