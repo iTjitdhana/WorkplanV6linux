@@ -1133,6 +1133,7 @@ export default function MedicalAppointmentDashboard() {
   useEffect(() => {
     if (viewMode !== "daily") return;
     if (!selectedDate || !productionData) return;
+    if (isCreatingRef.current) return; // ป้องกัน trigger ซ้ำ
     // job list ที่ต้องสร้าง
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
@@ -1148,7 +1149,7 @@ export default function MedicalAppointmentDashboard() {
     const missingDrafts = defaultDrafts.filter(draft =>
       !dayDrafts.some(item => item.job_code === draft.job_code)
     );
-    if (missingDrafts.length === 0 || isCreatingRef.current) return;
+    if (missingDrafts.length === 0) return;
     isCreatingRef.current = true;
     Promise.all(missingDrafts.map(draft =>
       fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
@@ -1168,12 +1169,10 @@ export default function MedicalAppointmentDashboard() {
         })
       })
     )).then(() => {
+      // หลังสร้างเสร็จ reload ข้อมูลใหม่
       loadAllProductionData();
-      isCreatingRef.current = false;
-    }).catch(() => {
-      isCreatingRef.current = false;
     });
-  }, [viewMode, selectedDate, productionData]);
+  }, [selectedDate, productionData, viewMode]);
 
   // เพิ่มฟังก์ชัน syncWorkOrder
   const syncWorkOrder = async (date: string) => {
@@ -1260,6 +1259,7 @@ export default function MedicalAppointmentDashboard() {
         }))
       ];
       setProductionData(allData);
+      isCreatingRef.current = false; // reset flag หลังโหลดข้อมูลเสร็จ
     } catch (error) {
       console.error('Error loading production data:', error);
     }
