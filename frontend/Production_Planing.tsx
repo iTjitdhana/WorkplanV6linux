@@ -1142,16 +1142,12 @@ export default function MedicalAppointmentDashboard() {
     ];
     const createMissingDrafts = async () => {
       isCreatingRef.current = true;
-      await loadAllProductionData(); // reload productionData (ต้องรวมทั้ง draft และ workplans จริง)
+      await loadAllProductionData();
       const latestData = productionData;
       const dayJobs = latestData.filter(item => item.production_date === selectedDate);
-      // log debug
-      console.log('[AUTO-DRAFT] dayJobs:', dayJobs.map(j => `${j.job_code} ${j.job_name} [isDraft:' + j.isDraft + ']' ));
       for (const draft of defaultDrafts) {
-        // เช็คซ้ำทั้ง draft และ workplans จริง
         const exists = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name);
         if (!exists) {
-          // ห้ามสร้างซ้ำถ้าในวันนั้นมี A, B, C, D ใน workplans จริงแล้ว
           const existsInPlan = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name && !item.isDraft);
           if (existsInPlan) {
             console.log(`[AUTO-DRAFT] Already exists in plan: ${draft.job_code} ${draft.job_name}`);
