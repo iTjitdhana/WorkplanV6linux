@@ -112,15 +112,28 @@ export default function MedicalAppointmentDashboard() {
 
   // Autocomplete job name/code
   useEffect(() => {
-    if (jobQuery.length > 0) {
-      fetch(`http://192.168.0.94:3101/api/process-steps/search?query=${encodeURIComponent(jobQuery)}`)
-        .then(res => res.json())
-        .then(data => setJobOptions(data.data || []));
-      setShowJobDropdown(true);
-    } else {
+    // เพิ่ม debounce และ minimum length
+    if (jobQuery.length < 2) {
       setShowJobDropdown(false);
       setJobOptions([]);
+      return;
     }
+
+    const timeoutId = setTimeout(() => {
+      fetch(`http://192.168.0.94:3101/api/process-steps/search?query=${encodeURIComponent(jobQuery)}`)
+        .then(res => res.json())
+        .then(data => {
+          setJobOptions(data.data || []);
+          setShowJobDropdown(true);
+        })
+        .catch(err => {
+          console.error('Error fetching job options:', err);
+          setJobOptions([]);
+          setShowJobDropdown(false);
+        });
+    }, 300); // debounce 300ms
+
+    return () => clearTimeout(timeoutId);
   }, [jobQuery]);
 
   // ฟังก์ชันสร้าง job_code ใหม่ (เลขงานอัตโนมัติ)
