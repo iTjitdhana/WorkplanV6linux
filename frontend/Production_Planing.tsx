@@ -1252,9 +1252,31 @@ export default function MedicalAppointmentDashboard() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
 
-  // ฟังก์ชันแปลงชื่อแสดงผลงาน (ลบ prefix เลขลำดับออก)
+  // ฟังก์ชันแปลงชื่อแสดงผลงาน (เติม prefix เฉพาะตอนแสดงผลเท่านั้น)
   const getDisplayJobName = (item: any, jobsOfDay: any[]) => {
-    return item.job_name;
+    const defaultCodes = ['A', 'B', 'C', 'D'];
+    // งานรหัส A, B, C, D แสดงชื่อจริง
+    if (defaultCodes.includes(item.job_code)) {
+      return item.job_name;
+    }
+    // งานพิเศษ (status_id === 10 หรือ job_code มีคำว่า 'งานพิเศษ')
+    const isSpecial = item.status_id === 10 || (typeof item.job_code === 'string' && item.job_code.includes('งานพิเศษ'));
+    let normalCount = 0, specialCount = 0, normalIndex = 0, specialIndex = 0;
+    jobsOfDay.forEach((j: any) => {
+      if (defaultCodes.includes(j.job_code)) return;
+      if (j.status_id === 10 || (typeof j.job_code === 'string' && j.job_code.includes('งานพิเศษ'))) {
+        specialCount++;
+        if (j.id === item.id) specialIndex = specialCount;
+      } else {
+        normalCount++;
+        if (j.id === item.id) normalIndex = normalCount;
+      }
+    });
+    if (isSpecial) {
+      return `งานพิเศษที่ ${specialIndex} ${item.job_name}`;
+    } else {
+      return `งานที่ ${normalIndex} ${item.job_name}`;
+    }
   };
 
   // เพิ่มฟังก์ชันเรียงลำดับงานแบบเดียวกับ Draft
