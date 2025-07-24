@@ -1298,6 +1298,21 @@ export default function MedicalAppointmentDashboard() {
     }
   };
 
+  // เพิ่มฟังก์ชันเรียงลำดับงานแบบเดียวกับ Draft
+  const sortJobsForDisplay = (jobs: any[]) => {
+    return [...jobs].sort((a, b) => {
+      // เรียงตามเวลาเริ่ม
+      const timeA = a.start_time || "00:00";
+      const timeB = b.start_time || "00:00";
+      const timeComparison = timeA.localeCompare(timeB);
+      if (timeComparison !== 0) return timeComparison;
+      // ถ้าเวลาเท่ากัน เรียงตามชื่อผู้ปฏิบัติงานคนแรก
+      const opA = (a.operators || "").split(", ")[0] || "";
+      const opB = (b.operators || "").split(", ")[0] || "";
+      return opA.localeCompare(opB);
+    });
+  };
+
   return (
     <div className={`min-h-screen bg-green-50/30 ${notoSansThai.className} flex flex-col`}>
       {/* Header */}
@@ -1777,7 +1792,7 @@ export default function MedicalAppointmentDashboard() {
 
                       {(selectedWeekDay ? selectedDayProduction : weekProduction).length > 0 ? (
                         <div className="space-y-1 sm:space-y-2">
-                          {(selectedWeekDay ? selectedDayProduction : weekProduction).map((item) => (
+                          {sortJobsForDisplay(selectedWeekDay ? selectedDayProduction : weekProduction).map((item) => (
                             <div
                               key={item.id}
                               className={`border-l-4 ${
@@ -1979,7 +1994,7 @@ export default function MedicalAppointmentDashboard() {
                             งานผลิตวันที่ {formatFullDate(new Date(selectedDate))} จำนวน {dailyProduction.length} งาน
                           </h4>
 
-                          {dailyProduction.map((item) => (
+                          {sortJobsForDisplay(dailyProduction).map((item) => (
                             <div
                               key={item.id}
                               className={`border-l-4 ${
