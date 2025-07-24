@@ -311,13 +311,13 @@ export default function MedicalAppointmentDashboard() {
     // แสดงงาน Default เป็น A, B, C, D
     const displayDefaultDrafts = defaultDrafts.map(draft => ({
       ...draft,
-      job_name: `${draft.job_code} ${draft.job_name}`
+      job_name: hasJobNumberPrefix(draft.job_name) ? draft.job_name : `${draft.job_code} ${draft.job_name}`
     }));
     
     // แสดงงานอื่นๆ เป็น 1, 2, 3, 4, 5...
     const displayOtherJobs = otherJobs.map((job, index) => ({
       ...job,
-      job_name: `${index + 1} ${job.job_name}`
+      job_name: hasJobNumberPrefix(job.job_name) ? job.job_name : `${index + 1} ${job.job_name}`
     }));
     
     return [...displayDefaultDrafts, ...displayOtherJobs];
@@ -1279,6 +1279,9 @@ export default function MedicalAppointmentDashboard() {
 
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
+
+  // ฟังก์ชันช่วยเช็ค prefix เลขงาน
+  const hasJobNumberPrefix = (name: string) => /^([A-D]|\d+)\s/.test(name);
 
   return (
     <div className={`min-h-screen bg-green-50/30 ${notoSansThai.className} flex flex-col`}>
@@ -2296,7 +2299,7 @@ export default function MedicalAppointmentDashboard() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setEditDraftModalOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
               <Button onClick={handleSaveEditDraft} disabled={isSubmitting} className="bg-green-700 hover:bg-green-800 text-white">
-                {isSubmitting ? "กำลังบันทึก..." : "บันทึก"}
+                {isSubmitting ? "กำลังบันทึก..." : "บันทึกเสร็จสิ้น"}
               </Button>
             </div>
           </DialogFooter>
