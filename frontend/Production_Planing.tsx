@@ -1313,20 +1313,65 @@ export default function MedicalAppointmentDashboard() {
     });
   };
 
-  // ฟังก์ชันสำหรับ Daily View: แยก defaultDrafts ขึ้นก่อน
+  // ฟังก์ชันสำหรับ Daily View: งานปกติเรียงก่อน งานพิเศษต่อท้าย
   const getSortedDailyProduction = (jobs: any[]) => {
     const defaultCodes = ['A', 'B', 'C', 'D'];
+    // งาน default (A,B,C,D)
     const defaultDrafts = jobs.filter(j => defaultCodes.includes(j.job_code));
-    const otherJobs = jobs.filter(j => !defaultCodes.includes(j.job_code));
+    // งานพิเศษ
+    const specialJobs = jobs.filter(j => j.status_id === 10 || (typeof j.job_code === 'string' && j.job_code.includes('งานพิเศษ')) && !defaultCodes.includes(j.job_code));
+    // งานปกติ (ไม่ใช่ default, ไม่ใช่งานพิเศษ)
+    const normalJobs = jobs.filter(j => !defaultCodes.includes(j.job_code) && !(j.status_id === 10 || (typeof j.job_code === 'string' && j.job_code.includes('งานพิเศษ'))));
+    // เรียงแต่ละกลุ่ม
+    defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
+    const sortFn = (a: any, b: any) => {
+      const timeA = a.start_time || "00:00";
+      const timeB = b.start_time || "00:00";
+      const timeComparison = timeA.localeCompare(timeB);
+      if (timeComparison !== 0) return timeComparison;
+      const opA = (a.operators || "").split(", ")[0] || "";
+      const opB = (b.operators || "").split(", ")[0] || "";
+      const indexA = opA.indexOf("อ");
+      const indexB = opB.indexOf("อ");
+      if (indexA === 0 && indexB !== 0) return -1;
+      if (indexB === 0 && indexA !== 0) return 1;
+      return opA.localeCompare(opB);
+    };
+    normalJobs.sort(sortFn);
+    specialJobs.sort(sortFn);
     return [
-      ...defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code)),
-      ...sortJobsForDisplay(otherJobs)
+      ...defaultDrafts,
+      ...normalJobs,
+      ...specialJobs
     ];
   };
-  // ฟังก์ชันสำหรับ Weekly View: filter งาน A, B, C, D ออก
+
+  // ฟังก์ชันสำหรับ Weekly View: งานปกติเรียงก่อน งานพิเศษต่อท้าย
   const getSortedWeeklyProduction = (jobs: any[]) => {
     const defaultCodes = ['A', 'B', 'C', 'D'];
-    return sortJobsForDisplay(jobs.filter(j => !defaultCodes.includes(j.job_code)));
+    // งานพิเศษ
+    const specialJobs = jobs.filter(j => j.status_id === 10 || (typeof j.job_code === 'string' && j.job_code.includes('งานพิเศษ')) && !defaultCodes.includes(j.job_code));
+    // งานปกติ (ไม่ใช่ default, ไม่ใช่งานพิเศษ)
+    const normalJobs = jobs.filter(j => !defaultCodes.includes(j.job_code) && !(j.status_id === 10 || (typeof j.job_code === 'string' && j.job_code.includes('งานพิเศษ'))));
+    const sortFn = (a: any, b: any) => {
+      const timeA = a.start_time || "00:00";
+      const timeB = b.start_time || "00:00";
+      const timeComparison = timeA.localeCompare(timeB);
+      if (timeComparison !== 0) return timeComparison;
+      const opA = (a.operators || "").split(", ")[0] || "";
+      const opB = (b.operators || "").split(", ")[0] || "";
+      const indexA = opA.indexOf("อ");
+      const indexB = opB.indexOf("อ");
+      if (indexA === 0 && indexB !== 0) return -1;
+      if (indexB === 0 && indexA !== 0) return 1;
+      return opA.localeCompare(opB);
+    };
+    normalJobs.sort(sortFn);
+    specialJobs.sort(sortFn);
+    return [
+      ...normalJobs,
+      ...specialJobs
+    ];
   };
 
   return (
