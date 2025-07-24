@@ -1274,7 +1274,7 @@ export default function MedicalAppointmentDashboard() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
 
-  // ฟังก์ชันช่วยเช็ค prefix เลขงาน (ย้ายขึ้นบนสุดของ component)
+  // ===== ฟังก์ชันช่วยเช็ค prefix เลขงาน (ต้องอยู่บนสุดของ component) =====
   const hasJobNumberPrefix = (name: string) => /^([A-D]|\d+)\s/.test(name);
 
   return (
