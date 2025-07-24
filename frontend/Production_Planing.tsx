@@ -867,7 +867,7 @@ export default function MedicalAppointmentDashboard() {
     return isValid;
   };
 
-  const handleSaveEditDraft = async () => {
+  const handleSaveEditDraft = async (isDraft = false) => {
     if (!editDraftData) return;
     setIsSubmitting(true);
     setMessage("");
@@ -879,16 +879,13 @@ export default function MedicalAppointmentDashboard() {
           const user = users.find(u => u.name === name);
           return user ? { id_code: user.id_code, name: user.name } : { name };
         });
-      
       const isValid = validateEditDraft();
-      const workflowStatusId = isValid ? 2 : 1; // 2 = บันทึกเสร็จสิ้น, 1 = แบบร่าง
-      
-      console.log('💾 Saving edit draft:');
-      console.log('  - Validation result:', isValid);
-      console.log('  - Workflow status ID:', workflowStatusId);
-      console.log('  - Machine ID:', machines.find(m => m.machine_code === editMachine)?.id);
-      console.log('  - Room ID:', rooms.find(r => r.room_code === editRoom)?.id);
-      
+      const workflowStatusId = isDraft ? 1 : (isValid ? 2 : 1); // 2 = บันทึกเสร็จสิ้น, 1 = แบบร่าง
+      if (!isDraft && !isValid) {
+        setMessage("กรุณากรอกข้อมูลให้ครบถ้วน");
+        setIsSubmitting(false);
+        return;
+      }
       const requestBody = {
         production_date: editDate,
         job_code: editDraftData.job_code,
@@ -901,9 +898,6 @@ export default function MedicalAppointmentDashboard() {
         workflow_status_id: workflowStatusId,
         operators: operatorsToSend
       };
-      
-      console.log('  - Request body:', requestBody);
-      
       const res = await fetch(`http://192.168.0.94:3101/api/work-plans/drafts/${editDraftData.id.replace('draft_', '')}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -911,7 +905,7 @@ export default function MedicalAppointmentDashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        setMessage("บันทึกแบบร่างสำเร็จ");
+        setMessage(isDraft ? "บันทึกแบบร่างสำเร็จ" : "บันทึกเสร็จสิ้น");
         setEditDraftModalOpen(false);
         await loadAllProductionData();
       } else {
@@ -2298,7 +2292,8 @@ export default function MedicalAppointmentDashboard() {
             })()}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setEditDraftModalOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
-              <Button onClick={handleSaveEditDraft} disabled={isSubmitting} className="bg-green-700 hover:bg-green-800 text-white">
+              <Button variant="outline" onClick={() => handleSaveEditDraft(true)} disabled={isSubmitting}>บันทึกแบบร่าง</Button>
+              <Button onClick={() => handleSaveEditDraft(false)} disabled={isSubmitting} className="bg-green-700 hover:bg-green-800 text-white">
                 {isSubmitting ? "กำลังบันทึก..." : "บันทึกเสร็จสิ้น"}
               </Button>
             </div>
