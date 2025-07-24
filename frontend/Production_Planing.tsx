@@ -1447,9 +1447,9 @@ export default function MedicalAppointmentDashboard() {
                   <div className="space-y-3 sm:space-y-4">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">ผู้ปฏิบัติงาน (1-4 คน)</Label>
-                      <Button variant="link" size="sm" className="text-green-600 p-0 h-auto text-xs">
+                      {/* <Button variant="link" size="sm" className="text-green-600 p-0 h-auto text-xs">
                         ล้างข้อมูลทั้งหมด
-                      </Button>
+                      </Button> */}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
