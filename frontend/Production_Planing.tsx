@@ -36,7 +36,7 @@ export default function MedicalAppointmentDashboard() {
   const [selectedDate, setSelectedDate] = useState("2025-07-16")
   const [searchTerm, setSearchTerm] = useState("")
   const [currentWeek, setCurrentWeek] = useState(new Date())
-  const [viewMode, setViewMode] = useState<"daily" | "weekly">("weekly")
+  const [viewMode, setViewMode] = useState<"daily" | "weekly">("daily")
   const [isFormCollapsed, setIsFormCollapsed] = useState(false)
   const [selectedWeekDay, setSelectedWeekDay] = useState<string | null>(null)
 
