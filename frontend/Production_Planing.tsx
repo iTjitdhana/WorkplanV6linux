@@ -949,7 +949,7 @@ export default function MedicalAppointmentDashboard() {
         return [
           idx + 1, // ลำดับ
           item.job_code || "",
-          item.job_name || "",
+          item.job_name || "", // ใช้ชื่อจริงเท่านั้น
           ops[0],
           ops[1],
           ops[2],
@@ -987,8 +987,8 @@ export default function MedicalAppointmentDashboard() {
           logRows.push([
             dateString, // วันที่
             dateValue, // Date Value
-            item.job_code || "", // เลขที่งาน
-            item.job_name || "", // ชื่องาน
+            item.job_code || "", // เลขที่งาน (รหัสจริง)
+            item.job_name || "", // ชื่องาน (ชื่อจริง)
             "", // ผู้ปฏิบัติงาน (ว่าง)
             item.start_time || "", // เวลาเริ่มต้น
             item.end_time || "", // เวลาสิ้นสุด
@@ -1000,8 +1000,8 @@ export default function MedicalAppointmentDashboard() {
             logRows.push([
               dateString, // วันที่
               dateValue, // Date Value
-              item.job_code || "", // เลขที่งาน
-              item.job_name || "", // ชื่องาน
+              item.job_code || "", // เลขที่งาน (รหัสจริง)
+              item.job_name || "", // ชื่องาน (ชื่อจริง)
               operator, // ผู้ปฏิบัติงาน
               item.start_time || "", // เวลาเริ่มต้น
               item.end_time || "", // เวลาสิ้นสุด
