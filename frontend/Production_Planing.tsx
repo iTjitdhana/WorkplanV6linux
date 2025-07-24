@@ -63,7 +63,7 @@ export default function MedicalAppointmentDashboard() {
 
   // ฟังก์ชันสร้าง array ของเวลา 08:00-18:00 ทีละ 15 นาที
   const generateTimeOptions = (start = "08:00", end = "18:00", step = 15) => {
-    const pad = n => n.toString().padStart(2, "0");
+    const pad = (n: number) => n.toString().padStart(2, "0");
     const result = [];
     let [h, m] = start.split(":").map(Number);
     const [endH, endM] = end.split(":").map(Number);
@@ -313,18 +313,16 @@ export default function MedicalAppointmentDashboard() {
       const result = operatorA.localeCompare(operatorB);
       console.log(`🔍 [DEBUG] Both have same "อ" position, comparing alphabetically: ${result}`);
       return result
-      
-      return 0
     });
 
-    console.log('🔍 [DEBUG] Sorted week data:', sortedData.map(item => ({
+    console.log('🔍 [DEBUG] Sorted week data:', sortedJobs.map((item: any) => ({
       job_name: item.job_name,
       start_time: item.start_time,
       operators: item.operators,
       first_operator: (item.operators || "").split(", ")[0] || ""
     })));
 
-    return sortedData;
+    return sortedJobs.length + 1;
   }
 
   // ฟังก์ชัน handle submit
@@ -642,7 +640,7 @@ export default function MedicalAppointmentDashboard() {
   const [editDate, setEditDate] = useState("");
 
   // ฟังก์ชัน normalize เวลาให้เป็น HH:mm
-  const normalizeTime = (t) => {
+  const normalizeTime = (t: string) => {
     if (!t) return "";
     const [h, m] = t.split(":");
     return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
@@ -903,17 +901,16 @@ export default function MedicalAppointmentDashboard() {
       // 1. เตรียมข้อมูล summaryRows สำหรับ 1.ใบสรุปงาน v.4 (ไม่เอา A, B, C, D)
       const defaultCodes = ['A', 'B', 'C', 'D'];
           // ฟังก์ชันแปลงรหัส/ID ห้องเป็นชื่อห้อง
-    const getRoomNameByCodeOrId = (codeOrId) => {
-      const room = rooms.find(
-        r => r.room_code === codeOrId || r.id?.toString() === codeOrId?.toString()
-      );
-      return room ? room.room_name : codeOrId || "";
+    const getRoomNameByCodeOrId = (codeOrId: string) => {
+      if (!codeOrId) return "";
+      const room = rooms.find(r => r.room_code === codeOrId || r.id?.toString() === codeOrId?.toString());
+      return room?.room_name || codeOrId;
     };
     // ฟังก์ชันแปลง ID เครื่องเป็นชื่อเครื่อง
-    const getMachineNameById = (machineId) => {
+    const getMachineNameById = (machineId: string) => {
       if (!machineId) return "";
       const machine = machines.find(m => m.id?.toString() === machineId?.toString());
-      return machine ? machine.machine_name : "";
+      return machine?.machine_name || machineId;
     };
       // เรียงงานตาม logic หน้าเว็บ
       const filtered = productionData
@@ -932,7 +929,7 @@ export default function MedicalAppointmentDashboard() {
           return operatorA.localeCompare(operatorB);
         });
       const summaryRows = filtered.map((item, idx) => {
-        let ops = (item.operators || "").split(", ").map((s) => s.trim());
+        let ops = (item.operators || "").split(", ").map((s: string) => s.trim());
         while (ops.length < 4) ops.push("");
         return [
           idx + 1, // ลำดับ
@@ -956,7 +953,7 @@ export default function MedicalAppointmentDashboard() {
       });
 
       // 3. เตรียมข้อมูลสำหรับ Log_แผนผลิต (แยกแถวตามผู้ปฏิบัติงาน)
-      const logRows = [];
+      const logRows: string[][] = [];
       const today = new Date();
       const dateString = today.toLocaleDateString('th-TH', { 
         weekday: 'long', 
@@ -968,7 +965,7 @@ export default function MedicalAppointmentDashboard() {
       const timeStamp = today.toLocaleString('en-GB') + ', ' + today.toLocaleTimeString('en-GB');
 
       filtered.forEach((item) => {
-        const operators = (item.operators || "").split(", ").map(s => s.trim()).filter(Boolean);
+        const operators = (item.operators || "").split(", ").map((s: string) => s.trim()).filter(Boolean);
         
         if (operators.length === 0) {
           // ถ้าไม่มีผู้ปฏิบัติงาน ส่ง 1 แถว
@@ -984,7 +981,7 @@ export default function MedicalAppointmentDashboard() {
           ]);
         } else {
           // ถ้ามีผู้ปฏิบัติงาน ส่งแถวละคน
-          operators.forEach(operator => {
+          operators.forEach((operator: string) => {
             logRows.push([
               dateString, // วันที่
               dateValue, // Date Value
