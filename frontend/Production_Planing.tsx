@@ -268,12 +268,19 @@ export default function MedicalAppointmentDashboard() {
       return operatorA.localeCompare(operatorB);
     });
     
-    // รวมงานทั้งหมดและเพิ่มลำดับ 1, 2, 3, 4, 5...
-    const allJobs = [...defaultDrafts, ...otherJobs];
-    return allJobs.map((job, index) => ({
+    // แสดงงาน Default เป็น A, B, C, D
+    const displayDefaultDrafts = defaultDrafts.map(draft => ({
+      ...draft,
+      job_name: `${draft.job_code} ${draft.job_name}`
+    }));
+    
+    // แสดงงานอื่นๆ เป็น 1, 2, 3, 4, 5...
+    const displayOtherJobs = otherJobs.map((job, index) => ({
       ...job,
       job_name: `${index + 1} ${job.job_name}`
     }));
+    
+    return [...displayDefaultDrafts, ...displayOtherJobs];
   };
 
   const weekProduction = getWeekProduction()
