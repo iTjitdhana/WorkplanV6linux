@@ -1142,13 +1142,21 @@ export default function MedicalAppointmentDashboard() {
     ];
     const createMissingDrafts = async () => {
       isCreatingRef.current = true;
-      await loadAllProductionData(); // reload ข้อมูลล่าสุด 1 ครั้ง
+      await loadAllProductionData(); // reload productionData (ต้องรวมทั้ง draft และ workplans จริง)
       const latestData = productionData;
       const dayJobs = latestData.filter(item => item.production_date === selectedDate);
-      console.log('[AUTO-DRAFT] dayJobs:', dayJobs.map(j => `${j.job_code} ${j.job_name}`));
+      // log debug
+      console.log('[AUTO-DRAFT] dayJobs:', dayJobs.map(j => `${j.job_code} ${j.job_name} [isDraft:' + j.isDraft + ']' ));
       for (const draft of defaultDrafts) {
+        // เช็คซ้ำทั้ง draft และ workplans จริง
         const exists = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name);
         if (!exists) {
+          // ห้ามสร้างซ้ำถ้าในวันนั้นมี A, B, C, D ใน workplans จริงแล้ว
+          const existsInPlan = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name && !item.isDraft);
+          if (existsInPlan) {
+            console.log(`[AUTO-DRAFT] Already exists in plan: ${draft.job_code} ${draft.job_name}`);
+            continue;
+          }
           console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
           await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
             method: 'POST',
@@ -1174,7 +1182,7 @@ export default function MedicalAppointmentDashboard() {
       isCreatingRef.current = false;
     };
     createMissingDrafts();
-  }, [selectedDate, viewMode]); // ไม่ใส่ productionData ใน dependency
+  }, [selectedDate, viewMode]);
 
   // เพิ่มฟังก์ชัน syncWorkOrder
   const syncWorkOrder = async (date: string) => {
@@ -1308,14 +1316,17 @@ export default function MedicalAppointmentDashboard() {
   // เพิ่มฟังก์ชันเรียงลำดับงานแบบเดียวกับ Draft
   const sortJobsForDisplay = (jobs: any[]) => {
     return [...jobs].sort((a, b) => {
-      // เรียงตามเวลาเริ่ม
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
       const timeComparison = timeA.localeCompare(timeB);
       if (timeComparison !== 0) return timeComparison;
-      // ถ้าเวลาเท่ากัน เรียงตามชื่อผู้ปฏิบัติงานคนแรก
+      // เรียงผู้ปฏิบัติงานที่ขึ้นต้นด้วย 'อ' ขึ้นก่อน
       const opA = (a.operators || "").split(", ")[0] || "";
       const opB = (b.operators || "").split(", ")[0] || "";
+      const indexA = opA.indexOf("อ");
+      const indexB = opB.indexOf("อ");
+      if (indexA === 0 && indexB !== 0) return -1;
+      if (indexB === 0 && indexA !== 0) return 1;
       return opA.localeCompare(opB);
     });
   };

@@ -448,20 +448,27 @@ class DraftWorkPlan {
             operators = [];
           }
           
-          // ตรวจสอบว่ามีงานในวันที่เดียวกันหรือไม่ (เพื่อกำหนดเป็นงานพิเศษ)
+          // ตรวจสอบว่ามีงานในวันนั้นอยู่แล้วหรือไม่ (เฉพาะที่ไม่ใช่ A, B, C, D)
+          const defaultCodes = ['A', 'B', 'C', 'D'];
+          const isDefaultJob = defaultCodes.includes(draft.job_code);
+          // เช็คว่ามี A, B, C, D ใน workplans จริงของวันนั้นหรือยัง
+          const [existingDefault] = await connection.execute(
+            'SELECT COUNT(*) as count FROM work_plans WHERE production_date = ? AND job_code = ?',
+            [draft.production_date, draft.job_code]
+          );
           const [existingPlans] = await connection.execute(
-            'SELECT COUNT(*) as count FROM work_plans WHERE production_date = ?',
+            'SELECT COUNT(*) as count FROM work_plans WHERE production_date = ? AND job_code NOT IN (\'A\', \'B\', \'C\', \'D\')',
             [draft.production_date]
           );
-          
-          const isDefaultJob = ['A', 'B', 'C', 'D'].includes(draft.job_code);
           const isSpecialJob = existingPlans[0].count > 0 && !isDefaultJob;
           let jobCode = draft.job_code;
           let jobName = draft.job_name;
+          // log debug
+          console.log(`[SYNC] draft: ${draft.job_code} ${draft.job_name}, isDefaultJob: ${isDefaultJob}, existingDefault: ${existingDefault[0].count}, isSpecialJob: ${isSpecialJob}`);
           if (!isDefaultJob && isSpecialJob) {
             const specialJobNumber = existingPlans[0].count + 1;
-            jobCode = `งานพิเศษ ${specialJobNumber}`;
-            jobName = `${draft.job_name} (งานพิเศษ ${specialJobNumber})`;
+            jobCode = `งานพิเศษที่ ${specialJobNumber}`;
+            jobName = draft.job_name.startsWith('งานพิเศษที่') ? draft.job_name : `งานพิเศษที่ ${specialJobNumber} ${draft.job_name}`;
           }
           
           // สร้าง work plan ใหม่
