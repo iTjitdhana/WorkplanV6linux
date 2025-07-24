@@ -60,7 +60,7 @@ export default function MedicalAppointmentDashboard() {
   const jobInputRef = useRef<HTMLInputElement>(null);
   const [jobName, setJobName] = useState("");
   const [selectedMachine, setSelectedMachine] = useState("");
-  const [isSelectingFromDropdown, setIsSelectingFromDropdown] = useState(false);
+
 
   const isCreatingRef = useRef(false); // <--- ย้ายมาอยู่นอก useEffect
 
@@ -113,12 +113,6 @@ export default function MedicalAppointmentDashboard() {
 
   // Autocomplete job name/code
   useEffect(() => {
-    // ไม่เรียก API ถ้ากำลังเลือกจาก dropdown
-    if (isSelectingFromDropdown) {
-      setIsSelectingFromDropdown(false);
-      return;
-    }
-
     // เพิ่ม debounce และ minimum length
     if (jobQuery.length < 1) {
       setShowJobDropdown(false);
@@ -141,7 +135,7 @@ export default function MedicalAppointmentDashboard() {
     }, 100); // ลด debounce เป็น 100ms ให้เร็วขึ้น
 
     return () => clearTimeout(timeoutId);
-  }, [jobQuery, isSelectingFromDropdown]);
+  }, [jobQuery]);
 
   // ฟังก์ชันสร้าง job_code ใหม่ (เลขงานอัตโนมัติ)
   const handleAddNewJob = () => {
@@ -1360,7 +1354,11 @@ export default function MedicalAppointmentDashboard() {
                         onChange={e => {
                           setJobQuery(e.target.value);
                         }}
-                        onFocus={() => setShowJobDropdown(jobQuery.length > 0)}
+                        onFocus={() => {
+                          if (jobQuery.length > 0 && jobOptions.length > 0) {
+                            setShowJobDropdown(true);
+                          }
+                        }}
                         onBlur={() => setTimeout(() => setShowJobDropdown(false), 100)}
                         className="pl-8 sm:pl-10 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                         autoComplete="off"
@@ -1374,11 +1372,11 @@ export default function MedicalAppointmentDashboard() {
                                 key={opt.job_code + idx}
                                 className="px-3 py-2 hover:bg-green-100 cursor-pointer text-sm"
                                 onClick={() => {
-                                  setIsSelectingFromDropdown(true);
                                   setJobCode(opt.job_code);
                                   setJobName(opt.job_name);
                                   setJobQuery(opt.job_name);
                                   setShowJobDropdown(false);
+                                  setJobOptions([]);
                                   jobInputRef.current?.blur();
                                 }}
                               >
@@ -1394,7 +1392,6 @@ export default function MedicalAppointmentDashboard() {
                                 className="text-green-700 hover:underline text-sm"
                                 onMouseDown={e => { 
                                   e.preventDefault(); 
-                                  setIsSelectingFromDropdown(true);
                                   handleAddNewJob(); 
                                 }}
                               >
