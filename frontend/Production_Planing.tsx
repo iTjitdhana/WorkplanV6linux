@@ -241,12 +241,9 @@ export default function MedicalAppointmentDashboard() {
 
   // Get production data for current week
   const getWeekProduction = () => {
-    const weekStart = weekDates[0].toISOString().split("T")[0]
-    const weekEnd = weekDates[6].toISOString().split("T")[0]
-
-    // กรองงาน A B C D ออกจาก Weekly View
+    const weekStart = weekDates[0].toISOString().split("T")[0];
+    const weekEnd = weekDates[6].toISOString().split("T")[0];
     const defaultCodes = ['A', 'B', 'C', 'D'];
-
     const filteredData = productionData
       .filter((item) => {
         const isInWeekRange = item.production_date >= weekStart && item.production_date <= weekEnd;
@@ -254,17 +251,12 @@ export default function MedicalAppointmentDashboard() {
         return isInWeekRange && isNotDefaultDraft;
       })
       .sort((a, b) => {
-        // เรียงตามวันที่ก่อน
         const dateComparison = a.production_date.localeCompare(b.production_date);
         if (dateComparison !== 0) return dateComparison;
-        
-        // ถ้าวันที่เหมือนกัน เรียงตามเวลาเริ่ม
         const timeA = a.start_time || "00:00";
         const timeB = b.start_time || "00:00";
         const timeComparison = timeA.localeCompare(timeB);
         if (timeComparison !== 0) return timeComparison;
-        
-        // หากเวลาเริ่มเหมือนกัน เรียงตามผู้ปฏิบัติงานคนที่ 1 ที่มีตัวอักษร "อ" ตำแหน่งแรก
         const operatorA = (a.operators || "").split(", ")[0] || "";
         const operatorB = (b.operators || "").split(", ")[0] || "";
         const indexA = operatorA.indexOf("อ");
@@ -273,11 +265,10 @@ export default function MedicalAppointmentDashboard() {
         if (indexB === 0 && indexA !== 0) return 1;
         return operatorA.localeCompare(operatorB);
       });
-    
-    // เพิ่มลำดับ 1, 2, 3, 4, 5...
+    // prefix เฉพาะถ้ายังไม่มี prefix
     return filteredData.map((item, index) => ({
       ...item,
-      job_name: `${index + 1} ${item.job_name}`
+      job_name: hasJobNumberPrefix(item.job_name) ? item.job_name : `${index + 1} ${item.job_name}`
     }));
   };
 
@@ -2291,7 +2282,6 @@ export default function MedicalAppointmentDashboard() {
               ) : null;
             })()}
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setEditDraftModalOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
               <Button variant="outline" onClick={() => handleSaveEditDraft(true)} disabled={isSubmitting}>บันทึกแบบร่าง</Button>
               <Button onClick={() => handleSaveEditDraft(false)} disabled={isSubmitting} className="bg-green-700 hover:bg-green-800 text-white">
                 {isSubmitting ? "กำลังบันทึก..." : "บันทึกเสร็จสิ้น"}
