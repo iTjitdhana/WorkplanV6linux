@@ -60,6 +60,7 @@ export default function MedicalAppointmentDashboard() {
   const jobInputRef = useRef<HTMLInputElement>(null);
   const [jobName, setJobName] = useState("");
   const [selectedMachine, setSelectedMachine] = useState("");
+  const [isSelectingFromDropdown, setIsSelectingFromDropdown] = useState(false);
 
   const isCreatingRef = useRef(false); // <--- ย้ายมาอยู่นอก useEffect
 
@@ -112,6 +113,12 @@ export default function MedicalAppointmentDashboard() {
 
   // Autocomplete job name/code
   useEffect(() => {
+    // ไม่เรียก API ถ้ากำลังเลือกจาก dropdown
+    if (isSelectingFromDropdown) {
+      setIsSelectingFromDropdown(false);
+      return;
+    }
+
     // เพิ่ม debounce และ minimum length
     if (jobQuery.length < 1) {
       setShowJobDropdown(false);
@@ -134,7 +141,7 @@ export default function MedicalAppointmentDashboard() {
     }, 100); // ลด debounce เป็น 100ms ให้เร็วขึ้น
 
     return () => clearTimeout(timeoutId);
-  }, [jobQuery]);
+  }, [jobQuery, isSelectingFromDropdown]);
 
   // ฟังก์ชันสร้าง job_code ใหม่ (เลขงานอัตโนมัติ)
   const handleAddNewJob = () => {
@@ -1367,6 +1374,7 @@ export default function MedicalAppointmentDashboard() {
                                 key={opt.job_code + idx}
                                 className="px-3 py-2 hover:bg-green-100 cursor-pointer text-sm"
                                 onClick={() => {
+                                  setIsSelectingFromDropdown(true);
                                   setJobCode(opt.job_code);
                                   setJobName(opt.job_name);
                                   setJobQuery(opt.job_name);
@@ -1384,7 +1392,11 @@ export default function MedicalAppointmentDashboard() {
                             <div className="px-3 py-2 bg-gray-50 border-t">
                               <button
                                 className="text-green-700 hover:underline text-sm"
-                                onMouseDown={e => { e.preventDefault(); handleAddNewJob(); }}
+                                onMouseDown={e => { 
+                                  e.preventDefault(); 
+                                  setIsSelectingFromDropdown(true);
+                                  handleAddNewJob(); 
+                                }}
                               >
                                 + เพิ่มรายการใหม่ "{jobQuery}"
                               </button>
