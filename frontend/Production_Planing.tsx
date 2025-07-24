@@ -131,7 +131,7 @@ export default function MedicalAppointmentDashboard() {
           setJobOptions([]);
           setShowJobDropdown(false);
         });
-    }, 150); // ลด debounce เป็น 150ms ให้เร็วขึ้น
+    }, 100); // ลด debounce เป็น 100ms ให้เร็วขึ้น
 
     return () => clearTimeout(timeoutId);
   }, [jobQuery]);
@@ -1352,11 +1352,9 @@ export default function MedicalAppointmentDashboard() {
                         value={jobQuery}
                         onChange={e => {
                           setJobQuery(e.target.value);
-                          setJobName("");
-                          setJobCode("");
                         }}
                         onFocus={() => setShowJobDropdown(jobQuery.length > 0)}
-                        onBlur={() => setTimeout(() => setShowJobDropdown(false), 150)}
+                        onBlur={() => setTimeout(() => setShowJobDropdown(false), 100)}
                         className="pl-8 sm:pl-10 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                         autoComplete="off"
                       />
@@ -1382,24 +1380,16 @@ export default function MedicalAppointmentDashboard() {
                           ) : (
                             <div className="px-3 py-2 text-gray-500 text-sm">ไม่พบงานผลิตนี้</div>
                           )}
-                          {(() => {
-                            const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, "");
-                            const isExactMatch = jobOptions.some(
-                              (opt) =>
-                                normalize(opt.job_name) === normalize(jobQuery) ||
-                                normalize(opt.job_code) === normalize(jobQuery)
-                            );
-                            return jobQuery.length > 0 && !isExactMatch ? (
-                              <div className="px-3 py-2 bg-gray-50 border-t">
-                                <button
-                                  className="text-green-700 hover:underline text-sm"
-                                  onMouseDown={e => { e.preventDefault(); handleAddNewJob(); }}
-                                >
-                                  + เพิ่มรายการใหม่ "{jobQuery}"
-                                </button>
-                              </div>
-                            ) : null;
-                          })()}
+                          {jobQuery.length > 0 && (
+                            <div className="px-3 py-2 bg-gray-50 border-t">
+                              <button
+                                className="text-green-700 hover:underline text-sm"
+                                onMouseDown={e => { e.preventDefault(); handleAddNewJob(); }}
+                              >
+                                + เพิ่มรายการใหม่ "{jobQuery}"
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
