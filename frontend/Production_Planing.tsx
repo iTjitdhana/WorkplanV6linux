@@ -1144,30 +1144,29 @@ export default function MedicalAppointmentDashboard() {
       isCreatingRef.current = true;
       let latestData = productionData;
       for (const draft of defaultDrafts) {
-        // reload ข้อมูลล่าสุดทุกครั้ง
         try {
           await loadAllProductionData();
         } catch {}
         latestData = productionData;
-        // เช็คซ้ำทั้งใน draft และ plan จริง (productionData ทั้งหมดในวันนั้น)
+        // เช็คซ้ำละเอียด: job_code และ job_name ต้องไม่ซ้ำในวันนั้น
         const dayJobs = latestData.filter(item => item.production_date === selectedDate);
-        const exists = dayJobs.some(item => item.job_code === draft.job_code);
+        const exists = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name);
         if (!exists) {
           await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          production_date: selectedDate,
-          job_code: draft.job_code,
-          job_name: draft.job_name,
-          workflow_status_id: 1,
-          operators: [],
-          start_time: '',
-          end_time: '',
-          machine_id: null,
-          production_room_id: null,
-          notes: '',
-        })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              production_date: selectedDate,
+              job_code: draft.job_code,
+              job_name: draft.job_name,
+              workflow_status_id: 1,
+              operators: [],
+              start_time: '',
+              end_time: '',
+              machine_id: null,
+              production_room_id: null,
+              notes: '',
+            })
           });
         }
       }
@@ -1272,17 +1271,17 @@ export default function MedicalAppointmentDashboard() {
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
 
   // เพิ่มฟังก์ชันแปลงชื่อแสดงผลงาน
-  const getDisplayJobName = (item, jobsOfDay) => {
+  const getDisplayJobName = (item: any, jobsOfDay: any[]) => {
     const defaultCodes = ['A', 'B', 'C', 'D'];
-    // งาน Default
     if (defaultCodes.includes(item.job_code)) {
+      if (item.job_name && item.job_name.trim().startsWith(item.job_code + ' ')) {
+        return item.job_name;
+      }
       return `${item.job_code} ${item.job_name}`;
     }
-    // งานพิเศษ (status_id == 10 หรือ job_code มีคำว่า 'งานพิเศษ')
     const isSpecial = item.status_id === 10 || (typeof item.job_code === 'string' && item.job_code.includes('งานพิเศษ'));
-    // หา running number ของแต่ละประเภทในวันนั้น
     let normalCount = 0, specialCount = 0, normalIndex = 0, specialIndex = 0;
-    jobsOfDay.forEach((j) => {
+    jobsOfDay.forEach((j: any) => {
       if (defaultCodes.includes(j.job_code)) return;
       if (j.status_id === 10 || (typeof j.job_code === 'string' && j.job_code.includes('งานพิเศษ'))) {
         specialCount++;
