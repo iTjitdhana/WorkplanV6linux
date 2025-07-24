@@ -61,6 +61,8 @@ export default function MedicalAppointmentDashboard() {
   const [jobName, setJobName] = useState("");
   const [selectedMachine, setSelectedMachine] = useState("");
 
+  const isCreatingRef = useRef(false); // <--- ย้ายมาอยู่นอก useEffect
+
   // ฟังก์ชันสร้าง array ของเวลา 08:00-18:00 ทีละ 15 นาที
   const generateTimeOptions = (start = "08:00", end = "18:00", step = 15) => {
     const pad = (n: number) => n.toString().padStart(2, "0");
@@ -248,22 +250,19 @@ export default function MedicalAppointmentDashboard() {
     const otherJobs = dayData.filter(item => !(item.isDraft && defaultCodes.includes(item.job_code)));
     // sort งาน draft 4 งานนี้ตามลำดับ code
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
-    // เพิ่ม code นำหน้าชื่อ
+    // เพิ่มเลขงานนำหน้าทุกงาน (รวม A B C D)
     const displayDefaultDrafts = defaultDrafts.map(draft => ({
       ...draft,
       job_name: draft.job_code && !draft.job_name.startsWith(draft.job_code + ' ')
         ? `${draft.job_code} ${draft.job_name}`
         : draft.job_name
     }));
-    
-    // เพิ่มเลขงานนำหน้าชื่องานอื่นๆ
     const displayOtherJobs = otherJobs.map(job => ({
       ...job,
       job_name: job.job_code && !job.job_name.startsWith(job.job_code + ' ')
         ? `${job.job_code} ${job.job_name}`
         : job.job_name
     }));
-    
     // sort งานอื่นตาม logic เดิม
     displayOtherJobs.sort((a, b) => {
       const timeA = a.start_time || "00:00";
@@ -1176,10 +1175,6 @@ export default function MedicalAppointmentDashboard() {
   useEffect(() => {
     if (viewMode !== "daily") return;
     if (!selectedDate || !productionData) return;
-    
-    // ป้องกันการสร้างซ้ำโดยใช้ ref
-    const isCreatingRef = { current: false };
-    
     // job list ที่ต้องสร้าง
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
@@ -1187,23 +1182,16 @@ export default function MedicalAppointmentDashboard() {
       { job_code: 'C', job_name: 'เบิกของส่งสาขา  - แห้ง' },
       { job_code: 'D', job_name: 'ตวงสูตร' },
     ];
-    
     // หาเฉพาะ draft ของวันนั้น
     const dayDrafts = productionData.filter(
       item => item.production_date === selectedDate && item.isDraft
     );
-    
     // หา draft ที่ยังไม่มีในวันนั้น
     const missingDrafts = defaultDrafts.filter(draft =>
       !dayDrafts.some(item => item.job_code === draft.job_code)
     );
-    
     if (missingDrafts.length === 0 || isCreatingRef.current) return;
-    
-    // ป้องกันการสร้างซ้ำ
     isCreatingRef.current = true;
-    
-    // สร้าง draft ที่ขาด
     Promise.all(missingDrafts.map(draft =>
       fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
         method: 'POST',
@@ -1222,7 +1210,6 @@ export default function MedicalAppointmentDashboard() {
         })
       })
     )).then(() => {
-      // reload ข้อมูลใหม่หลังสร้าง
       loadAllProductionData();
       isCreatingRef.current = false;
     }).catch(() => {
