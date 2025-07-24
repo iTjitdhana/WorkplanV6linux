@@ -200,7 +200,7 @@ export default function MedicalAppointmentDashboard() {
   const getWeekProduction = () => {
     const weekStart = weekDates[0].toISOString().split("T")[0]
     const weekEnd = weekDates[6].toISOString().split("T")[0]
-    
+
     // กรองงาน A B C D ออกจาก Weekly View
     const defaultCodes = ['A', 'B', 'C', 'D'];
 
@@ -212,13 +212,15 @@ export default function MedicalAppointmentDashboard() {
       })
       .sort((a, b) => {
         // เรียงตามวันที่ก่อน
-        const dateComparison = new Date(a.production_date).getTime() - new Date(b.production_date).getTime();
+        const dateComparison = a.production_date.localeCompare(b.production_date);
         if (dateComparison !== 0) return dateComparison;
-        // หากวันที่เหมือนกัน เรียงตามเวลาเริ่ม
+        
+        // ถ้าวันที่เหมือนกัน เรียงตามเวลาเริ่ม
         const timeA = a.start_time || "00:00";
         const timeB = b.start_time || "00:00";
         const timeComparison = timeA.localeCompare(timeB);
         if (timeComparison !== 0) return timeComparison;
+        
         // หากเวลาเริ่มเหมือนกัน เรียงตามผู้ปฏิบัติงานคนที่ 1 ที่มีตัวอักษร "อ" ตำแหน่งแรก
         const operatorA = (a.operators || "").split(", ")[0] || "";
         const operatorB = (b.operators || "").split(", ")[0] || "";
@@ -229,14 +231,12 @@ export default function MedicalAppointmentDashboard() {
         return operatorA.localeCompare(operatorB);
       });
     
-    // เพิ่มเลขงานนำหน้าชื่องาน
-    return filteredData.map(item => ({
+    // เพิ่มลำดับ 1, 2, 3, 4, 5...
+    return filteredData.map((item, index) => ({
       ...item,
-      job_name: item.job_code && !item.job_name.startsWith(item.job_code + ' ')
-        ? `${item.job_code} ${item.job_name}`
-        : item.job_name
+      job_name: `${index + 1} ${item.job_name}`
     }));
-  }
+  };
 
   // Get production data for selected day
   const getSelectedDayProduction = () => {
@@ -253,21 +253,8 @@ export default function MedicalAppointmentDashboard() {
     const otherJobs = dayData.filter(item => !(item.isDraft && defaultCodes.includes(item.job_code)));
     // sort งาน draft 4 งานนี้ตามลำดับ code
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
-    // เพิ่มเลขงานนำหน้าทุกงาน (รวม A B C D)
-    const displayDefaultDrafts = defaultDrafts.map(draft => ({
-      ...draft,
-      job_name: draft.job_code && !draft.job_name.startsWith(draft.job_code + ' ')
-        ? `${draft.job_code} ${draft.job_name}`
-        : draft.job_name
-    }));
-    const displayOtherJobs = otherJobs.map(job => ({
-      ...job,
-      job_name: job.job_code && !job.job_name.startsWith(job.job_code + ' ')
-        ? `${job.job_code} ${job.job_name}`
-        : job.job_name
-    }));
     // sort งานอื่นตาม logic เดิม
-    displayOtherJobs.sort((a, b) => {
+    otherJobs.sort((a, b) => {
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
       const timeComparison = timeA.localeCompare(timeB);
@@ -280,7 +267,13 @@ export default function MedicalAppointmentDashboard() {
       if (indexB === 0 && indexA !== 0) return 1;
       return operatorA.localeCompare(operatorB);
     });
-    return [...displayDefaultDrafts, ...displayOtherJobs];
+    
+    // รวมงานทั้งหมดและเพิ่มลำดับ 1, 2, 3, 4, 5...
+    const allJobs = [...defaultDrafts, ...otherJobs];
+    return allJobs.map((job, index) => ({
+      ...job,
+      job_name: `${index + 1} ${job.job_name}`
+    }));
   };
 
   const weekProduction = getWeekProduction()
