@@ -15,28 +15,40 @@ const SelectValue = SelectPrimitive.Value
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-      "touch-manipulation pointer-events-auto cursor-pointer", // เพิ่ม cursor-pointer และ pointer-events
-      className
-    )}
-    // รองรับ pointer events ทุกแบบ
-    onPointerDown={props.onPointerDown}
-    onPointerUp={props.onPointerUp}
-    onTouchStart={props.onTouchStart}
-    onTouchEnd={props.onTouchEnd}
-    onClick={props.onClick}
-    {...props}
-  >
-    {children}
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-))
+>(({ className, children, ...props }, ref) => {
+  // เพิ่ม fallback: ถ้า tap (touchend) ให้ trigger click
+  const handleTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (props.onTouchEnd) props.onTouchEnd(e);
+    // Fallback: trigger click ด้วยตนเอง
+    if (ref && typeof ref !== 'function' && ref.current) {
+      // ป้องกัน trigger ซ้ำถ้าเป็น mouse click จริง
+      if (typeof window !== 'undefined' && e.changedTouches.length === 1) {
+        ref.current.click();
+      }
+    }
+  };
+  return (
+    <SelectPrimitive.Trigger
+      ref={ref}
+      className={cn(
+        "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+        "touch-manipulation pointer-events-auto cursor-pointer",
+        className
+      )}
+      onPointerDown={props.onPointerDown}
+      onPointerUp={props.onPointerUp}
+      onTouchStart={props.onTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onClick={props.onClick}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className="h-4 w-4 opacity-50" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  );
+});
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
 
 const SelectScrollUpButton = React.forwardRef<
