@@ -24,31 +24,11 @@ const SelectTrigger = React.forwardRef<
       className
     )}
     // รองรับ pointer events ทุกแบบ
-    onPointerDown={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onPointerDown) props.onPointerDown(e);
-    }}
-    onPointerUp={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onPointerUp) props.onPointerUp(e);
-    }}
-    onTouchStart={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onTouchStart) props.onTouchStart(e);
-    }}
-    onTouchEnd={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onTouchEnd) props.onTouchEnd(e);
-    }}
-    onClick={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onClick) props.onClick(e);
-    }}
+    onPointerDown={props.onPointerDown}
+    onPointerUp={props.onPointerUp}
+    onTouchStart={props.onTouchStart}
+    onTouchEnd={props.onTouchEnd}
+    onClick={props.onClick}
     {...props}
   >
     {children}
@@ -110,31 +90,11 @@ const SelectContent = React.forwardRef<
       )}
       position={position}
       // รองรับ pointer events ทุกแบบ
-      onPointerDown={e => { 
-        e.preventDefault();
-        e.stopPropagation();
-        if (props.onPointerDown) props.onPointerDown(e);
-      }}
-      onPointerUp={e => { 
-        e.preventDefault();
-        e.stopPropagation();
-        if (props.onPointerUp) props.onPointerUp(e);
-      }}
-      onTouchStart={e => { 
-        e.preventDefault();
-        e.stopPropagation();
-        if (props.onTouchStart) props.onTouchStart(e);
-      }}
-      onTouchEnd={e => { 
-        e.preventDefault();
-        e.stopPropagation();
-        if (props.onTouchEnd) props.onTouchEnd(e);
-      }}
-      onClick={e => { 
-        e.preventDefault();
-        e.stopPropagation();
-        if (props.onClick) props.onClick(e);
-      }}
+      onPointerDown={props.onPointerDown}
+      onPointerUp={props.onPointerUp}
+      onTouchStart={props.onTouchStart}
+      onTouchEnd={props.onTouchEnd}
+      onClick={props.onClick}
       {...props}
     >
       <SelectScrollUpButton />
@@ -177,31 +137,11 @@ const SelectItem = React.forwardRef<
       className
     )}
     // รองรับ pointer events ทุกแบบ
-    onPointerDown={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onPointerDown) props.onPointerDown(e);
-    }}
-    onPointerUp={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onPointerUp) props.onPointerUp(e);
-    }}
-    onTouchStart={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onTouchStart) props.onTouchStart(e);
-    }}
-    onTouchEnd={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onTouchEnd) props.onTouchEnd(e);
-    }}
-    onClick={e => { 
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.onClick) props.onClick(e);
-    }}
+    onPointerDown={props.onPointerDown}
+    onPointerUp={props.onPointerUp}
+    onTouchStart={props.onTouchStart}
+    onTouchEnd={props.onTouchEnd}
+    onClick={props.onClick}
     {...props}
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
