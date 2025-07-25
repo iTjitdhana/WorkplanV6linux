@@ -1276,24 +1276,14 @@ export default function MedicalAppointmentDashboard() {
     }
     // งานพิเศษ (is_special === 1)
     if (item.is_special === 1) {
-      // นับลำดับงานพิเศษใน jobsOfDay
-      let specialIndex = 0, count = 0;
-      jobsOfDay.forEach((j: any) => {
-        if (j.is_special === 1 && !defaultCodes.includes(j.job_code)) {
-          count++;
-          if (j.id === item.id) specialIndex = count;
-        }
-      });
+      // นับลำดับงานพิเศษใน jobsOfDay โดยใช้ id จาก backend เท่านั้น
+      const specialJobs = jobsOfDay.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
+      const specialIndex = specialJobs.findIndex(j => j.id === item.id) + 1;
       return `งานพิเศษที่ ${specialIndex} ${item.job_name}`;
     } else {
       // งานปกติ
-      let normalIndex = 0, count = 0;
-      jobsOfDay.forEach((j: any) => {
-        if (j.is_special !== 1 && !defaultCodes.includes(j.job_code)) {
-          count++;
-          if (j.id === item.id) normalIndex = count;
-        }
-      });
+      const normalJobs = jobsOfDay.filter(j => j.is_special !== 1 && !defaultCodes.includes(j.job_code));
+      const normalIndex = normalJobs.findIndex(j => j.id === item.id) + 1;
       return `งานที่ ${normalIndex} ${item.job_name}`;
     }
   };

@@ -492,13 +492,7 @@ class DraftWorkPlan {
           let jobCode = draft.job_code;
           let jobName = draft.job_name;
           // log debug
-          console.log(`[SYNC] draft: ${draft.job_code} ${draft.job_name}, isDefaultJob: ${isDefaultJob}, existingDefault: ${existingDefault[0].count}, isSpecialJob: ${isSpecialJob}`);
-          if (!isDefaultJob && isSpecialJob) {
-            const specialJobNumber = existingPlans[0].count + 1;
-            jobCode = `งานพิเศษที่ ${specialJobNumber}`;
-            jobName = draft.job_name.startsWith('งานพิเศษที่') ? draft.job_name : `งานพิเศษที่ ${specialJobNumber} ${draft.job_name}`;
-          }
-          
+          console.log(`[SYNC] draft: ${draft.job_code} ${draft.job_name}, isSpecialDraft: ${isSpecialDraft}`);
           // สร้าง work plan ใหม่
           let insertQuery, insertParams;
           // ตรวจสอบว่ามี status_id และ is_special column หรือไม่
@@ -513,7 +507,6 @@ class DraftWorkPlan {
           const hasIsSpecialColumn = columns.some(col => col.COLUMN_NAME === 'is_special');
           console.log('🔄 Has status_id column:', hasStatusColumn, 'Has is_special column:', hasIsSpecialColumn);
           if (hasStatusColumn && hasIsSpecialColumn) {
-            // มี status_id และ is_special column
             insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special) VALUES (?, ?, ?, ?, ?, ?, ?)';
             insertParams = [
               draft.production_date, 
@@ -521,11 +514,10 @@ class DraftWorkPlan {
               jobName, 
               draft.start_time, 
               draft.end_time,
-              isSpecialJob ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
-              isSpecialJob ? 1 : 0   // is_special
+              isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialDraft ? 1 : 0   // is_special
             ];
           } else if (hasStatusColumn) {
-            // มี status_id column อย่างเดียว
             insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id) VALUES (?, ?, ?, ?, ?, ?)';
             insertParams = [
               draft.production_date, 
@@ -533,10 +525,9 @@ class DraftWorkPlan {
               jobName, 
               draft.start_time, 
               draft.end_time,
-              isSpecialJob ? 10 : 1 // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialDraft ? 10 : 1 // 10 = งานพิเศษ, 1 = รอดำเนินการ
             ];
           } else {
-            // ไม่มี status_id column
             insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time) VALUES (?, ?, ?, ?, ?)';
             insertParams = [
               draft.production_date, 
@@ -546,14 +537,10 @@ class DraftWorkPlan {
               draft.end_time
             ];
           }
-          
           console.log('🔄 Insert query:', insertQuery);
           console.log('🔄 Insert params:', insertParams);
-          
           const [result] = await connection.execute(insertQuery, insertParams);
-          
           const workPlanId = result.insertId;
-          
           // เพิ่ม operators
           for (const operator of operators) {
             await connection.execute(
@@ -561,28 +548,19 @@ class DraftWorkPlan {
               [workPlanId, operator.user_id || null, operator.id_code || null]
             );
           }
-          
           // ลบ draft หลังจาก sync สำเร็จ
           console.log('🔄 Deleting draft ID:', draft.id);
           await connection.execute('DELETE FROM work_plan_drafts WHERE id = ?', [draft.id]);
-          
           syncedCount++;
-          syncedDrafts.push({
-            draft_id: draft.id,
-            work_plan_id: workPlanId,
-            job_name: jobName,
-            production_date: draft.production_date,
-            is_special_job: isSpecialJob
-          });
-          
+          syncedDrafts.push({ draftId: draft.id, workPlanId });
           console.log('🔄 Successfully synced draft:', {
             draft_id: draft.id,
             work_plan_id: workPlanId,
             job_name: jobName
           });
           
-        } catch (error) {
-          console.error(`Error syncing draft ${draft.id}:`, error);
+        } catch (err) {
+          console.error(`Error syncing draft ${draft.id}:`, err);
           // ไม่ rollback ทั้งหมด แต่ข้าม draft ที่มีปัญหา
           continue;
         }
