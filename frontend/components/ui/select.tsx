@@ -20,13 +20,35 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-      "touch-manipulation pointer-events-auto", // เพิ่ม pointer-events และ touch support
+      "touch-manipulation pointer-events-auto cursor-pointer", // เพิ่ม cursor-pointer และ pointer-events
       className
     )}
-    // รองรับ pointerdown, touchstart, click
-    onPointerDown={e => { if (props.onPointerDown) props.onPointerDown(e); }}
-    onTouchStart={e => { if (props.onTouchStart) props.onTouchStart(e); }}
-    onClick={e => { if (props.onClick) props.onClick(e); }}
+    // รองรับ pointer events ทุกแบบ
+    onPointerDown={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onPointerDown) props.onPointerDown(e);
+    }}
+    onPointerUp={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onPointerUp) props.onPointerUp(e);
+    }}
+    onTouchStart={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onTouchStart) props.onTouchStart(e);
+    }}
+    onTouchEnd={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onTouchEnd) props.onTouchEnd(e);
+    }}
+    onClick={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onClick) props.onClick(e);
+    }}
     {...props}
   >
     {children}
@@ -87,10 +109,32 @@ const SelectContent = React.forwardRef<
         className
       )}
       position={position}
-      // รองรับ pointerdown, touchstart, click
-      onPointerDown={e => { if (props.onPointerDown) props.onPointerDown(e); }}
-      onTouchStart={e => { if (props.onTouchStart) props.onTouchStart(e); }}
-      onClick={e => { if (props.onClick) props.onClick(e); }}
+      // รองรับ pointer events ทุกแบบ
+      onPointerDown={e => { 
+        e.preventDefault();
+        e.stopPropagation();
+        if (props.onPointerDown) props.onPointerDown(e);
+      }}
+      onPointerUp={e => { 
+        e.preventDefault();
+        e.stopPropagation();
+        if (props.onPointerUp) props.onPointerUp(e);
+      }}
+      onTouchStart={e => { 
+        e.preventDefault();
+        e.stopPropagation();
+        if (props.onTouchStart) props.onTouchStart(e);
+      }}
+      onTouchEnd={e => { 
+        e.preventDefault();
+        e.stopPropagation();
+        if (props.onTouchEnd) props.onTouchEnd(e);
+      }}
+      onClick={e => { 
+        e.preventDefault();
+        e.stopPropagation();
+        if (props.onClick) props.onClick(e);
+      }}
       {...props}
     >
       <SelectScrollUpButton />
@@ -129,8 +173,35 @@ const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "pointer-events-auto touch-manipulation cursor-pointer", // เพิ่ม pointer-events และ cursor-pointer
       className
     )}
+    // รองรับ pointer events ทุกแบบ
+    onPointerDown={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onPointerDown) props.onPointerDown(e);
+    }}
+    onPointerUp={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onPointerUp) props.onPointerUp(e);
+    }}
+    onTouchStart={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onTouchStart) props.onTouchStart(e);
+    }}
+    onTouchEnd={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onTouchEnd) props.onTouchEnd(e);
+    }}
+    onClick={e => { 
+      e.preventDefault();
+      e.stopPropagation();
+      if (props.onClick) props.onClick(e);
+    }}
     {...props}
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
