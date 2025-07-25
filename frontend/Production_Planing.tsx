@@ -1133,6 +1133,13 @@ export default function MedicalAppointmentDashboard() {
     if (viewMode !== "daily") return;
     if (!selectedDate) return;
     if (isCreatingRef.current) return;
+    
+    // เพิ่มการเช็คว่าได้สร้าง draft สำหรับวันที่นี้แล้วหรือยัง
+    const hasCreatedDraftsForDate = sessionStorage.getItem(`drafts_created_${selectedDate}`);
+    if (hasCreatedDraftsForDate) {
+      console.log(`[AUTO-DRAFT] Drafts already created for date: ${selectedDate}`);
+      return;
+    }
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
       { job_code: 'B', job_name: 'เบิกของส่งสาขา  - สด' },
@@ -1144,16 +1151,31 @@ export default function MedicalAppointmentDashboard() {
       await loadAllProductionData();
       const latestData = productionData;
       const dayJobs = latestData.filter(item => item.production_date === selectedDate);
+      
       for (const draft of defaultDrafts) {
-        const exists = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name);
-        if (!exists) {
-          const existsInPlan = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name && !item.isDraft);
-          if (existsInPlan) {
-            console.log(`[AUTO-DRAFT] Already exists in plan: ${draft.job_code} ${draft.job_name}`);
-            continue;
-          }
-          console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
-          await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
+        // เช็คว่ามีงานนี้อยู่แล้วหรือไม่ (ทั้ง draft และ work plan จริง)
+        const existsAsDraft = dayJobs.some(item => 
+          item.job_code === draft.job_code && 
+          item.job_name === draft.job_name && 
+          item.isDraft
+        );
+        
+        const existsAsWorkPlan = dayJobs.some(item => 
+          item.job_code === draft.job_code && 
+          item.job_name === draft.job_name && 
+          !item.isDraft
+        );
+        
+        // ถ้ามีอยู่แล้วทั้ง draft และ work plan จริง ให้ข้าม
+        if (existsAsDraft || existsAsWorkPlan) {
+          console.log(`[AUTO-DRAFT] Already exists (draft: ${existsAsDraft}, workplan: ${existsAsWorkPlan}): ${draft.job_code} ${draft.job_name}`);
+          continue;
+        }
+        
+        // สร้าง draft ใหม่เฉพาะเมื่อไม่มีอยู่เลย
+        console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
+        try {
+          const response = await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1169,12 +1191,20 @@ export default function MedicalAppointmentDashboard() {
               notes: '',
             })
           });
-        } else {
-          console.log(`[AUTO-DRAFT] Already exists: ${draft.job_code} ${draft.job_name}`);
+          
+          if (!response.ok) {
+            console.error(`[AUTO-DRAFT] Failed to create draft: ${draft.job_code} ${draft.job_name}`);
+          }
+        } catch (error) {
+          console.error(`[AUTO-DRAFT] Error creating draft: ${draft.job_code} ${draft.job_name}`, error);
         }
       }
+      
       await loadAllProductionData();
       isCreatingRef.current = false;
+      
+      // บันทึกว่าสร้าง draft สำหรับวันที่นี้แล้ว
+      sessionStorage.setItem(`drafts_created_${selectedDate}`, 'true');
     };
     createMissingDrafts();
   }, [selectedDate, viewMode]);
