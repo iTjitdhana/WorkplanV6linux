@@ -432,6 +432,27 @@ class DraftWorkPlan {
       let syncedCount = 0;
       const syncedDrafts = [];
       
+      // 1. บันทึก log การ sync
+      let syncLogId = null;
+      if (targetDate) {
+        const [syncLogResult] = await connection.execute(
+          'INSERT INTO workplan_sync_log (production_date) VALUES (?)',
+          [targetDate]
+        );
+        syncLogId = syncLogResult.insertId;
+      }
+      // 2. ดึงเวลาซิงค์ล่าสุดของวันนั้น
+      let lastSyncTime = null;
+      if (targetDate) {
+        const [syncRows] = await connection.execute(
+          'SELECT synced_at FROM workplan_sync_log WHERE production_date = ? ORDER BY synced_at DESC LIMIT 1',
+          [targetDate]
+        );
+        if (syncRows.length > 0) {
+          lastSyncTime = new Date(syncRows[0].synced_at);
+        }
+      }
+      
       for (const draft of drafts) {
         try {
           // แปลง operators จาก JSON string เป็น array (robust)
@@ -461,6 +482,13 @@ class DraftWorkPlan {
             [draft.production_date]
           );
           const isSpecialJob = existingPlans[0].count > 0 && !isDefaultJob;
+          // 3. เช็คว่า draft นี้ถูกสร้างหลัง sync หรือไม่ (is_special)
+          let isSpecialDraft = false;
+          if (lastSyncTime && draft.created_at) {
+            const draftCreatedAt = new Date(draft.created_at);
+            isSpecialDraft = draftCreatedAt > lastSyncTime;
+          }
+          // 4. ไม่เติม prefix งานพิเศษใน job_code/job_name
           let jobCode = draft.job_code;
           let jobName = draft.job_name;
           // log debug
