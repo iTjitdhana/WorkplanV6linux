@@ -274,7 +274,8 @@ export default function MedicalAppointmentDashboard() {
     const targetDate = viewMode === "daily" ? selectedDate : selectedWeekDay;
     if (!targetDate) return [];
     const defaultCodes = ['A', 'B', 'C', 'D'];
-    const dayData = productionData.filter(item => item.production_date === targetDate);
+    const normalizeDate = (dateStr: string) => dateStr ? dateStr.split('T')[0] : '';
+    const dayData = productionData.filter(item => normalizeDate(item.production_date) === normalizeDate(targetDate));
 
     // งาน default (A,B,C,D)
     let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
