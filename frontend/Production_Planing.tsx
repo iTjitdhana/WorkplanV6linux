@@ -280,10 +280,12 @@ export default function MedicalAppointmentDashboard() {
     let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
 
-    // งานปกติ (is_special !== 1, ไม่ใช่ default)
-    const normalJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special !== 1);
-    // งานพิเศษ (is_special === 1)
-    const specialJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special === 1);
+    // งานปกติ (is_special !== 1, ไม่ใช่ default, isDraft = false)
+    const normalJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special !== 1 && !item.isDraft);
+    // งานพิเศษ (is_special === 1, isDraft = false)
+    const specialJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special === 1 && !item.isDraft);
+    // งาน draft (isDraft = true, ไม่ใช่ default)
+    const draftJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.isDraft);
 
     // ฟังก์ชันเรียงตามเวลา/คน
     const sortFn = (a: any, b: any) => {
@@ -301,9 +303,10 @@ export default function MedicalAppointmentDashboard() {
     };
     normalJobs.sort(sortFn);
     specialJobs.sort(sortFn);
+    draftJobs.sort(sortFn);
 
     // รวมกลุ่มตามลำดับที่ต้องการ
-    return [...defaultDrafts, ...normalJobs, ...specialJobs];
+    return [...defaultDrafts, ...normalJobs, ...specialJobs, ...draftJobs];
   };
 
   const weekProduction = getWeekProduction()
@@ -1285,17 +1288,19 @@ export default function MedicalAppointmentDashboard() {
     if (defaultCodes.includes(item.job_code)) {
       return item.job_name;
     }
-    if (item.is_special === 1) {
-      // งานพิเศษ: นับเฉพาะงานที่ is_special === 1
-      const specialJobs = jobsOfDay.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
+    if (item.is_special === 1 && !item.isDraft) {
+      // งานพิเศษ: เฉพาะที่ sync แล้ว
+      const specialJobs = jobsOfDay.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code) && !j.isDraft);
       const specialIndex = specialJobs.findIndex(j => j.id === item.id) + 1;
       return `งานพิเศษที่ ${specialIndex} ${item.job_name}`;
-    } else {
-      // งานปกติ: นับเฉพาะงานที่ is_special !== 1
-      const normalJobs = jobsOfDay.filter(j => j.is_special !== 1 && !defaultCodes.includes(j.job_code));
+    } else if (item.is_special !== 1 && !item.isDraft) {
+      // งานปกติ: เฉพาะที่ sync แล้ว
+      const normalJobs = jobsOfDay.filter(j => j.is_special !== 1 && !defaultCodes.includes(j.job_code) && !j.isDraft);
       const normalIndex = normalJobs.findIndex(j => j.id === item.id) + 1;
       return `งานที่ ${normalIndex} ${item.job_name}`;
     }
+    // งาน draft ที่ยังไม่ sync
+    return item.job_name;
   };
 
   // เพิ่มฟังก์ชันเรียงลำดับงานแบบเดียวกับ Draft
