@@ -905,141 +905,31 @@ export default function MedicalAppointmentDashboard() {
 
   // เพิ่มฟังก์ชัน Sync Drafts
   const handleSyncDrafts = async () => {
-    // เปิด Google Sheet ก่อน
-    console.log("🟢 [DEBUG] กำลังเปิด Google Sheet...");
-    try {
-      window.open("https://docs.google.com/spreadsheets/d/1lzsYNoIbTd1Uy5r37xUtK5PuOHyNlYYiqS7xZvrU8C8", "_blank");
-      console.log("🟢 [DEBUG] เปิด Google Sheet สำเร็จ");
-    } catch (err) {
-      console.error("🔴 [DEBUG] ไม่สามารถเปิด Google Sheet ได้:", err);
-      // ลองเปิดด้วยวิธีอื่น
-      const link = document.createElement('a');
-      link.href = "https://docs.google.com/spreadsheets/d/1lzsYNoIbTd1Uy5r37xUtK5PuOHyNlYYiqS7xZvrU8C8/edit?gid=1601393572#gid=1601393572";
-      link.target = "_blank";
-      link.click();
-    }
-
     setIsSubmitting(true);
     setMessage("");
     try {
-      await fetch("http://192.168.0.94:3101/api/work-plans/sync-drafts-to-plans", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetDate: selectedDate })
-      });
-      // 1. เตรียมข้อมูล summaryRows สำหรับ 1.ใบสรุปงาน v.4 (ไม่เอา A, B, C, D)
-      const defaultCodes = ['A', 'B', 'C', 'D'];
-          // ฟังก์ชันแปลงรหัส/ID ห้องเป็นชื่อห้อง
-    const getRoomNameByCodeOrId = (codeOrId: string) => {
-      if (!codeOrId) return "";
-      const room = rooms.find(r => r.room_code === codeOrId || r.id?.toString() === codeOrId?.toString());
-      return room?.room_name || codeOrId;
-    };
-    // ฟังก์ชันแปลง ID เครื่องเป็นชื่อเครื่อง
-    const getMachineNameById = (machineId: string) => {
-      if (!machineId) return "";
-      const machine = machines.find(m => m.id?.toString() === machineId?.toString());
-      return machine?.machine_name || machineId;
-    };
-      // เรียงงานตาม logic หน้าเว็บ
-      const filtered = productionData
-        .filter(item => item.production_date === selectedDate && !(item.isDraft && defaultCodes.includes(item.job_code)))
-        .sort((a, b) => {
-          const timeA = a.start_time || "00:00";
-          const timeB = b.start_time || "00:00";
-          const timeComparison = timeA.localeCompare(timeB);
-          if (timeComparison !== 0) return timeComparison;
-          const operatorA = (a.operators || "").split(", ")[0] || "";
-          const operatorB = (b.operators || "").split(", ")[0] || "";
-          const indexA = operatorA.indexOf("อ");
-          const indexB = operatorB.indexOf("อ");
-          if (indexA === 0 && indexB !== 0) return -1;
-          if (indexB === 0 && indexA !== 0) return 1;
-          return operatorA.localeCompare(operatorB);
+      if (!disableSyncToWorkplan) {
+        // sync ไป workplan จริงตามปกติ
+        await fetch("http://192.168.0.94:3101/api/work-plans/sync-drafts-to-plans", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetDate: selectedDate })
         });
-      const summaryRows = filtered.map((item, idx) => {
-        let ops = (item.operators || "").split(", ").map((s: string) => s.trim());
-        while (ops.length < 4) ops.push("");
-        return [
-          idx + 1, // ลำดับ
-          item.job_code || "",
-          item.job_name || "", // ใช้ชื่อจริงเท่านั้น
-          ops[0],
-          ops[1],
-          ops[2],
-          ops[3],
-          item.start_time || "",
-          item.end_time || "",
-          getMachineNameById(item.machine_id), // ส่งชื่อเครื่อง
-          getRoomNameByCodeOrId(item.production_room) // ส่งชื่อห้อง
-        ];
-      });
-      // 2. ส่ง batch ไป 1.ใบสรุปงาน v.4
+      } else {
+        // ข้ามการ sync ไป workplan จริง (ทดสอบ Google Sheet อย่างเดียว)
+        setMessage("โหมดทดสอบ: ไม่ sync ไป workplan จริง");
+      }
+      // ส่งไป Google Sheet ตามปกติ (หรือฟังก์ชันที่มีอยู่)
       await sendToGoogleSheet({
         sheetName: "1.ใบสรุปงาน v.4",
         rows: summaryRows,
         clearSheet: true
       });
-
-      // 3. เตรียมข้อมูลสำหรับ Log_แผนผลิต (แยกแถวตามผู้ปฏิบัติงาน)
-      const logRows: string[][] = [];
-      const today = new Date();
-      const dateString = today.toLocaleDateString('th-TH', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'numeric', 
-        day: 'numeric' 
-      }).replace('พ.ศ.', '').trim();
-      const dateValue = today.toLocaleDateString('en-GB'); // DD/MM/YYYY
-      const timeStamp = today.toLocaleString('en-GB') + ', ' + today.toLocaleTimeString('en-GB');
-
-      filtered.forEach((item) => {
-        const operators = (item.operators || "").split(", ").map((s: string) => s.trim()).filter(Boolean);
-        
-        if (operators.length === 0) {
-          // ถ้าไม่มีผู้ปฏิบัติงาน ส่ง 1 แถว
-          logRows.push([
-            dateString, // วันที่
-            dateValue, // Date Value
-            item.job_code || "", // เลขที่งาน (รหัสจริง)
-            item.job_name || "", // ชื่องาน (ชื่อจริง)
-            "", // ผู้ปฏิบัติงาน (ว่าง)
-            item.start_time || "", // เวลาเริ่มต้น
-            item.end_time || "", // เวลาสิ้นสุด
-            getRoomNameByCodeOrId(item.production_room) // ห้อง
-          ]);
-        } else {
-          // ถ้ามีผู้ปฏิบัติงาน ส่งแถวละคน
-          operators.forEach((operator: string) => {
-            logRows.push([
-              dateString, // วันที่
-              dateValue, // Date Value
-              item.job_code || "", // เลขที่งาน (รหัสจริง)
-              item.job_name || "", // ชื่องาน (ชื่อจริง)
-              operator, // ผู้ปฏิบัติงาน
-              item.start_time || "", // เวลาเริ่มต้น
-              item.end_time || "", // เวลาสิ้นสุด
-              getRoomNameByCodeOrId(item.production_room) // ห้อง
-            ]);
-          });
-        }
-      });
-
-      // 4. ส่ง batch ไป Log_แผนผลิต (แยกการส่ง)
-      if (logRows.length > 0) {
-        console.log("🟡 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต:", logRows.length, "แถว");
-        await sendToGoogleSheet({
-          sheetName: "Log_แผนผลิต",
-          rows: logRows,
-          clearSheet: true
-        });
-        console.log("🟢 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต สำเร็จ");
-      }
-      setIsSubmitting(false);
+      await loadAllProductionData();
     } catch (err) {
-      setMessage("เกิดข้อผิดพลาดในการเชื่อมต่อ API");
-      setIsSubmitting(false);
+      setMessage("เกิดข้อผิดพลาดในการ sync");
     }
+    setIsSubmitting(false);
   };
 
   // เพิ่มฟังก์ชันยกเลิกการผลิต
@@ -1381,6 +1271,9 @@ export default function MedicalAppointmentDashboard() {
       ...specialJobs
     ];
   };
+
+  // เพิ่ม state สำหรับ toggle ปิด/เปิดการ sync ไป workplan จริง
+  const [disableSyncToWorkplan, setDisableSyncToWorkplan] = useState(false);
 
   return (
     <div className={`min-h-screen bg-green-50/30 ${notoSansThai.className} flex flex-col`}>
@@ -1726,6 +1619,17 @@ export default function MedicalAppointmentDashboard() {
                       >
                         รายสัปดาห์
                       </Button>
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <label className="font-medium text-sm">
+                        <input
+                          type="checkbox"
+                          checked={disableSyncToWorkplan}
+                          onChange={e => setDisableSyncToWorkplan(e.target.checked)}
+                          className="mr-2"
+                        />
+                        ปิดการ sync ไป workplan จริง (ทดสอบ Google Sheet เท่านั้น)
+                      </label>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
