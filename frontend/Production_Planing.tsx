@@ -1900,7 +1900,7 @@ export default function MedicalAppointmentDashboard() {
                                       variant="outline"
                                       className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} bg-blue-50 border-blue-300 text-blue-700 font-medium flex-shrink-0`}
                                     >
-                                      {formatProductionDate(selectedDate)}
+                                      {formatProductionDate(viewMode === "weekly" ? item.production_date : selectedDate)}
                                     </Badge>
                                     <h3
                                       className={`font-bold text-gray-900 ${
@@ -2102,7 +2102,7 @@ export default function MedicalAppointmentDashboard() {
                                       variant="outline"
                                       className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} bg-blue-50 border-blue-300 text-blue-700 font-medium flex-shrink-0`}
                                     >
-                                      {formatProductionDate(selectedDate)}
+                                      {formatProductionDate(viewMode === "weekly" ? item.production_date : selectedDate)}
                                     </Badge>
                                     <h3
                                       className={`font-bold text-gray-900 ${
