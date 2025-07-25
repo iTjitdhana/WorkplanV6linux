@@ -1035,6 +1035,11 @@ export default function MedicalAppointmentDashboard() {
         });
         console.log("🟢 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต สำเร็จ");
       }
+      // 5. อัปเดตวันที่ใน D1 ของ sheet รายงาน-เวลาผู้ปฏิบัติงาน
+      await sendToGoogleSheet({
+        sheetName: "รายงาน-เวลาผู้ปฏิบัติงาน",
+        "Date Value": dateValue
+      });
       setIsSubmitting(false);
       
       // เพิ่มการ reload productionData หลัง sync สำเร็จ
