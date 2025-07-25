@@ -244,12 +244,12 @@ export default function MedicalAppointmentDashboard() {
     const weekStart = weekDates[0].toISOString().split("T")[0];
     const weekEnd = weekDates[6].toISOString().split("T")[0];
     const defaultCodes = ['A', 'B', 'C', 'D'];
+    // ไม่แสดงงาน A,B,C,D ใน Weekly View
     const filteredData = productionData
       .filter((item) => {
         const isInWeekRange = item.production_date >= weekStart && item.production_date <= weekEnd;
-        // แสดงงาน A, B, C, D ทั้งที่เป็น draft และ sync แล้ว
         const isDefaultJob = defaultCodes.includes(item.job_code);
-        return isInWeekRange && isDefaultJob;
+        return isInWeekRange && !isDefaultJob;
       })
       .sort((a, b) => {
         const dateComparison = a.production_date.localeCompare(b.production_date);
@@ -266,7 +266,6 @@ export default function MedicalAppointmentDashboard() {
         if (indexB === 0 && indexA !== 0) return 1;
         return operatorA.localeCompare(operatorB);
       });
-    // ไม่เติม prefix ใด ๆ
     return filteredData;
   };
 
@@ -277,9 +276,12 @@ export default function MedicalAppointmentDashboard() {
     const defaultCodes = ['A', 'B', 'C', 'D'];
     const dayData = productionData.filter(item => item.production_date === targetDate);
 
-    // งาน default (A,B,C,D) - ทั้งที่เป็น draft และ sync แล้ว
-    let defaultDrafts = dayData.filter(item => defaultCodes.includes(item.job_code));
-    defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
+    // เงื่อนไข: ถ้าเป็น Daily View หรือ (Weekly View และเลือกวัน) ให้แสดงงาน A,B,C,D
+    let defaultDrafts = [];
+    if (viewMode === "daily" || (viewMode === "weekly" && selectedWeekDay)) {
+      defaultDrafts = dayData.filter(item => defaultCodes.includes(item.job_code));
+      defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
+    }
 
     // งานปกติ (is_special !== 1, ไม่ใช่ default, isDraft = false)
     const normalJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special !== 1 && !item.isDraft);
