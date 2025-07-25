@@ -434,14 +434,7 @@ class DraftWorkPlan {
       
       // 1. บันทึก log การ sync
       let syncLogId = null;
-      if (targetDate) {
-        const [syncLogResult] = await connection.execute(
-          'INSERT INTO workplan_sync_log (production_date) VALUES (?)',
-          [targetDate]
-        );
-        syncLogId = syncLogResult.insertId;
-      }
-      // 2. ดึงเวลาซิงค์ล่าสุดของวันนั้น
+      // 2. ดึงเวลาซิงค์ล่าสุดของวันนั้น (ก่อน insert log ใหม่)
       let lastSyncTime = null;
       if (targetDate) {
         const [syncRows] = await connection.execute(
@@ -450,6 +443,9 @@ class DraftWorkPlan {
         );
         if (syncRows.length > 0) {
           lastSyncTime = new Date(syncRows[0].synced_at);
+          console.log(`[SYNC] Last sync time for ${targetDate}:`, lastSyncTime);
+        } else {
+          console.log(`[SYNC] No previous sync found for ${targetDate}`);
         }
       }
       
@@ -487,6 +483,13 @@ class DraftWorkPlan {
           if (lastSyncTime && draft.created_at) {
             const draftCreatedAt = new Date(draft.created_at);
             isSpecialDraft = draftCreatedAt > lastSyncTime;
+            console.log(`[SYNC] Draft ${draft.job_code} ${draft.job_name}:`, {
+              draftCreatedAt: draftCreatedAt,
+              lastSyncTime: lastSyncTime,
+              isSpecialDraft: isSpecialDraft
+            });
+          } else {
+            console.log(`[SYNC] Draft ${draft.job_code} ${draft.job_name}: No lastSyncTime or created_at, isSpecialDraft = false`);
           }
           // 4. ไม่เติม prefix งานพิเศษใน job_code/job_name
           let jobCode = draft.job_code;
@@ -564,6 +567,16 @@ class DraftWorkPlan {
           // ไม่ rollback ทั้งหมด แต่ข้าม draft ที่มีปัญหา
           continue;
         }
+      }
+      
+      // 3. บันทึก log การ sync (ย้ายมาหลัง loop)
+      if (targetDate) {
+        const [syncLogResult] = await connection.execute(
+          'INSERT INTO workplan_sync_log (production_date) VALUES (?)',
+          [targetDate]
+        );
+        syncLogId = syncLogResult.insertId;
+        console.log(`[SYNC] Inserted sync log with ID: ${syncLogId}`);
       }
       
       console.log('🔄 Committing transaction...');
