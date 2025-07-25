@@ -247,8 +247,9 @@ export default function MedicalAppointmentDashboard() {
     const filteredData = productionData
       .filter((item) => {
         const isInWeekRange = item.production_date >= weekStart && item.production_date <= weekEnd;
-        const isNotDefaultDraft = !(item.isDraft && defaultCodes.includes(item.job_code));
-        return isInWeekRange && isNotDefaultDraft;
+        // แสดงงาน A, B, C, D ทั้งที่เป็น draft และ sync แล้ว
+        const isDefaultJob = defaultCodes.includes(item.job_code);
+        return isInWeekRange && isDefaultJob;
       })
       .sort((a, b) => {
         const dateComparison = a.production_date.localeCompare(b.production_date);
@@ -276,8 +277,8 @@ export default function MedicalAppointmentDashboard() {
     const defaultCodes = ['A', 'B', 'C', 'D'];
     const dayData = productionData.filter(item => item.production_date === targetDate);
 
-    // งาน default (A,B,C,D)
-    let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
+    // งาน default (A,B,C,D) - ทั้งที่เป็น draft และ sync แล้ว
+    let defaultDrafts = dayData.filter(item => defaultCodes.includes(item.job_code));
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
 
     // งานปกติ (is_special !== 1, ไม่ใช่ default, isDraft = false)
@@ -1363,10 +1364,14 @@ export default function MedicalAppointmentDashboard() {
   // ฟังก์ชันสำหรับ Weekly View: งานปกติเรียงก่อน งานพิเศษต่อท้าย (ใช้ is_special)
   const getSortedWeeklyProduction = (jobs: any[]) => {
     const defaultCodes = ['A', 'B', 'C', 'D'];
+    // งาน default (A,B,C,D)
+    const defaultJobs = jobs.filter(j => defaultCodes.includes(j.job_code));
     // งานพิเศษ (is_special === 1)
     const specialJobs = jobs.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
     // งานปกติ (is_special !== 1, ไม่ใช่ default)
     const normalJobs = jobs.filter(j => !defaultCodes.includes(j.job_code) && j.is_special !== 1);
+    // เรียงแต่ละกลุ่ม
+    defaultJobs.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
     const sortFn = (a: any, b: any) => {
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
@@ -1383,6 +1388,7 @@ export default function MedicalAppointmentDashboard() {
     normalJobs.sort(sortFn);
     specialJobs.sort(sortFn);
     return [
+      ...defaultJobs,
       ...normalJobs,
       ...specialJobs
     ];
