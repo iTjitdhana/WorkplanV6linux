@@ -1274,14 +1274,13 @@ export default function MedicalAppointmentDashboard() {
     if (defaultCodes.includes(item.job_code)) {
       return item.job_name;
     }
-    // งานพิเศษ (is_special === 1)
     if (item.is_special === 1) {
-      // นับลำดับงานพิเศษใน jobsOfDay โดยใช้ id จาก backend เท่านั้น
+      // งานพิเศษ: นับเฉพาะงานที่ is_special === 1
       const specialJobs = jobsOfDay.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
       const specialIndex = specialJobs.findIndex(j => j.id === item.id) + 1;
       return `งานพิเศษที่ ${specialIndex} ${item.job_name}`;
     } else {
-      // งานปกติ
+      // งานปกติ: นับเฉพาะงานที่ is_special !== 1
       const normalJobs = jobsOfDay.filter(j => j.is_special !== 1 && !defaultCodes.includes(j.job_code));
       const normalIndex = normalJobs.findIndex(j => j.id === item.id) + 1;
       return `งานที่ ${normalIndex} ${item.job_name}`;
@@ -1311,10 +1310,10 @@ export default function MedicalAppointmentDashboard() {
     const defaultCodes = ['A', 'B', 'C', 'D'];
     // งาน default (A,B,C,D)
     const defaultDrafts = jobs.filter(j => defaultCodes.includes(j.job_code));
-    // งานพิเศษ (is_special === 1)
-    const specialJobs = jobs.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
     // งานปกติ (is_special !== 1, ไม่ใช่ default)
     const normalJobs = jobs.filter(j => !defaultCodes.includes(j.job_code) && j.is_special !== 1);
+    // งานพิเศษ (is_special === 1)
+    const specialJobs = jobs.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
     // เรียงแต่ละกลุ่ม
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
     const sortFn = (a: any, b: any) => {
