@@ -257,7 +257,7 @@ export default function TrackerPage() {
                     setSelectedWorkplan(wp || null);
                   }}
                 >
-                  <option value="">-- เลือก --</option>
+                  <option value="">กรุณาเลือก</option>
                   {workplans.map(wp => (
                     <option key={wp.id} value={wp.id}>{wp.job_code}: {wp.job_name}</option>
                   ))}
