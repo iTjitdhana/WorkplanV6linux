@@ -244,12 +244,11 @@ export default function MedicalAppointmentDashboard() {
     const weekStart = weekDates[0].toISOString().split("T")[0];
     const weekEnd = weekDates[6].toISOString().split("T")[0];
     const defaultCodes = ['A', 'B', 'C', 'D'];
-    // ไม่แสดงงาน A,B,C,D ใน Weekly View
     const filteredData = productionData
       .filter((item) => {
         const isInWeekRange = item.production_date >= weekStart && item.production_date <= weekEnd;
-        const isDefaultJob = defaultCodes.includes(item.job_code);
-        return isInWeekRange && !isDefaultJob;
+        const isNotDefaultDraft = !(item.isDraft && defaultCodes.includes(item.job_code));
+        return isInWeekRange && isNotDefaultDraft;
       })
       .sort((a, b) => {
         const dateComparison = a.production_date.localeCompare(b.production_date);
@@ -266,6 +265,7 @@ export default function MedicalAppointmentDashboard() {
         if (indexB === 0 && indexA !== 0) return 1;
         return operatorA.localeCompare(operatorB);
       });
+    // ไม่เติม prefix ใด ๆ
     return filteredData;
   };
 
@@ -276,12 +276,9 @@ export default function MedicalAppointmentDashboard() {
     const defaultCodes = ['A', 'B', 'C', 'D'];
     const dayData = productionData.filter(item => item.production_date === targetDate);
 
-    // เงื่อนไข: ถ้าเป็น Daily View หรือ (Weekly View และเลือกวัน) ให้แสดงงาน A,B,C,D
-    let defaultDrafts = [];
-    if (viewMode === "daily" || (viewMode === "weekly" && selectedWeekDay)) {
-      defaultDrafts = dayData.filter(item => defaultCodes.includes(item.job_code));
-      defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
-    }
+    // งาน default (A,B,C,D)
+    let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
+    defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
 
     // งานปกติ (is_special !== 1, ไม่ใช่ default, isDraft = false)
     const normalJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special !== 1 && !item.isDraft);
@@ -1135,13 +1132,6 @@ export default function MedicalAppointmentDashboard() {
     if (viewMode !== "daily") return;
     if (!selectedDate) return;
     if (isCreatingRef.current) return;
-    
-    // เพิ่มการเช็คว่าได้สร้าง draft สำหรับวันที่นี้แล้วหรือยัง
-    const hasCreatedDraftsForDate = sessionStorage.getItem(`drafts_created_${selectedDate}`);
-    if (hasCreatedDraftsForDate) {
-      console.log(`[AUTO-DRAFT] Drafts already created for date: ${selectedDate}`);
-      return;
-    }
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
       { job_code: 'B', job_name: 'เบิกของส่งสาขา  - สด' },
@@ -1153,31 +1143,16 @@ export default function MedicalAppointmentDashboard() {
       await loadAllProductionData();
       const latestData = productionData;
       const dayJobs = latestData.filter(item => item.production_date === selectedDate);
-      
       for (const draft of defaultDrafts) {
-        // เช็คว่ามีงานนี้อยู่แล้วหรือไม่ (ทั้ง draft และ work plan จริง)
-        const existsAsDraft = dayJobs.some(item => 
-          item.job_code === draft.job_code && 
-          item.job_name === draft.job_name && 
-          item.isDraft
-        );
-        
-        const existsAsWorkPlan = dayJobs.some(item => 
-          item.job_code === draft.job_code && 
-          item.job_name === draft.job_name && 
-          !item.isDraft
-        );
-        
-        // ถ้ามีอยู่แล้วทั้ง draft และ work plan จริง ให้ข้าม
-        if (existsAsDraft || existsAsWorkPlan) {
-          console.log(`[AUTO-DRAFT] Already exists (draft: ${existsAsDraft}, workplan: ${existsAsWorkPlan}): ${draft.job_code} ${draft.job_name}`);
-          continue;
-        }
-        
-        // สร้าง draft ใหม่เฉพาะเมื่อไม่มีอยู่เลย
-        console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
-        try {
-          const response = await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
+        const exists = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name);
+        if (!exists) {
+          const existsInPlan = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name && !item.isDraft);
+          if (existsInPlan) {
+            console.log(`[AUTO-DRAFT] Already exists in plan: ${draft.job_code} ${draft.job_name}`);
+            continue;
+          }
+          console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
+          await fetch('http://192.168.0.94:3101/api/work-plans/drafts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1193,20 +1168,12 @@ export default function MedicalAppointmentDashboard() {
               notes: '',
             })
           });
-          
-          if (!response.ok) {
-            console.error(`[AUTO-DRAFT] Failed to create draft: ${draft.job_code} ${draft.job_name}`);
-          }
-        } catch (error) {
-          console.error(`[AUTO-DRAFT] Error creating draft: ${draft.job_code} ${draft.job_name}`, error);
+        } else {
+          console.log(`[AUTO-DRAFT] Already exists: ${draft.job_code} ${draft.job_name}`);
         }
       }
-      
       await loadAllProductionData();
       isCreatingRef.current = false;
-      
-      // บันทึกว่าสร้าง draft สำหรับวันที่นี้แล้ว
-      sessionStorage.setItem(`drafts_created_${selectedDate}`, 'true');
     };
     createMissingDrafts();
   }, [selectedDate, viewMode]);
@@ -1396,14 +1363,10 @@ export default function MedicalAppointmentDashboard() {
   // ฟังก์ชันสำหรับ Weekly View: งานปกติเรียงก่อน งานพิเศษต่อท้าย (ใช้ is_special)
   const getSortedWeeklyProduction = (jobs: any[]) => {
     const defaultCodes = ['A', 'B', 'C', 'D'];
-    // งาน default (A,B,C,D)
-    const defaultJobs = jobs.filter(j => defaultCodes.includes(j.job_code));
     // งานพิเศษ (is_special === 1)
     const specialJobs = jobs.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
     // งานปกติ (is_special !== 1, ไม่ใช่ default)
     const normalJobs = jobs.filter(j => !defaultCodes.includes(j.job_code) && j.is_special !== 1);
-    // เรียงแต่ละกลุ่ม
-    defaultJobs.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
     const sortFn = (a: any, b: any) => {
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
@@ -1420,7 +1383,6 @@ export default function MedicalAppointmentDashboard() {
     normalJobs.sort(sortFn);
     specialJobs.sort(sortFn);
     return [
-      ...defaultJobs,
       ...normalJobs,
       ...specialJobs
     ];
