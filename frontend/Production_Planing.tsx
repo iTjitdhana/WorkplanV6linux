@@ -1874,7 +1874,10 @@ export default function MedicalAppointmentDashboard() {
 
                       {(selectedWeekDay ? selectedDayProduction : weekProduction).length > 0 ? (
                         <div className="space-y-1 sm:space-y-2">
-                          {getSortedWeeklyProduction(weekProduction).map((item) => (
+                          {(selectedWeekDay
+                            ? getSortedDailyProduction(selectedDayProduction)
+                            : getSortedWeeklyProduction(weekProduction)
+                          ).map((item) => (
                             <div
                               key={item.id}
                               className={`border-l-4 ${
