@@ -1501,6 +1501,7 @@ export default function MedicalAppointmentDashboard() {
                               <div
                                 key={opt.job_code + idx}
                                 className="px-3 py-2 hover:bg-green-100 cursor-pointer text-sm"
+                                onMouseDown={e => e.preventDefault()}
                                 onClick={() => {
                                   justSelectedFromDropdownRef.current = true;
                                   setJobCode(opt.job_code);
