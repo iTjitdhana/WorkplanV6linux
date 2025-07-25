@@ -275,10 +275,18 @@ export default function MedicalAppointmentDashboard() {
     if (!targetDate) return [];
     const defaultCodes = ['A', 'B', 'C', 'D'];
     const dayData = productionData.filter(item => item.production_date === targetDate);
+
+    // งาน default (A,B,C,D)
     let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
-    const otherJobs = dayData.filter(item => !(item.isDraft && defaultCodes.includes(item.job_code)));
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
-    otherJobs.sort((a, b) => {
+
+    // งานปกติ (is_special !== 1, ไม่ใช่ default)
+    const normalJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special !== 1);
+    // งานพิเศษ (is_special === 1)
+    const specialJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special === 1);
+
+    // ฟังก์ชันเรียงตามเวลา/คน
+    const sortFn = (a: any, b: any) => {
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
       const timeComparison = timeA.localeCompare(timeB);
@@ -290,9 +298,12 @@ export default function MedicalAppointmentDashboard() {
       if (indexA === 0 && indexB !== 0) return -1;
       if (indexB === 0 && indexA !== 0) return 1;
       return operatorA.localeCompare(operatorB);
-    });
-    // ไม่เติม prefix ใด ๆ
-    return [...defaultDrafts, ...otherJobs];
+    };
+    normalJobs.sort(sortFn);
+    specialJobs.sort(sortFn);
+
+    // รวมกลุ่มตามลำดับที่ต้องการ
+    return [...defaultDrafts, ...normalJobs, ...specialJobs];
   };
 
   const weekProduction = getWeekProduction()
