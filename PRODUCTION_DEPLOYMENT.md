@@ -1,230 +1,530 @@
-# การติดตั้งบน Production Server
+# 🚀 คู่มือการ Deploy แบบ Production Mode
 
-## 🚀 คำแนะนำสำหรับการติดตั้งบน Server
+## 📋 **Production vs Development**
 
-### ปัญหาที่พบ
-- รันได้บน localhost แต่พอขึ้น server แล้วเชื่อมต่อฐานข้อมูลไม่ได้
-- Error: `Access denied for user 'jitdhana'@'host.docker.internal'`
+### 🔧 **Development Mode**
+- รันด้วย `npm run dev`
+- Hot reload, debugging tools
+- ไม่ optimize performance
+- ใช้ port 3011 (frontend), 3101 (backend)
 
-### สาเหตุหลัก
-1. **Database Configuration**: ใช้ค่า config สำหรับ development บน production
-2. **MySQL User Permissions**: User ไม่มีสิทธิ์เชื่อมต่อจาก server
-3. **Network Configuration**: MySQL ไม่เปิดให้เชื่อมต่อจากภายนอก
-4. **Environment Variables**: ไม่ได้ตั้งค่า environment สำหรับ production
+### 🚀 **Production Mode**
+- Build และ optimize code
+- ใช้ PM2 สำหรับ process management
+- Environment variables สำหรับ production
+- Performance optimization
 
-## 🛠️ วิธีแก้ไข
+## 🛠️ **การ Setup Production Environment**
 
-### ขั้นตอนที่ 1: Clone และเข้าไปในโฟลเดอร์
+### 1. 📦 **Build Frontend**
+
+#### 1.1 Build Next.js App
 ```bash
-git clone https://github.com/iTjitdhana/WorkplansV4.git
-cd WorkplansV4/backend
+cd frontend
+npm run build
 ```
 
-### ขั้นตอนที่ 2: รัน Production Setup Script (แนะนำ)
+#### 1.2 ตรวจสอบ Build Output
 ```bash
-chmod +x setup_production.sh
-./setup_production.sh
+# ตรวจสอบไฟล์ที่ build
+ls -la .next/
+# ตรวจสอบ static files
+ls -la out/
 ```
 
-Script นี้จะทำการ:
-- ติดตั้ง MySQL (ถ้ายังไม่มี)
-- สร้างฐานข้อมูล `esp_tracker`
-- Import database schema
-- สร้างไฟล์ `.env` สำหรับ production
-- ติดตั้ง Node.js dependencies
-- ติดตั้งและตั้งค่า PM2
-- ทดสอบการเชื่อมต่อฐานข้อมูล
+### 2. 🔧 **Setup Backend Production**
 
-### ขั้นตอนที่ 3: Manual Setup (ถ้าไม่ใช้ script)
-
-#### 3.1 ติดตั้ง MySQL
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install mysql-server -y
-
-# CentOS/RHEL
-sudo yum install mysql-server -y
-
-# Start MySQL
-sudo systemctl start mysql
-sudo systemctl enable mysql
+#### 2.1 สร้างไฟล์ ecosystem.config.js
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: 'workplan-backend',
+      script: 'server.js',
+      cwd: './backend',
+      instances: 'max', // หรือระบุจำนวน เช่น 2
+      exec_mode: 'cluster',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3101
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: 3101,
+        DB_HOST: 'localhost',
+        DB_USER: 'root',
+        DB_PASSWORD: 'your_production_password',
+        DB_NAME: 'workplan',
+        DB_PORT: 3306
+      },
+      error_file: './logs/err.log',
+      out_file: './logs/out.log',
+      log_file: './logs/combined.log',
+      time: true
+    },
+    {
+      name: 'workplan-frontend',
+      script: 'npm',
+      args: 'start',
+      cwd: './frontend',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3011
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: 3011,
+        NEXT_PUBLIC_API_URL: 'http://localhost:3101'
+      }
+    }
+  ]
+};
 ```
 
-#### 3.2 สร้างฐานข้อมูลและ User
+#### 2.2 ติดตั้ง PM2
 ```bash
-mysql -u root -p
+# ติดตั้ง PM2 globally
+npm install -g pm2
+
+# ตรวจสอบการติดตั้ง
+pm2 --version
 ```
 
+### 3. 🗄️ **Database Optimization**
+
+#### 3.1 MySQL Configuration
 ```sql
--- สร้างฐานข้อมูล
-CREATE DATABASE IF NOT EXISTS esp_tracker;
+-- เพิ่ม indexes สำหรับ performance
+CREATE INDEX idx_work_plans_date ON work_plans(production_date);
+CREATE INDEX idx_work_plans_status ON work_plans(status_id);
+CREATE INDEX idx_logs_work_plan ON logs(work_plan_id);
+CREATE INDEX idx_logs_timestamp ON logs(timestamp);
 
--- ใช้ root user สำหรับ production (ปลอดภัยกว่า)
-GRANT ALL PRIVILEGES ON esp_tracker.* TO 'root'@'localhost';
-FLUSH PRIVILEGES;
-
--- ตรวจสอบ
-SHOW DATABASES;
-USE esp_tracker;
+-- Optimize tables
+OPTIMIZE TABLE work_plans;
+OPTIMIZE TABLE work_plan_drafts;
+OPTIMIZE TABLE logs;
 ```
 
-#### 3.3 Import Database Schema
-```bash
-# หา SQL file
-find . -name "*.sql" -type f
+#### 3.2 MySQL my.cnf Optimization
+```ini
+[mysqld]
+# Performance settings
+innodb_buffer_pool_size = 1G
+innodb_log_file_size = 256M
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
 
-# Import schema
-mysql -u root -p esp_tracker < "esp_tracker (6).sql"
+# Connection settings
+max_connections = 200
+max_connect_errors = 100000
+
+# Query cache
+query_cache_type = 1
+query_cache_size = 64M
+query_cache_limit = 2M
 ```
 
-#### 3.4 สร้างไฟล์ .env
-```bash
-cd backend
-nano .env
-```
+## 🚀 **การ Deploy แบบ Production**
 
-เพิ่มเนื้อหา:
-```env
-# Production Environment Variables
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_mysql_root_password
-DB_NAME=esp_tracker
-DB_PORT=3306
+### 1. 📦 **Build และ Deploy Script**
 
-# Server Configuration
-PORT=3101
-NODE_ENV=production
+#### 1.1 สร้างไฟล์ deploy-production.bat
+```batch
+@echo off
+echo ========================================
+echo 🚀 Production Deployment
+echo ========================================
 
-# Frontend URL for CORS
-FRONTEND_URL=http://192.168.0.94:3011
+echo.
+echo 📦 Building Frontend...
+cd frontend
+call npm run build
+if %errorlevel% neq 0 (
+    echo ❌ Frontend build failed
+    pause
+    exit /b 1
+)
+echo ✅ Frontend build successful
 
-# API Rate Limit
-API_RATE_LIMIT=1000
-```
+cd ..
 
-#### 3.5 ติดตั้ง Dependencies
-```bash
-npm install
-```
+echo.
+echo 🔧 Setting up Production Environment...
+if not exist "logs" mkdir logs
 
-#### 3.6 ทดสอบการเชื่อมต่อ
-```bash
-npm run dev
-```
-
-ดูว่ามี message:
-```
-✅ Database connected successfully
-🏠 Connected to host: localhost
-👤 Connected as user: root
-```
-
-### ขั้นตอนที่ 4: ติดตั้ง PM2 สำหรับ Production
-```bash
-# ติดตั้ง PM2
-sudo npm install -g pm2
-
-# Start application
+echo.
+echo 🚀 Starting Production with PM2...
 pm2 start ecosystem.config.js --env production
 
-# Save PM2 configuration
-pm2 save
-
-# Enable PM2 to start on boot
-pm2 startup
-```
-
-### ขั้นตอนที่ 5: ตั้งค่า Firewall
-```bash
-# เปิด port 3101 สำหรับ Backend API
-sudo ufw allow 3101
-
-# เปิด port 3011 สำหรับ Frontend (ถ้าจำเป็น)
-sudo ufw allow 3011
-
-# เปิด port 3306 สำหรับ MySQL (ถ้าจำเป็น)
-sudo ufw allow 3306
-
-# ตรวจสอบ firewall status
-sudo ufw status
-```
-
-## 🧪 การทดสอบ
-
-### ทดสอบ Backend API
-```bash
-curl http://192.168.0.94:3101/api/health
-```
-
-### ทดสอบการเชื่อมต่อฐานข้อมูล
-```bash
-mysql -u root -p -e "USE esp_tracker; SHOW TABLES;"
-```
-
-### ตรวจสอบ PM2 Status
-```bash
+echo.
+echo 📊 PM2 Status:
 pm2 status
-pm2 logs
+
+echo.
+echo 🎯 Production Deployment Complete!
+echo.
+echo 🌐 URLs:
+echo - Frontend: http://localhost:3011
+echo - Backend: http://localhost:3101
+echo.
+echo 📋 Commands:
+echo - pm2 status (ดูสถานะ)
+echo - pm2 logs (ดู logs)
+echo - pm2 restart all (restart ทั้งหมด)
+echo - pm2 stop all (หยุดทั้งหมด)
+echo.
+
+pause
 ```
 
-## 🔧 การจัดการ Application
-
-### PM2 Commands
+#### 1.2 สร้างไฟล์ deploy-production.sh (Linux/Mac)
 ```bash
-# ดู status
+#!/bin/bash
+
+echo "========================================"
+echo "🚀 Production Deployment"
+echo "========================================"
+
+echo ""
+echo "📦 Building Frontend..."
+cd frontend
+npm run build
+if [ $? -ne 0 ]; then
+    echo "❌ Frontend build failed"
+    exit 1
+fi
+echo "✅ Frontend build successful"
+
+cd ..
+
+echo ""
+echo "🔧 Setting up Production Environment..."
+mkdir -p logs
+
+echo ""
+echo "🚀 Starting Production with PM2..."
+pm2 start ecosystem.config.js --env production
+
+echo ""
+echo "📊 PM2 Status:"
+pm2 status
+
+echo ""
+echo "🎯 Production Deployment Complete!"
+echo ""
+echo "🌐 URLs:"
+echo "- Frontend: http://localhost:3011"
+echo "- Backend: http://localhost:3101"
+echo ""
+echo "📋 Commands:"
+echo "- pm2 status (ดูสถานะ)"
+echo "- pm2 logs (ดู logs)"
+echo "- pm2 restart all (restart ทั้งหมด)"
+echo "- pm2 stop all (หยุดทั้งหมด)"
+echo ""
+```
+
+### 2. 🔧 **Environment Configuration**
+
+#### 2.1 Production Environment Variables
+```env
+# backend/.env.production
+NODE_ENV=production
+PORT=3101
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_secure_password
+DB_NAME=workplan
+DB_PORT=3306
+
+# Security
+JWT_SECRET=your_jwt_secret_key
+SESSION_SECRET=your_session_secret
+
+# Google Apps Script
+GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
+
+# Performance
+API_RATE_LIMIT=100
+CORS_ORIGINS=http://localhost:3011,http://your-domain.com
+```
+
+#### 2.2 Frontend Environment Variables
+```env
+# frontend/.env.production
+NEXT_PUBLIC_API_URL=http://localhost:3101
+NEXT_PUBLIC_APP_ENV=production
+NEXT_PUBLIC_APP_VERSION=1.0.0
+```
+
+## 📊 **Performance Optimization**
+
+### 1. 🚀 **Frontend Optimization**
+
+#### 1.1 Next.js Configuration
+```javascript
+// next.config.mjs
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Production optimizations
+  output: 'standalone',
+  compress: true,
+  poweredByHeader: false,
+  
+  // Image optimization
+  images: {
+    domains: ['localhost'],
+    formats: ['image/webp', 'image/avif'],
+  },
+  
+  // Bundle analyzer
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
+    }
+    return config;
+  },
+  
+  // Security headers
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin',
+          },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;
+```
+
+#### 1.2 Bundle Analysis
+```bash
+# ติดตั้ง bundle analyzer
+npm install --save-dev @next/bundle-analyzer
+
+# รัน bundle analyzer
+npm run build
+npm run analyze
+```
+
+### 2. 🔧 **Backend Optimization**
+
+#### 2.1 Express.js Optimization
+```javascript
+// backend/server.js
+const express = require('express');
+const compression = require('compression');
+const helmet = require('helmet');
+
+const app = express();
+
+// Compression middleware
+app.use(compression());
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+// Rate limiting
+const rateLimit = require('express-rate-limit');
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP',
+});
+app.use('/api/', limiter);
+```
+
+#### 2.2 Database Connection Pooling
+```javascript
+// backend/config/database.js
+const mysql = require('mysql2/promise');
+
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
+  
+  // Connection pool settings
+  connectionLimit: 20,
+  acquireTimeout: 60000,
+  timeout: 60000,
+  reconnect: true,
+  
+  // Performance settings
+  charset: 'utf8mb4',
+  timezone: '+07:00',
+  
+  // SSL (ถ้าใช้)
+  // ssl: {
+  //   rejectUnauthorized: false
+  // }
+});
+
+module.exports = pool;
+```
+
+## 🔍 **Monitoring และ Logging**
+
+### 1. 📊 **PM2 Monitoring**
+```bash
+# ดูสถานะ processes
 pm2 status
 
 # ดู logs
-pm2 logs esp-tracker-backend
+pm2 logs
 
-# Restart
-pm2 restart esp-tracker-backend
+# ดู performance
+pm2 monit
 
-# Stop
-pm2 stop esp-tracker-backend
-
-# Delete
-pm2 delete esp-tracker-backend
+# ดู detailed info
+pm2 show workplan-backend
+pm2 show workplan-frontend
 ```
 
-### การอัพเดท Code
+### 2. 📈 **Performance Monitoring**
 ```bash
-# Pull latest code
-git pull origin main
+# ติดตั้ง monitoring tools
+npm install -g pm2-logrotate
 
-# Install new dependencies
-npm install
-
-# Restart application
-pm2 restart esp-tracker-backend
+# ตั้งค่า log rotation
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 30
 ```
 
-## 🐛 การแก้ไขปัญหา
+### 3. 🔍 **Health Check Endpoints**
+```javascript
+// backend/routes/health.js
+const express = require('express');
+const router = express.Router();
+const pool = require('../config/database');
 
-### ถ้ายัง Connection ไม่ได้
-1. ตรวจสอบ MySQL service: `sudo systemctl status mysql`
-2. ตรวจสอบ port: `netstat -tlnp | grep 3306`
-3. ตรวจสอบ .env file: `cat .env`
-4. ดู logs: `pm2 logs`
+router.get('/health', async (req, res) => {
+  try {
+    // ตรวจสอบ database connection
+    await pool.query('SELECT 1');
+    
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      database: 'connected'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message
+    });
+  }
+});
 
-### ถ้า Frontend เชื่อมต่อ Backend ไม่ได้
-1. ตรวจสอบ Backend รันอยู่: `pm2 status`
-2. ทดสอบ API: `curl http://192.168.0.94:3101/api/health`
-3. ตรวจสอบ CORS settings ใน `backend/server.js`
-4. ตรวจสอบ firewall: `sudo ufw status`
+module.exports = router;
+```
 
-## 📝 หมายเหตุ
+## 🔄 **Deployment Scripts**
 
-- **ความปลอดภัย**: ใช้ root user เฉพาะใน development เท่านั้น สำหรับ production ควรสร้าง user เฉพาะ
-- **Backup**: สำรองฐานข้อมูลเป็นประจำ
-- **Monitoring**: ใช้ PM2 monitoring หรือติดตั้ง monitoring tools เพิ่มเติม
-- **SSL**: พิจารณาใช้ HTTPS สำหรับ production
+### 1. 🚀 **Quick Deploy Script**
+```batch
+@echo off
+echo 🚀 Quick Production Deploy
 
-## 🆘 หากยังมีปัญหา
+echo 📦 Building...
+cd frontend && npm run build && cd ..
 
-ติดต่อแผนกเทคโนโลยีสารสนเทศ หรือส่ง logs มาดู:
-```bash
-pm2 logs --lines 50
-``` 
+echo 🔧 Restarting PM2...
+pm2 restart all
+
+echo ✅ Deploy Complete!
+```
+
+### 2. 🔄 **Rollback Script**
+```batch
+@echo off
+echo 🔄 Rolling back to previous version
+
+echo 📦 Reverting build...
+cd frontend && git checkout HEAD~1 && npm run build && cd ..
+
+echo 🔧 Restarting PM2...
+pm2 restart all
+
+echo ✅ Rollback Complete!
+```
+
+## 📋 **Production Checklist**
+
+### ✅ **Pre-Deployment**
+- [ ] Build frontend successful
+- [ ] Database optimized
+- [ ] Environment variables set
+- [ ] SSL certificates ready (ถ้าใช้)
+- [ ] Backup database
+
+### ✅ **Deployment**
+- [ ] PM2 processes started
+- [ ] Health check passed
+- [ ] Logs monitoring active
+- [ ] Performance metrics normal
+
+### ✅ **Post-Deployment**
+- [ ] All endpoints working
+- [ ] Database connections stable
+- [ ] Error logs clean
+- [ ] Performance acceptable
+
+## 🎯 **สรุป**
+
+### 🚀 **Production Mode Benefits:**
+- **Performance**: Optimized code, compression, caching
+- **Security**: Security headers, rate limiting, input validation
+- **Stability**: Process management, auto-restart, monitoring
+- **Scalability**: Load balancing, connection pooling
+
+### 📊 **Monitoring:**
+- PM2 process monitoring
+- Database performance
+- API response times
+- Error tracking
+
+### 🔧 **Maintenance:**
+- Regular backups
+- Log rotation
+- Performance tuning
+- Security updates
+
+---
+
+## 🎉 **Production Ready!**
+
+ระบบพร้อมใช้งานใน Production Mode แล้ว! 🚀 
