@@ -15,12 +15,18 @@ REM Step 1: Check file structure
 echo [STEP 1] Check File Structure
 echo ================================
 echo [INFO] Checking if SearchBox.tsx exists...
-if exist "frontend\components\SearchBox.tsx" (
+if exist "components\SearchBox.tsx" (
     echo [SUCCESS] SearchBox.tsx found
 ) else (
     echo [ERROR] SearchBox.tsx not found
-    pause
-    exit /b 1
+    echo [INFO] Checking in frontend directory...
+    if exist "frontend\components\SearchBox.tsx" (
+        echo [SUCCESS] SearchBox.tsx found in frontend directory
+    ) else (
+        echo [ERROR] SearchBox.tsx not found anywhere
+        pause
+        exit /b 1
+    )
 )
 echo.
 
@@ -28,7 +34,11 @@ REM Step 2: Check import path
 echo [STEP 2] Check Import Path
 echo ================================
 echo [INFO] Current import path in Production_Planing.tsx:
-findstr "import.*SearchBox" frontend\Production_Planing.tsx
+if exist "frontend\Production_Planing.tsx" (
+    findstr "import.*SearchBox" frontend\Production_Planing.tsx
+) else (
+    findstr "import.*SearchBox" Production_Planing.tsx
+)
 echo.
 
 REM Step 3: Try different import paths
