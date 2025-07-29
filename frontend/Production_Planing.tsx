@@ -26,7 +26,7 @@ import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Noto_Sans_Thai } from "next/font/google"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { SearchBox, SearchOption } from "@/components/SearchBox";
+// import { SearchBox, SearchOption } from "@/components/SearchBox";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -1604,19 +1604,14 @@ export default function MedicalAppointmentDashboard() {
                     </div>
                   </div>
 
-                  {/* Autocomplete Job Name/Code */}
+                  {/* Job Name Input */}
                   <div className="space-y-2 relative">
-                    <Label className="text-xs sm:text-sm font-bold text-gray-700">ค้นหารายการ (พิมพ์เพื่อค้นหา)</Label>
-                    <SearchBox
-                      value={jobQuery}
-                      onChange={setJobQuery}
-                      onSelect={(item: SearchOption) => {
-                        justSelectedFromDropdownRef.current = true;
-                        setJobCode(item.job_code);
-                        setJobName(item.job_name);
-                        setJobQuery(item.job_name);
-                      }}
-                      cacheRef={searchCacheRef}
+                    <Label className="text-xs sm:text-sm font-bold text-gray-700">ชื่องาน</Label>
+                    <Input
+                      value={jobName}
+                      onChange={(e) => setJobName(e.target.value)}
+                      placeholder="พิมพ์ชื่องาน..."
+                      className="text-sm"
                     />
                   </div>
 
