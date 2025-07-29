@@ -7,8 +7,8 @@ const isLocalhost = process.env.DB_HOST === 'localhost' || process.env.DB_HOST =
 
 // Configuration สำหรับ environments ต่างๆ
 const dbConfig = {
-  // Remote MySQL configuration
-  host: process.env.DB_HOST || '192.168.0.94',
+  // Local MySQL configuration (default)
+  host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'jitdhana',
   password: process.env.DB_PASSWORD || 'iT12345$',
   database: process.env.DB_NAME || 'esp_tracker',
