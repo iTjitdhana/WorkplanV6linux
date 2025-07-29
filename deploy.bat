@@ -55,6 +55,9 @@ if %errorlevel% neq 0 (
     echo [WARNING] MySQL is not installed or not in PATH
     echo Please install MySQL manually or ensure it's in your PATH
     echo Download from: https://dev.mysql.com/downloads/mysql/
+    echo.
+    echo [INFO] You can continue without MySQL for now and install it later
+    echo [INFO] The system will work with SQLite as fallback
     pause
 ) else (
     echo [INFO] MySQL is installed
@@ -110,11 +113,17 @@ cd frontend
 
 REM Install dependencies
 echo [INFO] Installing frontend dependencies...
-call npm install
+echo [INFO] Using --legacy-peer-deps to resolve dependency conflicts...
+call npm install --legacy-peer-deps
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install frontend dependencies
-    pause
-    exit /b 1
+    echo [INFO] Trying with --force flag...
+    call npm install --force
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to install frontend dependencies even with --force
+        pause
+        exit /b 1
+    )
 )
 
 REM Create .env.local file
