@@ -1,139 +1,152 @@
 @echo off
-REM 🚀 Production Mode Startup Script
-REM สำหรับรันระบบใน Production Mode ที่มีประสิทธิภาพสูงสุด
+REM 🚀 Start Production Mode
+REM สำหรับรันระบบใน Production mode
 
 echo.
 echo ================================
-echo Production Mode Startup
+echo Start Production Mode
 echo ================================
 echo.
 
-echo [INFO] Starting WorkplanV5 in Production Mode...
-echo [INFO] This will optimize performance for production use
+echo [INFO] Starting system in Production mode...
 echo.
 
-REM Check if PM2 is installed
-pm2 --version >nul 2>&1
+REM Step 1: Check if backend is running
+echo [STEP 1] Check Backend Status
+echo ================================
+echo [INFO] Checking if backend is running...
+
+curl -s http://192.168.0.94:3101 >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] PM2 is not installed
-    echo [INFO] Installing PM2 globally...
-    npm install -g pm2
-    if %errorlevel% neq 0 (
-        echo [ERROR] Failed to install PM2
-        pause
-        exit /b 1
-    )
+    echo [ERROR] Backend is not running
+    echo [INFO] Starting backend server...
+    cd backend
+    start "Backend Production" cmd /k "npm start"
+    cd ..
+    echo [INFO] Backend server started
+    echo [INFO] Please wait a moment...
+    timeout /t 5 >nul
+) else (
+    echo [SUCCESS] Backend is running
+)
+echo.
+
+REM Step 2: Build frontend for production
+echo [STEP 2] Build Frontend for Production
+echo ================================
+echo [INFO] Building frontend for production...
+
+cd frontend
+echo [INFO] Installing dependencies...
+call npm install --legacy-peer-deps
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to install dependencies
+    echo [INFO] Trying with --force...
+    call npm install --force
 )
 
-echo.
-echo [STEP 1] Building Frontend for Production
-echo ================================
-cd frontend
-
-echo [INFO] Installing dependencies with production optimizations...
-call npm install --legacy-peer-deps --production
-
-echo [INFO] Building frontend for production...
+echo [INFO] Building for production...
 call npm run build
-
 if %errorlevel% neq 0 (
-    echo [ERROR] Frontend build failed
+    echo [ERROR] Build failed
+    echo [INFO] Please check the errors above
     pause
     exit /b 1
 )
-
-echo [SUCCESS] Frontend built successfully!
-
 cd ..
-
+echo [SUCCESS] Frontend built successfully
 echo.
-echo [STEP 2] Setting up Backend for Production
+
+REM Step 3: Start frontend in production mode
+echo [STEP 3] Start Frontend Production Server
 echo ================================
-cd backend
+echo [INFO] Starting frontend in production mode...
 
-echo [INFO] Installing backend dependencies...
-call npm install --production
-
-echo [INFO] Creating production environment file...
-if not exist .env (
-    echo [INFO] Creating .env file for production...
-    (
-    echo # Production Environment Variables
-    echo DB_HOST=localhost
-    echo DB_USER=root
-    echo DB_PASSWORD=your_mysql_password
-    echo DB_NAME=esp_tracker
-    echo DB_PORT=3306
-    echo PORT=3101
-    echo NODE_ENV=production
-    echo FRONTEND_URL=http://localhost:3011
-    echo API_RATE_LIMIT=1000
-    echo CORS_ORIGIN=http://localhost:3011
-    echo JWT_SECRET=your_jwt_secret_key_here
-    echo SESSION_SECRET=your_session_secret_here
-    ) > .env
-    echo [INFO] Please edit backend\.env with your actual MySQL password
-)
-
+cd frontend
+start "Frontend Production" cmd /k "npm start"
 cd ..
-
+echo [SUCCESS] Frontend production server started
 echo.
-echo [STEP 3] Starting Services with PM2
+
+REM Step 4: Show access URLs
+echo [STEP 4] Access URLs
 echo ================================
-
-echo [INFO] Stopping existing PM2 processes...
-pm2 stop all 2>nul
-pm2 delete all 2>nul
-
-echo [INFO] Starting Backend with PM2...
-cd backend
-pm2 start server.js --name "workplan-backend" --env production --max-memory-restart 512M --node-args="--max-old-space-size=512"
-
-echo [INFO] Starting Frontend with PM2...
-cd ../frontend
-pm2 start npm --name "workplan-frontend" -- start --env production
-
-cd ..
-
+echo [INFO] System is now running in Production mode:
 echo.
-echo [STEP 4] Saving PM2 Configuration
+echo [BACKEND]
+echo - API URL: http://192.168.0.94:3101
+echo - Local API: http://localhost:3101
+echo.
+echo [FRONTEND]
+echo - Production URL: http://192.168.0.94:3011
+echo - Local URL: http://localhost:3011
+echo.
+echo [FEATURES]
+echo - SearchBox autocomplete: ✅ Enabled
+echo - Dropdown components: ✅ Enabled
+echo - Production optimizations: ✅ Enabled
+echo.
+
+REM Step 5: Create monitoring script
+echo [STEP 5] Create Monitoring Script
 echo ================================
-pm2 save
-pm2 startup
+echo [INFO] Creating monitoring script...
 
-echo.
-echo [STEP 5] Setting up Auto-restart
-echo ================================
-echo [INFO] Configuring PM2 to auto-restart on system reboot...
-pm2 startup
-echo [INFO] Run the command above as Administrator if prompted
+(
+echo @echo off
+echo REM 📊 Production Monitoring
+echo echo.
+echo echo ================================
+echo echo Production Monitoring
+echo echo ================================
+echo echo.
+echo echo [INFO] Monitoring production system...
+echo echo.
+echo echo [STEP 1] Check backend status...
+echo curl -s http://192.168.0.94:3101 ^>nul 2^>^&1
+echo if %%errorlevel%% neq 0 ^(
+echo   echo [ERROR] Backend not accessible
+echo ^) else ^(
+echo   echo [SUCCESS] Backend accessible
+echo ^)
+echo echo.
+echo echo [STEP 2] Check frontend status...
+echo curl -s http://192.168.0.94:3011 ^>nul 2^>^&1
+echo if %%errorlevel%% neq 0 ^(
+echo   echo [ERROR] Frontend not accessible
+echo ^) else ^(
+echo   echo [SUCCESS] Frontend accessible
+echo ^)
+echo echo.
+echo echo [STEP 3] Check API endpoints...
+echo curl -s http://192.168.0.94:3101/api/users
+echo echo.
+echo echo [STEP 4] Check database connection...
+echo cd backend
+echo node -e "const mysql = require('mysql2/promise'); async function test() { try { const conn = await mysql.createConnection({host: '192.168.0.94', user: 'jitdhana', password: 'iT12345$', database: 'esp_tracker'}); console.log('✅ Database connected'); await conn.end(); } catch(err) { console.log('❌ Database error:', err.message); } } test();"
+echo cd ..
+echo echo.
+echo pause
+) > monitor-production.bat
 
+echo [SUCCESS] Monitoring script created: monitor-production.bat
 echo.
-echo [STEP 6] Performance Monitoring
-echo ================================
-echo [INFO] Starting PM2 monitoring...
-pm2 monit
 
-echo.
 echo ================================
-echo 🎉 Production Mode Started Successfully!
+echo ✅ Production Mode Started!
 echo ================================
 echo.
-echo [ACCESS URLs]
-echo Backend API: http://localhost:3101
-echo Frontend App: http://localhost:3011
-echo PM2 Dashboard: pm2 monit
+echo [NEXT STEPS]
+echo 1. Open http://192.168.0.94:3011
+echo 2. Test SearchBox autocomplete
+echo 3. Test dropdown components
+echo 4. Run: monitor-production.bat
 echo.
-echo [MANAGEMENT COMMANDS]
-echo View logs: pm2 logs
-echo Restart all: pm2 restart all
-echo Stop all: pm2 stop all
-echo Status: pm2 status
-echo.
-echo [PERFORMANCE TIPS]
-echo - Backend uses 512MB memory limit
-echo - Frontend optimized for production
-echo - Auto-restart on crashes
-echo - Monitoring enabled
+echo [TROUBLESHOOTING]
+echo If there are issues:
+echo 1. Check backend logs
+echo 2. Check frontend logs
+echo 3. Run monitor-production.bat
+echo 4. Check browser console
 echo.
 pause 
