@@ -248,6 +248,40 @@ class LogController {
       });
     }
   }
+
+  // Get work plans status based on logs
+  static async getWorkPlansStatus(req, res) {
+    try {
+      const { workPlanIds } = req.query;
+      
+      console.log('[DEBUG] getWorkPlansStatus called with workPlanIds:', workPlanIds);
+      
+      if (!workPlanIds) {
+        return res.status(400).json({
+          success: false,
+          message: 'workPlanIds parameter is required'
+        });
+      }
+      
+      // แปลง string เป็น array
+      const workPlanIdsArray = workPlanIds.split(',').map(id => parseInt(id.trim()));
+      console.log('[DEBUG] Parsed workPlanIdsArray:', workPlanIdsArray);
+      
+      const statusMap = await Log.getWorkPlansStatus(workPlanIdsArray);
+      console.log('[DEBUG] Status map result:', statusMap);
+      
+      res.json({
+        success: true,
+        data: statusMap
+      });
+    } catch (error) {
+      console.error('[ERROR] Error in getWorkPlansStatus:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
 }
 
 module.exports = LogController; 

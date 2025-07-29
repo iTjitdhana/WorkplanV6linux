@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Override สำหรับสถานะ "รอดำเนินการ" ให้เป็นสีเทา */
+.status-pending {
+  background-color: #f9fafb !important;
+  color: #4b5563 !important;
+  border-color: #d1d5db !important;
+}
+
+/* บังคับให้สถานะ "รอดำเนินการ" เป็นสีเทา */
+[class*="bg-red"][class*="text-red"]:has-text("รอดำเนินการ"),
+[class*="bg-red"][class*="text-red"]:contains("รอดำเนินการ") {
+  background-color: #f9fafb !important;
+  color: #4b5563 !important;
+  border-color: #d1d5db !important;
+}
+
+/* Override สำหรับ border สีแดงของสถานะ "รอดำเนินการ" */
+.border-l-red-400:has-text("รอดำเนินการ"),
+.border-l-red-400:contains("รอดำเนินการ") {
+  border-left-color: #9ca3af !important;
+  background-color: #f9fafb !important;
+}
+
 body {
   font-family: Arial, Helvetica, sans-serif;
 }

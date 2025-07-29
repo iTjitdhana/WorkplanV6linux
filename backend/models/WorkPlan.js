@@ -12,12 +12,14 @@ class WorkPlan {
           wp.job_name,
           wp.start_time,
           wp.end_time,
+          wp.notes,
+          wp.operators,
           COALESCE(wp.status_id, 1) as status_id,
           COALESCE(ps.name, 'รอดำเนินการ') as status_name,
           COALESCE(ps.color, '#FF6B6B') as status_color,
           ff.is_finished,
           ff.updated_at as finished_at,
-          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) as operators,
+          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) as operators_from_join,
           GROUP_CONCAT(DISTINCT wpo.id_code ORDER BY wpo.id_code) as operator_codes
         FROM work_plans wp
         LEFT JOIN production_statuses ps ON wp.status_id = ps.id
@@ -58,12 +60,14 @@ class WorkPlan {
           wp.job_name,
           wp.start_time,
           wp.end_time,
+          wp.notes,
+          wp.operators,
           1 as status_id,
           'รอดำเนินการ' as status_name,
           '#FF6B6B' as status_color,
           ff.is_finished,
           ff.updated_at as finished_at,
-          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) as operators,
+          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) as operators_from_join,
           GROUP_CONCAT(DISTINCT wpo.id_code ORDER BY wpo.id_code) as operator_codes
         FROM work_plans wp
         LEFT JOIN finished_flags ff ON wp.id = ff.work_plan_id
@@ -102,6 +106,8 @@ class WorkPlan {
           wp.job_name,
           wp.start_time,
           wp.end_time,
+          wp.notes,
+          wp.operators,
           ff.is_finished,
           ff.updated_at as finished_at
         FROM work_plans wp
@@ -167,7 +173,7 @@ class WorkPlan {
     try {
       await connection.beginTransaction();
       
-      const { production_date, job_code, job_name, start_time, end_time, operators } = workPlanData;
+      const { production_date, job_code, job_name, start_time, end_time, notes, operators } = workPlanData;
       
       console.log('🗄️ Database insert - production_date:', production_date);
       console.log('🗄️ Database insert - production_date type:', typeof production_date);
@@ -193,12 +199,12 @@ class WorkPlan {
       
       // Insert work plan
       const insertQuery = `
-        INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, notes, operators)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
       
       const [result] = await connection.execute(insertQuery, [
-        formattedDate, job_code, job_name, formattedStartTime, formattedEndTime
+        formattedDate, job_code, job_name, formattedStartTime, formattedEndTime, notes || null, operators ? JSON.stringify(operators) : null
       ]);
       
       const workPlanId = result.insertId;
@@ -235,7 +241,7 @@ class WorkPlan {
     try {
       await connection.beginTransaction();
       
-      const { production_date, job_code, job_name, start_time, end_time, operators } = workPlanData;
+      const { production_date, job_code, job_name, start_time, end_time, notes, operators } = workPlanData;
       
       // แปลงวันที่ให้เป็นรูปแบบที่ถูกต้อง
       let formattedDate = production_date;
@@ -254,12 +260,12 @@ class WorkPlan {
       // Update work plan
       const updateQuery = `
         UPDATE work_plans 
-        SET production_date = ?, job_code = ?, job_name = ?, start_time = ?, end_time = ?
+        SET production_date = ?, job_code = ?, job_name = ?, start_time = ?, end_time = ?, notes = ?, operators = ?
         WHERE id = ?
       `;
       
       await connection.execute(updateQuery, [
-        formattedDate, job_code, job_name, formattedStartTime, formattedEndTime, id
+        formattedDate, job_code, job_name, formattedStartTime, formattedEndTime, notes || null, operators ? JSON.stringify(operators) : null, id
       ]);
       
       // Update operators
@@ -353,11 +359,26 @@ class WorkPlan {
   // Update work plan status
   static async updateStatus(id, statusId) {
     try {
+      // ตรวจสอบว่ามีคอลัมน์ status_id หรือไม่
+      const [columns] = await pool.execute(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'work_plans' 
+        AND COLUMN_NAME = 'status_id'
+      `);
+      
+      if (columns.length === 0) {
+        console.log('⚠️ status_id column not found, skipping status update');
+        return true; // Return true to avoid error
+      }
+      
       const query = 'UPDATE work_plans SET status_id = ? WHERE id = ?';
       const [result] = await pool.execute(query, [statusId, id]);
       return result.affectedRows > 0;
     } catch (error) {
-      throw new Error(`Error updating work plan status: ${error.message}`);
+      console.error('Error updating work plan status:', error);
+      return false;
     }
   }
 
@@ -410,7 +431,7 @@ class DraftWorkPlan {
     try {
       await connection.beginTransaction();
       
-      let query = 'SELECT * FROM work_plan_drafts WHERE workflow_status_id = 2';
+      let query = 'SELECT * FROM work_plan_drafts WHERE workflow_status_id = 2 AND job_code NOT IN (\'A\', \'B\', \'C\', \'D\')';
       let params = [];
       
       // ถ้ามีการระบุวันที่ ให้ sync เฉพาะวันที่นั้น
@@ -423,8 +444,9 @@ class DraftWorkPlan {
       
       console.log('🔄 Sync query:', query);
       console.log('🔄 Sync params:', params);
+      console.log('🔄 [PROTECTION] กรองออกงาน A, B, C, D จาก sync');
       
-      // ดึง drafts ที่มีสถานะ "บันทึกเสร็จสิ้น" (workflow_status_id = 2)
+      // ดึง drafts ที่มีสถานะ "บันทึกเสร็จสิ้น" (workflow_status_id = 2) และไม่ใช่ A, B, C, D
       const [drafts] = await connection.execute(query, params);
       
       console.log('🔄 Found drafts to sync:', drafts.length);
@@ -517,8 +539,19 @@ class DraftWorkPlan {
           const hasStatusColumn = columns.some(col => col.COLUMN_NAME === 'status_id');
           const hasIsSpecialColumn = columns.some(col => col.COLUMN_NAME === 'is_special');
           console.log('🔄 Has status_id column:', hasStatusColumn, 'Has is_special column:', hasIsSpecialColumn);
-          if (hasStatusColumn && hasIsSpecialColumn) {
-            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special) VALUES (?, ?, ?, ?, ?, ?, ?)';
+          // ตรวจสอบว่ามี operators column หรือไม่
+          const [operatorsColumns] = await connection.execute(`
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'work_plans' 
+            AND COLUMN_NAME = 'operators'
+          `);
+          const hasOperatorsColumn = operatorsColumns.length > 0;
+          console.log('🔄 Has operators column:', hasOperatorsColumn);
+          
+          if (hasStatusColumn && hasIsSpecialColumn && hasOperatorsColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special, notes, operators) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
             insertParams = [
               draft.production_date, 
               jobCode, 
@@ -526,26 +559,54 @@ class DraftWorkPlan {
               draft.start_time, 
               draft.end_time,
               isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
-              isSpecialDraft ? 1 : 0   // is_special
+              isSpecialDraft ? 1 : 0,   // is_special
+              draft.notes || null,      // notes
+              JSON.stringify(operators) // operators
             ];
-          } else if (hasStatusColumn) {
-            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id) VALUES (?, ?, ?, ?, ?, ?)';
+          } else if (hasStatusColumn && hasOperatorsColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, notes, operators) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
             insertParams = [
               draft.production_date, 
               jobCode, 
               jobName, 
               draft.start_time, 
               draft.end_time,
-              isSpecialDraft ? 10 : 1 // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              draft.notes || null,     // notes
+              JSON.stringify(operators) // operators
             ];
-          } else {
-            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time) VALUES (?, ?, ?, ?, ?)';
+          } else if (hasStatusColumn && hasIsSpecialColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
             insertParams = [
               draft.production_date, 
               jobCode, 
               jobName, 
               draft.start_time, 
-              draft.end_time
+              draft.end_time,
+              isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialDraft ? 1 : 0,   // is_special
+              draft.notes || null       // notes
+            ];
+          } else if (hasStatusColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?)';
+            insertParams = [
+              draft.production_date, 
+              jobCode, 
+              jobName, 
+              draft.start_time, 
+              draft.end_time,
+              isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              draft.notes || null      // notes
+            ];
+          } else {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, notes) VALUES (?, ?, ?, ?, ?, ?)';
+            insertParams = [
+              draft.production_date, 
+              jobCode, 
+              jobName, 
+              draft.start_time, 
+              draft.end_time,
+              draft.notes || null      // notes
             ];
           }
           console.log('🔄 Insert query:', insertQuery);

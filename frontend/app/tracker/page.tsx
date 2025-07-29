@@ -35,9 +35,13 @@ export default function TrackerPage() {
   // Load workplans by date
   useEffect(() => {
     setIsLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans?date=${date}`)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101';
+    fetch(`${apiUrl}/api/work-plans?date=${date}`)
       .then(res => res.json())
-      .then(data => setWorkplans((data.data || []).filter((wp: any) => wp.status_name !== 'งานผลิตถูกยกเลิก')))
+      .then(data => {
+        console.log('[DEBUG] Loaded workplans:', data);
+        setWorkplans((data.data || []).filter((wp: any) => wp.status_name !== 'งานผลิตถูกยกเลิก'));
+      })
       .finally(() => setIsLoading(false));
     setSelectedWorkplan(null);
     setProcessSteps([]);
@@ -50,10 +54,13 @@ export default function TrackerPage() {
   useEffect(() => {
     if (!selectedWorkplan) return;
     setIsLoading(true);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101';
     Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/process-steps?job_code=${selectedWorkplan.job_code}`).then(res => res.json()),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/logs/work-plan/${selectedWorkplan.id}`).then(res => res.json())
+      fetch(`${apiUrl}/api/process-steps?job_code=${selectedWorkplan.job_code}`).then(res => res.json()),
+      fetch(`${apiUrl}/api/logs/work-plan/${selectedWorkplan.id}`).then(res => res.json())
     ]).then(([steps, logs]) => {
+      console.log('[DEBUG] Loaded process steps:', steps);
+      console.log('[DEBUG] Loaded process logs:', logs);
       setProcessSteps(steps.data || []);
       setProcessLogs(logs.data || []);
       setSelectedProcessIndex(0);
@@ -70,24 +77,42 @@ export default function TrackerPage() {
     }
     const step = processSteps[selectedProcessIndex];
     const log = processLogs.find((l: any) => l.process_number === step.process_number) || {};
+    
+    console.log('[DEBUG] Timer update:', {
+      step: step.process_number,
+      log: log,
+      start_time: log.start_time,
+      stop_time: log.stop_time,
+      used_time: log.used_time
+    });
+    
     if (log.start_time && !log.stop_time) {
-      // running
+      // running - เริ่ม timer
       const start = new Date(log.start_time);
       if (timer) clearInterval(timer);
       const t = setInterval(() => {
-        setUsedSec(Math.floor((Date.now() - start.getTime()) / 1000));
+        const currentSec = Math.floor((Date.now() - start.getTime()) / 1000);
+        setUsedSec(currentSec);
+        console.log('[DEBUG] Timer tick:', currentSec);
       }, 1000);
       setTimer(t);
       setUsedSec(Math.floor((Date.now() - start.getTime()) / 1000));
     } else if (log.used_time != null) {
+      // finished - แสดงเวลาจาก database
       setUsedSec(log.used_time);
       if (timer) clearInterval(timer);
     } else {
+      // not started - รีเซ็ต timer
       setUsedSec(null);
       if (timer) clearInterval(timer);
     }
-    return () => { if (timer) clearInterval(timer); };
-    // eslint-disable-next-line
+    
+    return () => { 
+      if (timer) {
+        clearInterval(timer);
+        setTimer(null);
+      }
+    };
   }, [processLogs, selectedProcessIndex]);
 
   // Scroll to active step in process list
@@ -100,6 +125,75 @@ export default function TrackerPage() {
     }
   }, [selectedProcessIndex]);
 
+  // Handle finish production
+  const handleFinishProduction = async () => {
+    if (!selectedWorkplan) return;
+    setIsLoading(true);
+    setMessage("");
+    setStatusType("info");
+    
+    console.log("[DEBUG] handleFinishProduction called for workplan:", selectedWorkplan.id);
+    
+    try {
+      const apiUrl = 'http://localhost:3101'; // Hardcode URL เพื่อแก้ปัญหา
+      
+      console.log("[DEBUG] API URL:", apiUrl);
+      console.log("[DEBUG] Workplan ID:", selectedWorkplan.id);
+      console.log("[DEBUG] Full URL:", `${apiUrl}/api/work-plans/${selectedWorkplan.id}/status`);
+      
+      // อัปเดตสถานะงานเป็น "เสร็จสิ้น" (status_id = 4)
+      const res = await fetch(`${apiUrl}/api/work-plans/${selectedWorkplan.id}/status`, {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        mode: 'cors',
+        body: JSON.stringify({ status_id: 4 }) // 4 = เสร็จสิ้น
+      });
+      
+      const result = await res.json();
+      console.log("[DEBUG] Finish production response:", result);
+      
+      if (!res.ok || !result.success) {
+        console.error("[DEBUG] API error:", result);
+        throw new Error(result.message || "API error");
+      }
+      
+      setMessage("จบงานผลิตแล้ว");
+      setStatusType("success");
+      
+      // Reload workplans เพื่ออัปเดตสถานะ
+      console.log("[DEBUG] Reloading workplans...");
+      const workplansRes = await fetch(`${apiUrl}/api/work-plans?date=${date}`);
+      const workplansData = await workplansRes.json();
+      setWorkplans((workplansData.data || []).filter((wp: any) => wp.status_name !== 'งานผลิตถูกยกเลิก'));
+      
+      // อัปเดต selectedWorkplan ด้วยสถานะใหม่
+      const updatedWorkplan = workplansData.data?.find((wp: any) => wp.id === selectedWorkplan.id);
+      if (updatedWorkplan) {
+        setSelectedWorkplan(updatedWorkplan);
+      }
+      
+    } catch (e: any) {
+      console.error("[DEBUG] Error in handleFinishProduction:", e);
+      console.error("[DEBUG] Error name:", e.name);
+      console.error("[DEBUG] Error message:", e.message);
+      console.error("[DEBUG] Error stack:", e.stack);
+      
+      let errorMessage = "เกิดข้อผิดพลาดในการจบงานผลิต";
+      if (e.name === 'TypeError' && e.message.includes('Failed to fetch')) {
+        errorMessage = "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อ";
+      } else if (e.message) {
+        errorMessage += ": " + e.message;
+      }
+      
+      setMessage(errorMessage);
+      setStatusType("fail");
+    }
+    setIsLoading(false);
+  };
+
   // Handle start/stop
   const handleLog = async (isStart: boolean) => {
     if (!selectedWorkplan || !processSteps[selectedProcessIndex]) return;
@@ -109,6 +203,15 @@ export default function TrackerPage() {
     const step = processSteps[selectedProcessIndex];
     const status = isStart ? "start" : "stop";
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
+    
+    console.log("[DEBUG] handleLog called:", {
+      isStart,
+      workplan: selectedWorkplan.id,
+      step: step.process_number,
+      status,
+      timestamp
+    });
+    
     try {
       console.log("[DEBUG] ส่ง log ไป backend:", {
         work_plan_id: selectedWorkplan.id,
@@ -116,7 +219,9 @@ export default function TrackerPage() {
         status,
         timestamp
       });
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/logs`, {
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101';
+      const res = await fetch(`${apiUrl}/api/logs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -126,15 +231,26 @@ export default function TrackerPage() {
           timestamp
         })
       });
+      
       const result = await res.json().catch(() => ({}));
       console.log("[DEBUG] log response:", result);
-      if (!res.ok || !result.success) throw new Error(result.message || "API error");
+      
+      if (!res.ok || !result.success) {
+        console.error("[DEBUG] API error:", result);
+        throw new Error(result.message || "API error");
+      }
+      
       setMessage(isStart ? "เริ่มขั้นตอนแล้ว" : "หยุดขั้นตอนแล้ว");
       setStatusType("success");
+      
       // reload logs
-      const logs = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/logs/work-plan/${selectedWorkplan.id}`).then(r => r.json());
+      console.log("[DEBUG] Reloading logs...");
+      const logs = await fetch(`${apiUrl}/api/logs/work-plan/${selectedWorkplan.id}`).then(r => r.json());
+      console.log("[DEBUG] Reloaded logs:", logs);
       setProcessLogs(logs.data || []);
+      
     } catch (e: any) {
+      console.error("[DEBUG] Error in handleLog:", e);
       setMessage("เกิดข้อผิดพลาดในการบันทึก: " + (e?.message || ""));
       setStatusType("fail");
     }
@@ -172,7 +288,7 @@ export default function TrackerPage() {
             <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-4">
               {/* Header */}
               <div className="text-center text-lg font-semibold mb-2">
-                {selectedWorkplan ? `${selectedWorkplan.job_name} (${selectedWorkplan.job_code})` : "แผนงานผลิต"}
+                {selectedWorkplan ? selectedWorkplan.job_name : "แผนงานผลิต"}
               </div>
               {/* เลขขั้นตอน + ปุ่มลูกศร + ชื่อขั้นตอน */}
               <div className="flex flex-col items-center mb-2">
@@ -220,7 +336,14 @@ export default function TrackerPage() {
                   <div className="text-xs text-gray-500">เวลาที่ใช้</div>
                   <div className="font-bold text-lg">{(() => {
                     const log = processLogs.find((l: any) => l.process_number === processSteps[selectedProcessIndex]?.process_number) || {};
-                    return log.used_time != null ? formatUsedTime(log.used_time) : "–";
+                    // ใช้ usedSec ถ้ามี (timer กำลังทำงาน) หรือใช้ log.used_time จาก database
+                    if (usedSec !== null) {
+                      return formatUsedTime(usedSec);
+                    } else if (log.used_time != null) {
+                      return formatUsedTime(log.used_time);
+                    } else {
+                      return "–";
+                    }
                   })()}</div>
                 </div>
               </div>
@@ -238,7 +361,8 @@ export default function TrackerPage() {
                 >หยุดขั้นตอน</button>
                 <button
                   className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg text-lg disabled:opacity-50"
-                  disabled
+                  onClick={() => handleFinishProduction()}
+                  disabled={isLoading || !selectedWorkplan}
                 >จบงานผลิตแล้ว</button>
               </div>
             </div>
@@ -259,13 +383,27 @@ export default function TrackerPage() {
                 >
                   <option value="">กรุณาเลือก</option>
                   {workplans.map(wp => (
-                    <option key={wp.id} value={wp.id}>{wp.job_code}: {wp.job_name}</option>
+                    <option key={wp.id} value={wp.id}>{wp.job_name}</option>
                   ))}
                 </select>
               </div>
               {selectedWorkplan && selectedWorkplan.operators && (
                 <div className="mt-2 text-gray-700 text-base">
-                  <span className="font-semibold">ผู้ปฏิบัติงาน:</span> {Array.isArray(selectedWorkplan.operators) ? selectedWorkplan.operators.join(", ") : selectedWorkplan.operators}
+                  <span className="font-semibold">ผู้ปฏิบัติงาน:</span> {(() => {
+                    try {
+                      if (typeof selectedWorkplan.operators === 'string') {
+                        return selectedWorkplan.operators;
+                      } else if (Array.isArray(selectedWorkplan.operators)) {
+                        return selectedWorkplan.operators.map((op: any) => 
+                          typeof op === 'string' ? op : op.name || op.id_code || 'Unknown'
+                        ).join(", ");
+                      } else {
+                        return 'ไม่ระบุ';
+                      }
+                    } catch (e) {
+                      return 'ไม่ระบุ';
+                    }
+                  })()}
                 </div>
               )}
             </div>
@@ -289,7 +427,16 @@ export default function TrackerPage() {
                       <div className="flex flex-col text-base text-right min-w-[110px] gap-0.5">
                         <span>เริ่ม: <span className="text-green-700 font-bold">{log.start_time ? new Date(log.start_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–"}</span></span>
                         <span>สิ้นสุด: <span className="text-red-600 font-bold">{log.stop_time ? new Date(log.stop_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–"}</span></span>
-                        <span>ใช้เวลา: <span className="text-blue-700 font-bold">{log.used_time != null ? formatUsedTime(log.used_time) : "–"}</span></span>
+                        <span>ใช้เวลา: <span className="text-blue-700 font-bold">{(() => {
+                          // ถ้าเป็นขั้นตอนที่กำลังทำงาน ให้ใช้ usedSec
+                          if (idx === selectedProcessIndex && usedSec !== null) {
+                            return formatUsedTime(usedSec);
+                          } else if (log.used_time != null) {
+                            return formatUsedTime(log.used_time);
+                          } else {
+                            return "–";
+                          }
+                        })()}</span></span>
                       </div>
                     </div>
                   );

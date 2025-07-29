@@ -27,6 +27,7 @@ router.get('/', LogController.getAll);
 router.get('/:id', LogController.getById);
 router.get('/work-plan/:workPlanId', LogController.getByWorkPlanId);
 router.get('/work-plan/:workPlanId/status', LogController.getProcessStatus);
+router.get('/work-plans/status', LogController.getWorkPlansStatus);
 router.get('/summary/:date', LogController.getProductionSummary);
 
 router.post('/', logValidation, LogController.create);

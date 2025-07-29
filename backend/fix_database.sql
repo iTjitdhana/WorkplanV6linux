@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `production_statuses` (
 -- 3. Insert production statuses if not exists
 INSERT IGNORE INTO `production_statuses` (`id`, `name`, `description`, `color`, `is_active`) VALUES
 (1, 'รอดำเนินการ', 'งานที่ยังไม่ได้เริ่มดำเนินการ', '#FF6B6B', 1),
-(2, 'กำลังดำเนินการ', 'งานที่กำลังดำเนินการอยู่', '#4ECDC4', 1),
+(2, 'กำลังดำเนินการ', 'งานที่กำลังดำเนินการอยู่', '#F59E0B', 1),
 (3, 'รอตรวจสอบ', 'งานที่เสร็จแล้วรอการตรวจสอบ', '#45B7D1', 1),
 (4, 'เสร็จสิ้น', 'งานที่เสร็จสิ้นแล้ว', '#96CEB4', 1),
 (5, 'ระงับการทำงาน', 'งานที่ถูกระงับการทำงานชั่วคราว', '#FFEAA7', 1),
@@ -56,3 +56,34 @@ DEALLOCATE PREPARE fk_stmt;
 
 -- 5. Update existing work plans to have default status (รอดำเนินการ)
 UPDATE `work_plans` SET `status_id` = 1 WHERE `status_id` IS NULL; 
+
+-- เพิ่มคอลัมน์ notes ในตาราง work_plans (ถ้ายังไม่มี)
+SET @notes_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                     WHERE TABLE_SCHEMA = DATABASE() 
+                     AND TABLE_NAME = 'work_plans' 
+                     AND COLUMN_NAME = 'notes');
+
+SET @notes_sql = IF(@notes_exists = 0, 
+    'ALTER TABLE work_plans ADD COLUMN notes text COLLATE utf8mb4_unicode_520_ci DEFAULT NULL COMMENT "หมายเหตุ"',
+    'SELECT "Column notes already exists" as message'
+);
+PREPARE notes_stmt FROM @notes_sql;
+EXECUTE notes_stmt;
+DEALLOCATE PREPARE notes_stmt;
+
+-- เพิ่มคอลัมน์ operators ในตาราง work_plans (ถ้ายังไม่มี)
+SET @operators_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                         WHERE TABLE_SCHEMA = DATABASE() 
+                         AND TABLE_NAME = 'work_plans' 
+                         AND COLUMN_NAME = 'operators');
+
+SET @operators_sql = IF(@operators_exists = 0, 
+    'ALTER TABLE work_plans ADD COLUMN operators JSON DEFAULT NULL COMMENT "ข้อมูลผู้ปฏิบัติงานในรูปแบบ JSON"',
+    'SELECT "Column operators already exists" as message'
+);
+PREPARE operators_stmt FROM @operators_sql;
+EXECUTE operators_stmt;
+DEALLOCATE PREPARE operators_stmt;
+
+-- อัปเดตข้อมูลที่มีอยู่ (ถ้ามี)
+-- UPDATE `work_plans` SET `notes` = NULL WHERE `notes` IS NULL; 

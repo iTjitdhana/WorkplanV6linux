@@ -324,6 +324,97 @@ class Log {
       throw new Error(`Error fetching production summary: ${error.message}`);
     }
   }
+
+  // Get work plan status based on logs
+  static async getWorkPlanStatus(workPlanId) {
+    try {
+      console.log(`[DEBUG] Getting status for work plan ID: ${workPlanId}`);
+      
+      // ตรวจสอบว่ามี logs สำหรับ work plan นี้หรือไม่
+      const hasLogsQuery = `
+        SELECT COUNT(*) as log_count
+        FROM logs 
+        WHERE work_plan_id = ?
+      `;
+      
+      const [logCountResult] = await pool.execute(hasLogsQuery, [workPlanId]);
+      const hasLogs = logCountResult[0].log_count > 0;
+      
+      console.log(`[DEBUG] Has logs for work plan ${workPlanId}: ${hasLogs}`);
+      
+      if (!hasLogs) {
+        return { status: 'pending', message: 'รอดำเนินการ' };
+      }
+      
+      // ตรวจสอบสถานะของแต่ละ process
+      const processStatusQuery = `
+        SELECT 
+          l.process_number,
+          l.status,
+          l.timestamp,
+          ps.process_description
+        FROM logs l
+        LEFT JOIN work_plans wp ON l.work_plan_id = wp.id
+        LEFT JOIN process_steps ps ON wp.job_code = ps.job_code AND l.process_number = ps.process_number
+        WHERE l.work_plan_id = ? AND l.id IN (
+          SELECT MAX(id) FROM logs 
+          WHERE work_plan_id = ? 
+          GROUP BY process_number
+        )
+        ORDER BY l.process_number
+      `;
+      
+      const [processRows] = await pool.execute(processStatusQuery, [workPlanId, workPlanId]);
+      console.log(`[DEBUG] Process rows for work plan ${workPlanId}:`, processRows);
+      
+      // ตรวจสอบว่าทุก process มี status เป็น 'stop' หรือไม่
+      const allProcessesStopped = processRows.length > 0 && processRows.every(row => row.status === 'stop');
+      
+      console.log(`[DEBUG] All processes stopped for work plan ${workPlanId}: ${allProcessesStopped}`);
+      
+      if (allProcessesStopped) {
+        return { 
+          status: 'completed', 
+          message: 'เสร็จสิ้น',
+          processes: processRows
+        };
+      } else {
+        return { 
+          status: 'in_progress', 
+          message: 'กำลังดำเนินการ',
+          processes: processRows
+        };
+      }
+    } catch (error) {
+      console.error(`[ERROR] Error in getWorkPlanStatus for work plan ${workPlanId}:`, error);
+      throw new Error(`Error fetching work plan status: ${error.message}`);
+    }
+  }
+
+  // Get work plan status for multiple work plans
+  static async getWorkPlansStatus(workPlanIds) {
+    try {
+      if (!workPlanIds || workPlanIds.length === 0) {
+        return {};
+      }
+      
+      const statusMap = {};
+      
+      for (const workPlanId of workPlanIds) {
+        try {
+          const status = await this.getWorkPlanStatus(workPlanId);
+          statusMap[workPlanId] = status;
+        } catch (error) {
+          console.error(`Error getting status for work plan ${workPlanId}:`, error);
+          statusMap[workPlanId] = { status: 'error', message: 'เกิดข้อผิดพลาด' };
+        }
+      }
+      
+      return statusMap;
+    } catch (error) {
+      throw new Error(`Error fetching work plans status: ${error.message}`);
+    }
+  }
 }
 
 module.exports = Log; 

@@ -50,5 +50,6 @@ router.delete('/:id', WorkPlanController.delete);
 router.patch('/:id/finish', WorkPlanController.markAsFinished);
 router.patch('/:id/unfinish', WorkPlanController.markAsUnfinished);
 router.patch('/:id/cancel', WorkPlanController.cancelProduction);
+router.patch('/:id/status', WorkPlanController.updateStatus);
 
 module.exports = router; 

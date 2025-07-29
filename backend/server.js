@@ -42,6 +42,8 @@ const allowedOrigins = [
   'http://localhost:3011',
   'http://127.0.0.1:3011',
   'http://192.168.0.94:3011',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
   // Network access origins
   /^http:\/\/192\.168\.\d+\.\d+:3011$/,  // Allow any 192.168.x.x IP
   /^http:\/\/10\.\d+\.\d+\.\d+:3011$/,   // Allow any 10.x.x.x IP
@@ -71,8 +73,8 @@ app.use(cors({
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 
 // Body parsing middleware

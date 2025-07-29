@@ -48,6 +48,12 @@ const notoSansThai = Noto_Sans_Thai({
 const hasJobNumberPrefix = (name: string) => /^([A-D]|\d+)\s/.test(name);
 
 export default function MedicalAppointmentDashboard() {
+  // Helper function for API URL
+  const getApiUrl = (endpoint: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101';
+    return `${baseUrl}${endpoint}`;
+  };
+
   // เปลี่ยน default selectedDate เป็นวันที่ปัจจุบัน (dynamic)
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
@@ -510,17 +516,23 @@ export default function MedicalAppointmentDashboard() {
   // เพิ่มฟังก์ชันส่งข้อมูลไป Google Sheet
   const sendToGoogleSheet = async (data: any) => {
     console.log("🟡 [DEBUG] call sendToGoogleSheet", data);
-    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/send-to-google-sheet`;
+    const url = getApiUrl('/api/send-to-google-sheet');
+    console.log("🟡 [DEBUG] Google Sheet URL:", url);
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      console.log("🟡 [DEBUG] Google Sheet response status:", res.status);
       const result = await res.text();
       console.log("🟢 [DEBUG] Google Sheet result:", result);
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
     } catch (err) {
       console.error("🔴 [DEBUG] Google Sheet error:", err);
+      throw err; // Re-throw เพื่อให้ handleSyncDrafts จับ error ได้
     }
   };
 
@@ -856,6 +868,7 @@ export default function MedicalAppointmentDashboard() {
 
   // Helper function to render staff avatars
   const renderStaffAvatars = (staff: string, isFormCollapsed: boolean) => {
+    console.log('🔍 [DEBUG] renderStaffAvatars called with staff:', staff);
     if (!staff) {
       return (
         <span className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} text-gray-400`}>
@@ -864,6 +877,7 @@ export default function MedicalAppointmentDashboard() {
       );
     }
     const staffList = staff.split(", ");
+    console.log('🔍 [DEBUG] staffList:', staffList);
     
     return (
       <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
@@ -872,6 +886,7 @@ export default function MedicalAppointmentDashboard() {
             // หา id_code จาก name
             const user = users.find(u => u.name === person);
             const idCode = user?.id_code;
+            console.log('🔍 [DEBUG] Person:', person, 'User:', user, 'ID Code:', idCode);
             
             return (
             <Avatar
@@ -883,7 +898,11 @@ export default function MedicalAppointmentDashboard() {
                 } border-2 border-white shadow-sm flex-shrink-0`}
               >
                 <AvatarImage
-                  src={staffImages[person] || (idCode && staffImages[idCode]) || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
+                  src={(() => {
+                    const imageSrc = staffImages[person] || (idCode && staffImages[idCode]) || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`;
+                    console.log('🔍 [DEBUG] Image src for', person, ':', imageSrc);
+                    return imageSrc;
+                  })()}
                   alt={person}
                   className="object-cover object-center avatar-image"
                   style={{ imageRendering: "crisp-edges" }}
@@ -1090,7 +1109,10 @@ export default function MedicalAppointmentDashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        setMessage(isDraft ? "บันทึกแบบร่างสำเร็จ" : "บันทึกเสร็จสิ้น");
+        const successMessage = isDraft ? "บันทึกแบบร่างสำเร็จ" : "บันทึกเสร็จสิ้น";
+        setMessage(successMessage);
+        setSuccessDialogMessage(successMessage);
+        setShowSuccessDialog(true);
         setEditDraftModalOpen(false);
         await loadAllProductionData();
       } else {
@@ -1121,7 +1143,7 @@ export default function MedicalAppointmentDashboard() {
     setIsSubmitting(true);
     setMessage("");
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/sync-drafts-to-plans`, {
+      await fetch(getApiUrl('/api/work-plans/sync-drafts-to-plans'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetDate: selectedDate })
@@ -1160,25 +1182,28 @@ export default function MedicalAppointmentDashboard() {
         let ops = (item.operators || "").split(", ").map((s: string) => s.trim());
         while (ops.length < 4) ops.push("");
         return [
-          idx + 1, // ลำดับ
-          item.job_code || "",
-          item.job_name || "", // ใช้ชื่อจริงเท่านั้น
-          ops[0],
-          ops[1],
-          ops[2],
-          ops[3],
-          item.start_time || "",
-          item.end_time || "",
-          getMachineNameById(item.machine_id), // ส่งชื่อเครื่อง
-          getRoomNameByCodeOrId(item.production_room) // ส่งชื่อห้อง
+          idx + 1, // ลำดับ (A)
+          item.job_code || "", // รหัสวัตถุดิบ (B)
+          item.job_name || "", // รายการ (C)
+          ops[0], // ผู้ปฏิบัติงาน 1 (D)
+          ops[1], // ผู้ปฏิบัติงาน 2 (E)
+          ops[2], // ผู้ปฏิบัติงาน 3 (F)
+          ops[3], // ผู้ปฏิบัติงาน 4 (G)
+          item.start_time || "", // เริ่มต้น (H)
+          item.end_time || "", // สิ้นสุด (I)
+          getMachineNameById(item.machine_id), // เครื่องที่ (J)
+          getRoomNameByCodeOrId(item.production_room) // ห้องผลิต (K)
         ];
       });
       // 2. ส่ง batch ไป 1.ใบสรุปงาน v.4
+      console.log("🟡 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4:", summaryRows.length, "แถว");
+      console.log("🟡 [DEBUG] ข้อมูล summaryRows:", summaryRows);
       await sendToGoogleSheet({
         sheetName: "1.ใบสรุปงาน v.4",
         rows: summaryRows,
         clearSheet: true
       });
+      console.log("🟢 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4 สำเร็จ");
 
       // 3. เตรียมข้อมูลสำหรับ Log_แผนผลิต (แยกแถวตามผู้ปฏิบัติงาน)
       const logRows: string[][] = [];
@@ -1196,7 +1221,7 @@ export default function MedicalAppointmentDashboard() {
         const operators = (item.operators || "").split(", ").map((s: string) => s.trim()).filter(Boolean);
         
         if (operators.length === 0) {
-          // ถ้าไม่มีผู้ปฏิบัติงาน ส่ง 1 แถว
+          // ถ้าไม่มีผู้ปฏิบัติงาน ส่ง 1 แถว (8 คอลัมน์)
           logRows.push([
             dateString, // วันที่
             dateValue, // Date Value
@@ -1205,10 +1230,10 @@ export default function MedicalAppointmentDashboard() {
             "", // ผู้ปฏิบัติงาน (ว่าง)
             item.start_time || "", // เวลาเริ่มต้น
             item.end_time || "", // เวลาสิ้นสุด
-            getRoomNameByCodeOrId(item.production_room) // ห้อง
+            getRoomNameByCodeOrId(item.production_room) // ห้อง (ไม่รวม notes)
           ]);
         } else {
-          // ถ้ามีผู้ปฏิบัติงาน ส่งแถวละคน
+          // ถ้ามีผู้ปฏิบัติงาน ส่งแถวละคน (8 คอลัมน์)
           operators.forEach((operator: string) => {
             logRows.push([
               dateString, // วันที่
@@ -1218,7 +1243,7 @@ export default function MedicalAppointmentDashboard() {
               operator, // ผู้ปฏิบัติงาน
               item.start_time || "", // เวลาเริ่มต้น
               item.end_time || "", // เวลาสิ้นสุด
-              getRoomNameByCodeOrId(item.production_room) // ห้อง
+              getRoomNameByCodeOrId(item.production_room) // ห้อง (ไม่รวม notes)
             ]);
           });
         }
@@ -1227,24 +1252,37 @@ export default function MedicalAppointmentDashboard() {
       // 4. ส่ง batch ไป Log_แผนผลิต (แยกการส่ง)
       if (logRows.length > 0) {
         console.log("🟡 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต:", logRows.length, "แถว");
+        console.log("🟡 [DEBUG] ข้อมูล logRows:", logRows);
         await sendToGoogleSheet({
           sheetName: "Log_แผนผลิต",
           rows: logRows,
           clearSheet: true
         });
         console.log("🟢 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต สำเร็จ");
+      } else {
+        console.log("🟡 [DEBUG] ไม่มีข้อมูล logRows ที่จะส่ง");
       }
       // 5. อัปเดตวันที่ใน D1 ของ sheet รายงาน-เวลาผู้ปฏิบัติงาน
+      const reportSheetName = "รายงาน-เวลาผู้ปฏิบัติงาน";
+      console.log("🟡 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน:", dateValue);
+      console.log("🟡 [DEBUG] Sheet name:", reportSheetName);
+      console.log("🟡 [DEBUG] Sheet name length:", reportSheetName.length);
       await sendToGoogleSheet({
-        sheetName: "รายงาน-เวลาผู้ปฏิบัติงาน",
+        sheetName: reportSheetName,
         "Date Value": dateValue
       });
+      console.log("🟢 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน สำเร็จ");
       setIsSubmitting(false);
       
       // เพิ่มการ reload productionData หลัง sync สำเร็จ
       console.log("🔄 [DEBUG] Sync completed, reloading production data...");
       await loadAllProductionData();
       console.log("🟢 [DEBUG] Production data reloaded successfully");
+      
+      // แสดงข้อความสำเร็จ
+      setMessage("Sync และพิมพ์ใบงานผลิตสำเร็จ");
+      setSuccessDialogMessage("Sync และพิมพ์ใบงานผลิตสำเร็จ");
+      setShowSuccessDialog(true);
       
     } catch (err) {
       setMessage("เกิดข้อผิดพลาดในการเชื่อมต่อ API");
@@ -1266,16 +1304,24 @@ export default function MedicalAppointmentDashboard() {
     setMessage("");
     
     try {
-          const url = `${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/${workPlanId}/cancel`;
+          const url = `http://localhost:3101/api/work-plans/${workPlanId}/cancel`;
     console.log('🔴 [DEBUG] Making PATCH request to:', url);
     
     const res = await fetch(url, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      mode: 'cors'
     });
       
       console.log('🔴 [DEBUG] Response status:', res.status);
       console.log('🔴 [DEBUG] Response ok:', res.ok);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
       
       const data = await res.json();
       console.log('🔴 [DEBUG] Response data:', data);
@@ -1349,7 +1395,7 @@ export default function MedicalAppointmentDashboard() {
       
       try {
         // ดึงข้อมูล drafts จาก database โดยตรง
-        const draftsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`);
+        const draftsResponse = await fetch(getApiUrl('/api/work-plans/drafts'));
         const draftsData = await draftsResponse.json();
         const existingDrafts = draftsData.data || [];
         
@@ -1368,7 +1414,7 @@ export default function MedicalAppointmentDashboard() {
           
           if (!exists) {
             console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`, {
+            const response = await fetch(getApiUrl('/api/work-plans/drafts'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1412,7 +1458,7 @@ export default function MedicalAppointmentDashboard() {
   const syncWorkOrder = async (date: string) => {
     if (!date) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/sync-work-order?date=${date}`, {
+              const res = await fetch(getApiUrl(`/api/work-plans/sync-work-order?date=${date}`), {
         method: 'POST'
       });
       if (res.ok) {
@@ -1445,9 +1491,30 @@ export default function MedicalAppointmentDashboard() {
       //   await syncWorkOrder(selectedDate);
       // }
       const [plans, drafts] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans`).then(res => res.json()),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`).then(res => res.json())
+        fetch(getApiUrl('/api/work-plans')).then(res => res.json()),
+        fetch(getApiUrl('/api/work-plans/drafts')).then(res => res.json())
       ]);
+      
+      // ดึงสถานะจาก logs สำหรับ work plans ที่ sync แล้ว
+      const workPlanIds = (plans.data || []).map((p: any) => p.id).filter(Boolean);
+      let logsStatusMap: { [key: number]: any } = {};
+      
+      if (workPlanIds.length > 0) {
+        try {
+          console.log('[DEBUG] Fetching logs status for workPlanIds:', workPlanIds);
+          const logsResponse = await fetch(
+            getApiUrl(`/api/logs/work-plans/status?workPlanIds=${workPlanIds.join(',')}`)
+          );
+          const logsData = await logsResponse.json();
+          console.log('[DEBUG] Logs response:', logsData);
+          if (logsData.success) {
+            logsStatusMap = logsData.data;
+            console.log('[DEBUG] Logs status map:', logsStatusMap);
+          }
+        } catch (error) {
+          console.error('Error fetching logs status:', error);
+        }
+      }
       // สร้าง map สำหรับ lookup draft ตาม job_code+job_name+production_date
       const draftMap = new Map();
       (drafts.data || []).forEach((d: any) => {
@@ -1470,9 +1537,11 @@ export default function MedicalAppointmentDashboard() {
           }
           let status = 'แบบร่าง';
           let recordStatus = 'แบบร่าง';
+          let isPrinted = false;
           if (d.workflow_status_id === 2) {
             status = 'บันทึกเสร็จสิ้น';
             recordStatus = 'บันทึกเสร็จสิ้น';
+            isPrinted = false; // งานที่บันทึกเสร็จสิ้นยังไม่ถือว่าพิมพ์แล้ว
           } else if (d.workflow_status_id === 1) {
             status = 'แบบร่าง';
             recordStatus = 'แบบร่าง';
@@ -1488,6 +1557,7 @@ export default function MedicalAppointmentDashboard() {
             operators: operatorNames,
             status: status,
             recordStatus: recordStatus,
+            isPrinted: isPrinted,
             production_room: d.production_room_id || d.production_room || 'ไม่ระบุ',
             machine_id: d.machine_id || '',
             notes: d.notes || '',
@@ -1497,11 +1567,59 @@ export default function MedicalAppointmentDashboard() {
           // Workaround: หา draft ที่ตรงกันมาเติมข้อมูลห้อง/เครื่อง/หมายเหตุ
           const key = `${p.production_date}__${p.job_code}__${p.job_name}`;
           const draft = draftMap.get(key);
+          
+          // ใช้สถานะจาก logs ถ้ามี
+          const logsStatus = logsStatusMap[p.id];
+          let status = 'รอดำเนินการ';
+          let status_name = 'รอดำเนินการ';
+          
+          console.log(`[DEBUG] Work plan ${p.id} logs status:`, logsStatus);
+          console.log(`[DEBUG] Work plan ${p.id} status_id:`, p.status_id);
+          
+          // ตรวจสอบ status_id จากฐานข้อมูลก่อน
+          if (p.status_id === 9) {
+            status = 'ยกเลิกการผลิต';
+            status_name = 'ยกเลิกการผลิต';
+            console.log(`[DEBUG] Work plan ${p.id} is cancelled (status_id: 9)`);
+          } else if (logsStatus) {
+            status = logsStatus.message;
+            status_name = logsStatus.message;
+            console.log(`[DEBUG] Using logs status for work plan ${p.id}: ${status}`);
+          } else {
+            status = p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status;
+            status_name = p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status;
+            console.log(`[DEBUG] Using default status for work plan ${p.id}: ${status}`);
+          }
+          
+          // Parse operators จาก draft หรือจาก work plan
+          let operatorNames = '';
+          try {
+            if (draft && draft.operators) {
+              // ใช้ operators จาก draft ก่อน
+              const operators = typeof draft.operators === 'string' ? JSON.parse(draft.operators) : draft.operators;
+              if (Array.isArray(operators)) {
+                operatorNames = operators.map((o: any) => o.name || o).join(', ');
+              }
+            } else if (p.operators) {
+              // ใช้ operators จาก work plan
+              const operators = typeof p.operators === 'string' ? JSON.parse(p.operators) : p.operators;
+              if (Array.isArray(operators)) {
+                operatorNames = operators.map((o: any) => o.name || o).join(', ');
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing operators for work plan', p.id, e);
+            operatorNames = '';
+          }
+          
           return {
             ...p,
             isDraft: false,
-            status: p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status,
+            status: status,
+            status_name: status_name,
             recordStatus: p.recordStatus === 'แผนจริง' || !p.recordStatus ? 'บันทึกสำเร็จ' : p.recordStatus,
+            isPrinted: true, // งานที่ sync แล้วถือว่าพิมพ์แล้ว
+            operators: operatorNames, // เพิ่ม operators ที่ parse แล้ว
             production_room: (draft && (draft.production_room_id || draft.production_room)) || p.production_room || 'ไม่ระบุ',
             machine_id: (draft && draft.machine_id) || p.machine_id || '',
             notes: (draft && draft.notes) || p.notes || '',
@@ -1517,6 +1635,8 @@ export default function MedicalAppointmentDashboard() {
 
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [successDialogMessage, setSuccessDialogMessage] = useState("");
 
   // ฟังก์ชันแปลงชื่อแสดงผลงาน (เติม prefix เฉพาะตอนแสดงผลเท่านั้น, ใช้ is_special)
   const getDisplayJobName = (item: any, jobsOfDay: any[]) => {
@@ -2053,12 +2173,16 @@ export default function MedicalAppointmentDashboard() {
                             <div
                               key={item.id}
                                         className={`p-1 sm:p-2 rounded-md border-l-2 sm:border-l-3 ${
-                                item.status_name === "งานผลิตถูกยกเลิก"
+                                item.status_name === "ยกเลิกการผลิต"
                                             ? "border-l-red-400 bg-red-50"
-                                    : item.recordStatus === "บันทึกเสร็จสิ้น"
+                                    : item.status_name === "เสร็จสิ้น"
                                       ? "border-l-green-400 bg-green-50"
+                                      : item.status_name === "กำลังดำเนินการ"
+                                        ? "border-l-yellow-400 bg-yellow-50"
+                                        : item.status_name === "รอดำเนินการ"
+                                          ? "border-l-gray-400 bg-gray-50"
                                       : item.recordStatus === "บันทึกแบบร่าง"
-                                                ? "border-l-gray-400 bg-gray-50"
+                                            ? "border-l-gray-400 bg-gray-50"
                                           : "border-l-gray-400 bg-gray-50"
                               }`}
                             >
@@ -2097,22 +2221,30 @@ export default function MedicalAppointmentDashboard() {
                                         )}
 
                                         {/* สถานะ */}
-                                        <div className="mt-1">
+                                        <div className="mt-1 flex items-center justify-between">
                                           <span
                                             className={`inline-block px-1 sm:px-1.5 py-0.5 rounded text-xs ${
                                               item.status_name === "รอดำเนินการ"
-                                                ? "bg-gray-100 text-gray-700"
+                                                ? "status-pending"
                                                 : item.status_name === "กำลังดำเนินการ"
-                                                  ? "bg-blue-100 text-blue-700"
+                                                  ? "bg-yellow-100 text-yellow-700"
                                                   : item.status_name === "เสร็จสิ้น"
                                                     ? "bg-green-100 text-green-700"
-                                                    : item.status_name === "งานผลิตถูกยกเลิก"
+                                                    : item.status_name === "ยกเลิกการผลิต"
                                                       ? "bg-red-100 text-red-700"
-                                                      : "bg-gray-100 text-gray-700"
+                                                      : "status-pending"
                                             } truncate`}
                                           >
                                             {item.status_name || "รอดำเนินการ"}
                                           </span>
+                                          
+                                          {/* แสดงจุดสีเขียวถ้าพิมพ์แล้ว (เฉพาะงานที่ sync แล้ว) */}
+                                          {item.isPrinted && !item.isDraft && (
+                                            <div className="flex items-center space-x-1">
+                                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                              <span className="text-xs text-green-600">พิมพ์แล้ว</span>
+                                            </div>
+                                          )}
                               </div>
                             </div>
                           ))}
@@ -2180,16 +2312,18 @@ export default function MedicalAppointmentDashboard() {
                               className={`border-l-4 ${
                                 isFormCollapsed ? "p-3 sm:p-4 md:p-6" : "p-2 sm:p-3 md:p-4"
                               } rounded-r-lg ${
-                                item.status_name === "งานผลิตถูกยกเลิก"
+                                item.status_name === "ยกเลิกการผลิต"
                                   ? "border-l-red-400 bg-red-100"
                                   : item.isDraft
                                     ? "border-l-gray-400 bg-gray-100"
-                                    : item.recordStatus === "บันทึกเสร็จสิ้น"
+                                    : item.status_name === "เสร็จสิ้น"
                                       ? "border-l-green-400 bg-green-50"
+                                      : item.status_name === "กำลังดำเนินการ"
+                                        ? "border-l-yellow-400 bg-yellow-50"
+                                        : item.status_name === "รอดำเนินการ"
+                                          ? "border-l-gray-400 bg-gray-50"
                                       : item.recordStatus === "บันทึกแบบร่าง"
                                         ? "border-l-gray-400 bg-gray-100"
-                                        : item.recordStatus === "บันทึกสำเร็จ"
-                                          ? "border-l-green-500 bg-green-100"
                                           : "border-l-gray-400 bg-gray-50"
                               }`}
                             >
@@ -2221,21 +2355,17 @@ export default function MedicalAppointmentDashboard() {
                                       variant="outline"
                                       className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} flex-shrink-0 ${
                                         item.status_name === "รอดำเนินการ"
-                                          ? "border-gray-500 text-gray-700"
+                                          ? "status-pending"
                                           : item.status_name === "กำลังดำเนินการ"
-                                            ? "border-blue-500 text-blue-700"
+                                            ? "border-yellow-500 text-yellow-700"
                                             : item.status_name === "เสร็จสิ้น"
                                               ? "border-green-500 text-green-700"
-                                              : item.status_name === "งานผลิตถูกยกเลิก"
+                                              : item.status_name === "ยกเลิกการผลิต"
                                                 ? "border-red-500 text-red-700"
                                                 : item.status_name === "งานพิเศษ"
                                                   ? "border-orange-500 text-orange-700"
-                                                  : "border-gray-500 text-gray-700"
+                                                  : "status-pending"
                                       }`}
-                                      style={{
-                                        borderColor: item.status_color,
-                                        color: item.status_color
-                                      }}
                                     >
                                       {item.status_name || "รอดำเนินการ"}
                                     </Badge>
@@ -2266,6 +2396,15 @@ export default function MedicalAppointmentDashboard() {
                                 </div>
 
                                 <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                                  {/* แสดงจุดสีเขียวถ้าพิมพ์แล้ว แทนปุ่ม */}
+                                  {item.isPrinted && !item.isDraft ? (
+                                    <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-green-50 rounded-md">
+                                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                      <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-green-700`}>
+                                        พิมพ์แล้ว
+                                      </span>
+                                    </div>
+                                  ) : (
                                   <Button
                                     variant="ghost"
                                     size={isFormCollapsed ? "default" : "sm"}
@@ -2281,6 +2420,7 @@ export default function MedicalAppointmentDashboard() {
                                       {item.recordStatus}
                                     </span>
                                   </Button>
+                                  )}
                                   <div className="flex space-x-1">
                                     <Button
                                       variant="ghost"
@@ -2355,40 +2495,40 @@ export default function MedicalAppointmentDashboard() {
 
       {/* Modal สำหรับแก้ไข draft */}
       <Dialog open={editDraftModalOpen} onOpenChange={setEditDraftModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto ${notoSansThai.className}`}>
           <DialogHeader>
-            <DialogTitle>แก้ไขแบบร่างงานผลิต</DialogTitle>
+            <DialogTitle className={notoSansThai.className}>แก้ไขแบบร่างงานผลิต</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 py-2">
             {/* คอลัมน์ซ้าย */}
             <div className="space-y-3">
               {/* วันที่ผลิต */}
               <div className="space-y-1">
-                <Label className="text-xs font-bold text-gray-700">วันที่ผลิต</Label>
+                <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>วันที่ผลิต</Label>
                 <Input
                   type="date"
                   value={editDate}
                   onChange={e => setEditDate(e.target.value)}
-                  className="text-sm h-8"
+                  className={`text-sm h-8 ${notoSansThai.className}`}
                 />
               </div>
               {/* ชื่องาน */}
               <div className="space-y-1">
-                <Label className="text-xs font-bold text-gray-700">ชื่องาน</Label>
+                <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>ชื่องาน</Label>
                 <Input
                   value={editJobName}
                   onChange={e => setEditJobName(e.target.value)}
-                  className="text-sm h-8"
+                  className={`text-sm h-8 ${notoSansThai.className}`}
                 />
               </div>
               {/* เครื่องบันทึกข้อมูลการผลิต */}
               <div className="space-y-1">
-                <Label className="text-xs font-bold text-gray-700">เครื่องบันทึกข้อมูลการผลิต</Label>
+                <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>เครื่องบันทึกข้อมูลการผลิต</Label>
                 <Select
                   value={editMachine || "__none__"}
                   onValueChange={val => setEditMachine(val === "__none__" ? "" : val)}
                 >
-                  <SelectTrigger className="text-sm h-8">
+                  <SelectTrigger className={`text-sm h-8 ${notoSansThai.className}`}>
                     <SelectValue placeholder="เลือก..." />
                   </SelectTrigger>
                   <SelectContent className={notoSansThai.className}>
@@ -2401,12 +2541,12 @@ export default function MedicalAppointmentDashboard() {
               </div>
               {/* ห้องผลิต */}
               <div className="space-y-1">
-                <Label className="text-xs font-bold text-gray-700">ห้องผลิต</Label>
+                <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>ห้องผลิต</Label>
                 <Select
                   value={editRoom || "__none__"}
                   onValueChange={val => setEditRoom(val === "__none__" ? "" : val)}
                 >
-                  <SelectTrigger className="text-sm h-8">
+                  <SelectTrigger className={`text-sm h-8 ${notoSansThai.className}`}>
                     <SelectValue placeholder="เลือกห้องผลิต..." />
                   </SelectTrigger>
                   <SelectContent className={notoSansThai.className}>
@@ -2423,11 +2563,11 @@ export default function MedicalAppointmentDashboard() {
             <div className="space-y-3">
               {/* ผู้ปฏิบัติงาน */}
               <div className="space-y-1">
-                <Label className="text-xs font-bold text-gray-700">ผู้ปฏิบัติงาน (1-4 คน)</Label>
+                <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>ผู้ปฏิบัติงาน (1-4 คน)</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {[1, 2, 3, 4].map((position) => (
                     <div key={position} className="space-y-1">
-                      <Label className="text-xs text-gray-600">ผู้ปฏิบัติงาน {position}</Label>
+                      <Label className={`text-xs text-gray-600 ${notoSansThai.className}`}>ผู้ปฏิบัติงาน {position}</Label>
                       <Select
                         value={editOperators[position - 1] || "__none__"}
                         onValueChange={val => {
@@ -2436,7 +2576,7 @@ export default function MedicalAppointmentDashboard() {
                           setEditOperators(newOps);
                         }}
                       >
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className={`h-8 text-xs ${notoSansThai.className}`}>
                           <SelectValue placeholder="เลือก" />
                         </SelectTrigger>
                         <SelectContent className={notoSansThai.className}>
@@ -2457,9 +2597,9 @@ export default function MedicalAppointmentDashboard() {
               {/* เวลาเริ่ม-สิ้นสุด */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label className="text-xs font-bold text-gray-700">เวลาเริ่ม</Label>
+                  <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>เวลาเริ่ม</Label>
                   <Select value={editStartTime || "__none__"} onValueChange={val => setEditStartTime(val === "__none__" ? "" : val)}>
-                    <SelectTrigger className="text-sm h-8">
+                    <SelectTrigger className={`text-sm h-8 ${notoSansThai.className}`}>
                       <SelectValue placeholder="เลือกเวลาเริ่ม..." />
                     </SelectTrigger>
                     <SelectContent className={notoSansThai.className}>
@@ -2475,9 +2615,9 @@ export default function MedicalAppointmentDashboard() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs font-bold text-gray-700">เวลาสิ้นสุด</Label>
+                  <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>เวลาสิ้นสุด</Label>
                   <Select value={editEndTime || "__none__"} onValueChange={val => setEditEndTime(val === "__none__" ? "" : val)}>
-                    <SelectTrigger className="text-sm h-8">
+                    <SelectTrigger className={`text-sm h-8 ${notoSansThai.className}`}>
                       <SelectValue placeholder="เลือกเวลาสิ้นสุด..." />
                     </SelectTrigger>
                     <SelectContent className={notoSansThai.className}>
@@ -2495,10 +2635,10 @@ export default function MedicalAppointmentDashboard() {
               </div>
               {/* หมายเหตุ */}
               <div className="space-y-1">
-                <Label className="text-xs font-bold text-gray-700">หมายเหตุ</Label>
+                <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>หมายเหตุ</Label>
                 <Textarea
                   placeholder="เพิ่มหมายเหตุเพิ่มเติมสำหรับการผลิต..."
-                  className="min-h-[60px] resize-none text-sm"
+                  className={`min-h-[60px] resize-none text-sm ${notoSansThai.className}`}
                   value={editNote}
                   onChange={debouncedEditNoteChange}
                 />
@@ -2514,15 +2654,15 @@ export default function MedicalAppointmentDashboard() {
                   variant="destructive" 
                   onClick={() => handleDeleteDraft(editDraftId)} 
                   disabled={isSubmitting}
-                  className="bg-red-600 hover:bg-red-700 text-white"
+                  className={`bg-red-600 hover:bg-red-700 text-white ${notoSansThai.className}`}
                 >
                   {isSubmitting ? "กำลังลบ..." : "ลบ"}
                 </Button>
               ) : null;
             })()}
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => handleSaveEditDraft(true)} disabled={isSubmitting}>บันทึกแบบร่าง</Button>
-              <Button onClick={() => handleSaveEditDraft(false)} disabled={isSubmitting} className="bg-green-700 hover:bg-green-800 text-white">
+              <Button variant="outline" onClick={() => handleSaveEditDraft(true)} disabled={isSubmitting} className={notoSansThai.className}>บันทึกแบบร่าง</Button>
+              <Button onClick={() => handleSaveEditDraft(false)} disabled={isSubmitting} className={`bg-green-700 hover:bg-green-800 text-white ${notoSansThai.className}`}>
                 {isSubmitting ? "กำลังบันทึก..." : "บันทึกเสร็จสิ้น"}
               </Button>
             </div>
@@ -2531,13 +2671,26 @@ export default function MedicalAppointmentDashboard() {
       </Dialog>
 
       <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
-        <DialogContent className="max-w-xs text-center">
+        <DialogContent className={`max-w-xs text-center ${notoSansThai.className}`}>
           <DialogHeader>
-            <DialogTitle>ข้อผิดพลาด</DialogTitle>
+            <DialogTitle className={notoSansThai.className}>ข้อผิดพลาด</DialogTitle>
           </DialogHeader>
           <div className="mb-4">{errorDialogMessage}</div>
           <DialogFooter>
-            <Button onClick={() => setShowErrorDialog(false)} className="w-full">ตกลง</Button>
+            <Button onClick={() => setShowErrorDialog(false)} className={`w-full ${notoSansThai.className}`}>ตกลง</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog สำหรับแสดง popup แจ้งเตือนเมื่อบันทึกเสร็จสิ้น */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className={`max-w-xs text-center ${notoSansThai.className}`}>
+          <DialogHeader>
+            <DialogTitle className={`${notoSansThai.className} text-green-600`}>สำเร็จ</DialogTitle>
+          </DialogHeader>
+          <div className="mb-4 text-green-700">{successDialogMessage}</div>
+          <DialogFooter>
+            <Button onClick={() => setShowSuccessDialog(false)} className={`w-full bg-green-600 hover:bg-green-700 text-white ${notoSansThai.className}`}>ตกลง</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

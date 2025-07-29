@@ -184,11 +184,16 @@ class WorkPlanController {
   // Cancel production (ยกเลิกการผลิต)
   static async cancelProduction(req, res) {
     try {
+      console.log('🔴 [DEBUG] cancelProduction called');
       const { id } = req.params;
+      console.log('🔴 [DEBUG] Work plan ID:', id);
       
       // ตรวจสอบว่า work plan มีอยู่หรือไม่
       const workPlan = await WorkPlan.findById(id);
+      console.log('🔴 [DEBUG] Found work plan:', workPlan);
+      
       if (!workPlan) {
+        console.log('🔴 [DEBUG] Work plan not found');
         return res.status(404).json({
           success: false,
           message: 'ไม่พบแผนการผลิตที่ระบุ'
@@ -196,20 +201,79 @@ class WorkPlanController {
       }
       
       // อัพเดทสถานะเป็น "ยกเลิกการผลิต" (status_id = 9)
+      console.log('🔴 [DEBUG] Updating status to 9 (ยกเลิกการผลิต)');
       const updated = await WorkPlan.updateStatus(id, 9);
+      console.log('🔴 [DEBUG] Update result:', updated);
       
       if (updated) {
+        console.log('🔴 [DEBUG] Cancel successful');
         res.json({
           success: true,
           message: 'ยกเลิกการผลิตสำเร็จ'
         });
       } else {
+        console.log('🔴 [DEBUG] Cancel failed');
         res.status(400).json({
           success: false,
           message: 'ไม่สามารถยกเลิกการผลิตได้'
         });
       }
     } catch (error) {
+      console.error('🔴 [DEBUG] Error in cancelProduction:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  // Update work plan status
+  static async updateStatus(req, res) {
+    try {
+      console.log('🔄 [DEBUG] updateStatus called');
+      const { id } = req.params;
+      const { status_id } = req.body;
+      
+      console.log('🔄 [DEBUG] Work plan ID:', id);
+      console.log('🔄 [DEBUG] New status ID:', status_id);
+      
+      if (!status_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'status_id is required'
+        });
+      }
+      
+      const workPlan = await WorkPlan.findById(id);
+      if (!workPlan) {
+        console.log('🔄 [DEBUG] Work plan not found');
+        return res.status(404).json({
+          success: false,
+          message: 'Work plan not found'
+        });
+      }
+      
+      console.log('🔄 [DEBUG] Found work plan:', workPlan);
+      console.log('🔄 [DEBUG] Updating status to', status_id);
+      
+      const updated = await WorkPlan.updateStatus(id, status_id);
+      console.log('🔄 [DEBUG] Update result:', updated);
+      
+      if (!updated) {
+        console.log('🔄 [DEBUG] Update failed');
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to update work plan status'
+        });
+      }
+      
+      console.log('🔄 [DEBUG] Successfully updated status');
+      res.json({
+        success: true,
+        message: 'Work plan status updated successfully'
+      });
+    } catch (error) {
+      console.error('🔄 [DEBUG] Error in updateStatus:', error);
       res.status(500).json({
         success: false,
         message: error.message
