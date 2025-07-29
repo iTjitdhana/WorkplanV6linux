@@ -35,7 +35,7 @@ export default function TrackerPage() {
   // Load workplans by date
   useEffect(() => {
     setIsLoading(true);
-    fetch(`http://192.168.0.94:3101/api/work-plans?date=${date}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans?date=${date}`)
       .then(res => res.json())
       .then(data => setWorkplans((data.data || []).filter((wp: any) => wp.status_name !== 'งานผลิตถูกยกเลิก')))
       .finally(() => setIsLoading(false));
@@ -51,8 +51,8 @@ export default function TrackerPage() {
     if (!selectedWorkplan) return;
     setIsLoading(true);
     Promise.all([
-      fetch(`http://192.168.0.94:3101/api/process-steps?job_code=${selectedWorkplan.job_code}`).then(res => res.json()),
-      fetch(`http://192.168.0.94:3101/api/logs/work-plan/${selectedWorkplan.id}`).then(res => res.json())
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/process-steps?job_code=${selectedWorkplan.job_code}`).then(res => res.json()),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/logs/work-plan/${selectedWorkplan.id}`).then(res => res.json())
     ]).then(([steps, logs]) => {
       setProcessSteps(steps.data || []);
       setProcessLogs(logs.data || []);
@@ -116,7 +116,7 @@ export default function TrackerPage() {
         status,
         timestamp
       });
-      const res = await fetch("http://192.168.0.94:3101/api/logs", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/logs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -132,7 +132,7 @@ export default function TrackerPage() {
       setMessage(isStart ? "เริ่มขั้นตอนแล้ว" : "หยุดขั้นตอนแล้ว");
       setStatusType("success");
       // reload logs
-      const logs = await fetch(`http://192.168.0.94:3101/api/logs/work-plan/${selectedWorkplan.id}`).then(r => r.json());
+      const logs = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/logs/work-plan/${selectedWorkplan.id}`).then(r => r.json());
       setProcessLogs(logs.data || []);
     } catch (e: any) {
       setMessage("เกิดข้อผิดพลาดในการบันทึก: " + (e?.message || ""));
@@ -302,4 +302,4 @@ export default function TrackerPage() {
       </div>
     </div>
   );
-} 
+}

@@ -270,7 +270,9 @@ export default function MedicalAppointmentDashboard() {
           searchCacheRef.current.set(cacheKey, results);
           if (searchCacheRef.current.size > 50) {
             const firstKey = searchCacheRef.current.keys().next().value;
+            if (firstKey) {
             searchCacheRef.current.delete(firstKey);
+            }
           }
           setJobOptions(results);
           setShowJobDropdown(true);
@@ -366,6 +368,67 @@ export default function MedicalAppointmentDashboard() {
     return days[date.getDay()]
   }
 
+  // เพิ่มฟังก์ชันสำหรับสีของแต่ละวัน
+  const getDayBackgroundColor = (date: Date) => {
+    const dayIndex = date.getDay() // 0 = อาทิตย์, 1 = จันทร์, ...
+    const colors = [
+      "bg-red-100 border-red-200", // อาทิตย์ - สีแดง
+      "bg-yellow-100 border-yellow-200", // จันทร์ - สีเหลือง
+      "bg-pink-100 border-pink-200", // อังคาร - สีชมพู
+      "bg-green-100 border-green-200", // พุธ - สีเขียว
+      "bg-orange-100 border-orange-200", // พฤหัสบดี - สีส้ม
+      "bg-blue-100 border-blue-200", // ศุกร์ - สีฟ้า
+      "bg-purple-100 border-purple-200", // เสาร์ - สีม่วง
+    ]
+    return colors[dayIndex]
+  }
+
+  const getDayTextColor = (date: Date) => {
+    const dayIndex = date.getDay()
+    const colors = [
+      "text-red-800", // อาทิตย์
+      "text-yellow-800", // จันทร์
+      "text-pink-800", // อังคาร
+      "text-green-800", // พุธ
+      "text-orange-800", // พฤหัสบดี
+      "text-blue-800", // ศุกร์
+      "text-purple-800", // เสาร์
+    ]
+    return colors[dayIndex]
+  }
+
+  // Staff image mapping
+  const staffImages: { [key: string]: string } = {
+    // ชื่อไทย
+    จรัญ: "/images/staff/จรัญ.jpg",
+    แมน: "/images/staff/แมน.jpg",
+    แจ็ค: "/images/staff/แจ็ค.jpg",
+    ป้าน้อย: "/images/staff/ป้าน้อย.jpg",
+    พี่ตุ่น: "/images/staff/พี่ตุ่น.jpg",
+    เอ: "/images/staff/เอ.jpg",
+    โอเล่: "/images/staff/โอเล่.jpg",
+    พี่ภา: "/images/staff/พี่ภา.jpg",
+    อาร์ม: "/images/staff/อาร์ม.jpg",
+    สาม: "/images/staff/สาม.jpg",
+    มิ้นต์: "/placeholder.svg?height=80&width=80&text=มิ้นต์",
+    นิค: "/placeholder.svg?height=80&width=80&text=นิค",
+    เกลือ: "/placeholder.svg?height=80&width=80&text=เกลือ",
+    เป้ง: "/placeholder.svg?height=80&width=80&text=เป้ง",
+    // id_code
+    arm: "/images/staff/อาร์ม.jpg",
+    saam: "/images/staff/สาม.jpg",
+    toon: "/images/staff/พี่ตุ่น.jpg",
+    man: "/images/staff/แมน.jpg",
+    sanya: "/images/staff/พี่สัญญา.jpg",
+    noi: "/images/staff/ป้าน้อย.jpg",
+    pha: "/images/staff/พี่ภา.jpg",
+    ae: "/images/staff/เอ.jpg",
+    rd: "/images/staff/RD.jpg",
+    Ola: "/images/staff/โอเล่.jpg",
+    JJ: "/images/staff/จรัญ.jpg",
+    Jak: "/images/staff/แจ็ค.jpg",
+  }
+
   const weekDates = getWeekDates(currentWeek)
   const weekRange = `${formatFullDate(weekDates[0])} - ${formatFullDate(weekDates[6])}`
 
@@ -377,8 +440,9 @@ export default function MedicalAppointmentDashboard() {
     const filteredData = productionData
       .filter((item) => {
         const isInWeekRange = item.production_date >= weekStart && item.production_date <= weekEnd;
-        const isNotDefaultDraft = !(item.isDraft && defaultCodes.includes(item.job_code));
-        return isInWeekRange && isNotDefaultDraft;
+        // กรองออกงาน A, B, C, D ทั้งหมด (ทั้งแบบร่างและเสร็จแล้ว)
+        const isNotDefaultJob = !defaultCodes.includes(item.job_code);
+        return isInWeekRange && isNotDefaultJob;
       })
       .sort((a, b) => {
         const dateComparison = a.production_date.localeCompare(b.production_date);
@@ -530,15 +594,25 @@ export default function MedicalAppointmentDashboard() {
   const normalize = (str: string) => str.trim().toLowerCase().replace(/\s+/g, "");
 
   const isJobNameDuplicate = (name: string) => {
-    // ตรวจสอบกับข้อมูลที่มีอยู่จริงในระบบ
+    // ตรวจสอบกับข้อมูลที่มีอยู่จริงในระบบเฉพาะวันที่เลือก
     const normalizedName = normalize(name);
     console.log('🔍 [DEBUG] Checking for duplicate job name:', name);
     console.log('🔍 [DEBUG] Normalized name:', normalizedName);
-    console.log('🔍 [DEBUG] Current production data jobs:', productionData.map(item => ({
+    console.log('🔍 [DEBUG] Selected date:', selectedDate);
+    
+    // กรองข้อมูลเฉพาะวันที่เลือก
+    const jobsOfSelectedDate = productionData.filter(item => {
+      const itemDate = item.production_date ? item.production_date.split('T')[0] : '';
+      return itemDate === selectedDate;
+    });
+    
+    console.log('🔍 [DEBUG] Jobs of selected date:', jobsOfSelectedDate.map(item => ({
       job_name: item.job_name || '',
-      normalized: normalize(item.job_name || '')
+      normalized: normalize(item.job_name || ''),
+      production_date: item.production_date
     })));
-    const isDuplicate = productionData.some(item => normalize(item.job_name || '') === normalizedName);
+    
+    const isDuplicate = jobsOfSelectedDate.some(item => normalize(item.job_name || '') === normalizedName);
     console.log('🔍 [DEBUG] Is duplicate:', isDuplicate);
     return isDuplicate;
   };
@@ -778,21 +852,7 @@ export default function MedicalAppointmentDashboard() {
     );
   };
 
-  // Staff image mapping (ใช้ id_code เป็น key)
-  const staffImages: { [key: string]: string } = {
-    arm: "/images/staff/อาร์ม.jpg",
-    saam: "/images/staff/สาม.jpg",
-    toon: "/images/staff/พี่ตุ่น.jpg",
-    man: "/images/staff/แมน.jpg",
-    sanya: "/images/staff/พี่สัญญา.jpg",
-    noi: "/images/staff/ป้าน้อย.jpg",
-    pha: "/images/staff/พี่ภา.jpg",
-    ae: "/images/staff/เอ.jpg",
-    rd: "/images/staff/RD.jpg",
-    Ola: "/images/staff/โอเล่.jpg",
-    JJ: "/images/staff/จรัญ.jpg",
-    Jak: "/images/staff/แจ็ค.jpg",
-  };
+
 
   // Helper function to render staff avatars
   const renderStaffAvatars = (staff: string, isFormCollapsed: boolean) => {
@@ -804,27 +864,29 @@ export default function MedicalAppointmentDashboard() {
       );
     }
     const staffList = staff.split(", ");
-    // DEBUG LOGS
-    // console.log('users:', users);
-    // console.log('staffList:', staffList);
+    
     return (
-      <div className="flex items-center space-x-2 sm:space-x-3">
-        <div className="flex -space-x-2">
+      <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
+        <div className="flex -space-x-1 sm:-space-x-2">
           {staffList.map((person, index) => {
             // หา id_code จาก name
             const user = users.find(u => u.name === person);
             const idCode = user?.id_code;
-            // console.log('user found:', user, 'idCode:', idCode);
-            // console.log('image path:', idCode && staffImages[idCode]);
+            
             return (
             <Avatar
               key={index}
-                className={`${isFormCollapsed ? "w-9 h-9 sm:w-12 h-12" : "w-7 h-7 sm:w-9 h-9"} border-2 border-white`}
+                className={`${
+                  isFormCollapsed
+                    ? "w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-14 lg:h-14"
+                    : "w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10"
+                } border-2 border-white shadow-sm flex-shrink-0`}
               >
                 <AvatarImage
-                  src={idCode && staffImages[idCode] ? staffImages[idCode] : `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
+                  src={staffImages[person] || (idCode && staffImages[idCode]) || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
                   alt={person}
-                  className="object-cover avatar-image"
+                  className="object-cover object-center avatar-image"
+                  style={{ imageRendering: "crisp-edges" }}
                 />
               <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
                 {person.charAt(0)}
@@ -833,7 +895,11 @@ export default function MedicalAppointmentDashboard() {
             );
           })}
         </div>
-        <span className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} text-gray-600 truncate`}>
+        <span
+          className={`${
+            isFormCollapsed ? "text-xs sm:text-sm md:text-base lg:text-lg" : "text-xs sm:text-sm"
+          } text-gray-600 truncate min-w-0`}
+        >
           ผู้ปฏิบัติงาน: {staff}
         </span>
       </div>
@@ -1494,14 +1560,22 @@ export default function MedicalAppointmentDashboard() {
   // ฟังก์ชันสำหรับ Daily View: งานปกติเรียงก่อน งานพิเศษต่อท้าย (ใช้ is_special)
   const getSortedDailyProduction = (jobs: any[]) => {
     const defaultCodes = ['A', 'B', 'C', 'D'];
-    // งาน default (A,B,C,D)
+    
+    // แยกงานเป็นกลุ่มต่างๆ
     const defaultDrafts = jobs.filter(j => defaultCodes.includes(j.job_code));
-    // งานปกติ (is_special !== 1, ไม่ใช่ default)
     const normalJobs = jobs.filter(j => !defaultCodes.includes(j.job_code) && j.is_special !== 1);
-    // งานพิเศษ (is_special === 1)
     const specialJobs = jobs.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
-    // เรียงแต่ละกลุ่ม
+    
+    // แยกงานแบบร่าง (isDraft = true) ออกจากงานปกติ
+    const normalDrafts = normalJobs.filter(j => j.isDraft);
+    const normalCompleted = normalJobs.filter(j => !j.isDraft);
+    const specialDrafts = specialJobs.filter(j => j.isDraft);
+    const specialCompleted = specialJobs.filter(j => !j.isDraft);
+    
+    // เรียงงาน default ตามลำดับ A, B, C, D
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
+    
+    // เรียงงานปกติและงานพิเศษที่เสร็จแล้วตามเวลา
     const sortFn = (a: any, b: any) => {
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
@@ -1515,22 +1589,41 @@ export default function MedicalAppointmentDashboard() {
       if (indexB === 0 && indexA !== 0) return 1;
       return opA.localeCompare(opB);
     };
-    normalJobs.sort(sortFn);
-    specialJobs.sort(sortFn);
+    
+    normalCompleted.sort(sortFn);
+    specialCompleted.sort(sortFn);
+    
+    // เรียงงานแบบร่างตามเวลาที่สร้าง (ใหม่สุดอยู่ล่างสุด)
+    const sortDraftsByCreatedAt = (a: any, b: any) => {
+      const createdAtA = new Date(a.created_at || a.updated_at || 0);
+      const createdAtB = new Date(b.created_at || b.updated_at || 0);
+      return createdAtA.getTime() - createdAtB.getTime(); // เรียงจากเก่าไปใหม่
+    };
+    
+    normalDrafts.sort(sortDraftsByCreatedAt);
+    specialDrafts.sort(sortDraftsByCreatedAt);
+    
+    // ส่งคืนตามลำดับ: default -> งานปกติเสร็จแล้ว -> งานพิเศษเสร็จแล้ว -> งานปกติแบบร่าง -> งานพิเศษแบบร่าง
     return [
       ...defaultDrafts,
-      ...normalJobs,
-      ...specialJobs
+      ...normalCompleted,
+      ...specialCompleted,
+      ...normalDrafts,
+      ...specialDrafts
     ];
   };
 
-  // ฟังก์ชันสำหรับ Weekly View: งานปกติเรียงก่อน งานพิเศษต่อท้าย (ใช้ is_special)
+  // ฟังก์ชันสำหรับ Weekly View: ไม่รวมงาน A, B, C, D
   const getSortedWeeklyProduction = (jobs: any[]) => {
     const defaultCodes = ['A', 'B', 'C', 'D'];
+    // กรองออกงาน A, B, C, D ทั้งหมด
+    const filteredJobs = jobs.filter(j => !defaultCodes.includes(j.job_code));
+    
     // งานพิเศษ (is_special === 1)
-    const specialJobs = jobs.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code));
-    // งานปกติ (is_special !== 1, ไม่ใช่ default)
-    const normalJobs = jobs.filter(j => !defaultCodes.includes(j.job_code) && j.is_special !== 1);
+    const specialJobs = filteredJobs.filter(j => j.is_special === 1);
+    // งานปกติ (is_special !== 1)
+    const normalJobs = filteredJobs.filter(j => j.is_special !== 1);
+    
     const sortFn = (a: any, b: any) => {
       const timeA = a.start_time || "00:00";
       const timeB = b.start_time || "00:00";
@@ -1544,8 +1637,10 @@ export default function MedicalAppointmentDashboard() {
       if (indexB === 0 && indexA !== 0) return 1;
       return opA.localeCompare(opB);
     };
+    
     normalJobs.sort(sortFn);
     specialJobs.sort(sortFn);
+    
     return [
       ...normalJobs,
       ...specialJobs
@@ -1553,7 +1648,7 @@ export default function MedicalAppointmentDashboard() {
   };
 
   return (
-    <div className={`min-h-screen bg-green-50/30 ${notoSansThai.className} flex flex-col`}>
+    <div className={`min-h-screen bg-gray-200 ${notoSansThai.className} flex flex-col`}>
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-600 shadow-md">
         <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8">
@@ -1588,7 +1683,7 @@ export default function MedicalAppointmentDashboard() {
           <div
             className={`transition-all duration-300 ${isFormCollapsed ? "lg:w-16" : "w-full lg:w-2/5"} ${isFormCollapsed && "hidden lg:block"}`}
           >
-            <Card className="shadow-lg bg-white/80 backdrop-blur-sm h-fit">
+            <Card className="shadow-lg bg-white h-fit">
               <CardHeader
                 className={`pb-3 sm:pb-4 ${isFormCollapsed ? "flex justify-center items-center min-h-[60px] sm:min-h-[80px]" : ""}`}
               >
@@ -1807,7 +1902,7 @@ export default function MedicalAppointmentDashboard() {
 
           {/* Right Panel - Schedule View */}
           <div className={`transition-all duration-300 ${isFormCollapsed ? "flex-1" : "w-full lg:w-3/5"}`}>
-            <Card className="shadow-lg bg-white/80 backdrop-blur-sm">
+            <Card className="shadow-lg bg-white">
               <CardHeader className="pb-3 sm:pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                   <CardTitle
@@ -1843,17 +1938,23 @@ export default function MedicalAppointmentDashboard() {
                         รายสัปดาห์
                       </Button>
                     </div>
-                    <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={handleSyncDrafts}
                         disabled={isSubmitting}
-                        className="flex items-center space-x-1 text-green-600 border-green-300 hover:bg-green-50"
+                      className="bg-white border-green-600 text-green-700 hover:bg-green-50 flex items-center space-x-1 sm:space-x-2 h-7 sm:h-8 md:h-9"
                       >
-                        <span className="text-xs">Sync พิมพ์ใบงานผลิต</span>
+                      <RefreshCw className={`${isFormCollapsed ? "w-3 h-3 sm:w-4 sm:h-4" : "w-3 h-3"}`} />
+                      <span
+                        className={`${
+                          isFormCollapsed ? "text-xs sm:text-sm md:text-base" : "text-xs sm:text-sm"
+                        } hidden sm:inline`}
+                      >
+                        พิมพ์ใบงานผลิต
+                      </span>
+                      <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} sm:hidden`}>พิมพ์</span>
                       </Button>
-                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -1893,253 +1994,151 @@ export default function MedicalAppointmentDashboard() {
                       </Button>
                     </div>
 
-                    {/* Weekly Calendar Grid */}
-                    <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                    {/* Weekly Calendar Table */}
+                    <div className="overflow-x-auto">
+                      <div className="min-w-full">
+                        {/* Header Row */}
+                        <div className="grid grid-cols-7 gap-1 mb-2">
                       {weekDates.map((date, index) => {
                         const dateStr = date.toISOString().split("T")[0]
                         const dayProduction = productionData.filter((item) => item.production_date === dateStr)
-                        const isSelected = selectedWeekDay === dateStr
+                        const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
 
                         return (
-                          <Button
-                            key={index}
-                            variant="ghost"
-                            onClick={() => setSelectedWeekDay(selectedWeekDay === dateStr ? null : dateStr)}
-                            className={`border rounded-lg p-1 sm:p-2 md:p-3 text-center h-auto ${
-                              isFormCollapsed
-                                ? "min-h-[80px] sm:min-h-[120px] md:min-h-[140px]"
-                                : "min-h-[60px] sm:min-h-[80px] md:min-h-[100px]"
-                            } ${
-                              isSelected
-                                ? "border-green-600 bg-green-100 hover:bg-green-200"
-                                : "border-gray-200 bg-white hover:bg-gray-50"
-                            } transition-colors duration-200`}
-                          >
-                            <div className="flex flex-col items-center space-y-1">
                               <div
-                                className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} font-medium ${
-                                  isSelected ? "text-green-800" : "text-gray-600"
-                                }`}
+                            key={index}
+                                className={`${getDayBackgroundColor(date)} rounded-lg p-1 sm:p-2 text-center min-w-0`}
+                          >
+                              <div
+                                  className={`${
+                                    isFormCollapsed ? "text-xs sm:text-sm md:text-base" : "text-xs sm:text-sm"
+                                  } font-medium ${getDayTextColor(date)} truncate`}
                               >
                                 {getDayName(date)}
                               </div>
                               <div
                                 className={`${
-                                  isFormCollapsed ? "text-sm sm:text-lg md:text-2xl" : "text-xs sm:text-sm md:text-lg"
-                                } font-bold ${isSelected ? "text-green-900" : "text-gray-900"}`}
+                                    isFormCollapsed ? "text-sm sm:text-lg md:text-xl" : "text-sm sm:text-lg"
+                                  } font-bold ${getDayTextColor(date)}`}
                               >
                                 {formatDate(date)}
                               </div>
-                              {dayProduction.length > 0 && (
-                                <div className="mt-1 sm:mt-2">
                                   <div
                                     className={`${
-                                      isFormCollapsed ? "w-2 h-2 sm:w-3 sm:h-3" : "w-1.5 h-1.5 sm:w-2 sm:h-2"
-                                    } bg-green-500 rounded-full mx-auto`}
-                                  ></div>
-                                  <div
-                                    className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-gray-500 mt-1`}
+                                    isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"
+                                  } ${getDayTextColor(date)} opacity-75 mt-1`}
                                   >
-                                    {dayProduction.length} งาน
+                                    {filteredDayProduction.length} งาน
                                   </div>
                                 </div>
-                              )}
-                            </div>
-                          </Button>
                         )
                       })}
                     </div>
 
-                    <Separator />
+                        {/* Production Content Grid */}
+                        <div className="grid grid-cols-7 gap-1">
+                          {weekDates.map((date, index) => {
+                            const dateStr = date.toISOString().split("T")[0]
+                            const dayProduction = productionData.filter((item) => item.production_date === dateStr)
+                            const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
 
-                    {/* Production Cards - Show selected day or all week */}
-                    <div className="space-y-1 sm:space-y-2">
-                      <h4
-                        className={`font-medium text-gray-900 ${
-                          isFormCollapsed ? "text-sm sm:text-lg md:text-xl" : "text-xs sm:text-sm md:text-base"
-                        }`}
-                      >
-                        {selectedWeekDay
-                          ? `งานผลิตวันที่ ${formatFullDate(new Date(selectedWeekDay))} จำนวน ${selectedDayProduction.length} งาน`
-                          : `สัปดาห์นี้มีงานผลิตจำนวน ${weekProduction.length} งาน`}
-                      </h4>
-
-                      {selectedWeekDay && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedWeekDay(null)}
-                          className="text-green-600 border-green-300 hover:bg-green-50 text-xs sm:text-sm"
-                        >
-                          ← กลับไปดูทั้งสัปดาห์
-                        </Button>
-                      )}
-
-                      {(selectedWeekDay ? selectedDayProduction : weekProduction).length > 0 ? (
+                            return (
+                              <div
+                                key={index}
+                                className="border border-gray-200 rounded-lg p-1 sm:p-2 bg-white min-h-[150px] sm:min-h-[200px] md:min-h-[250px] lg:min-h-[300px] overflow-hidden"
+                              >
+                                {filteredDayProduction.length > 0 ? (
                         <div className="space-y-1 sm:space-y-2">
-                          {(selectedWeekDay
-                            ? getSortedDailyProduction(selectedDayProduction)
-                            : getSortedWeeklyProduction(weekProduction)
-                          ).map((item) => (
+                                    {filteredDayProduction.map((item) => (
                             <div
                               key={item.id}
-                              className={`border-l-4 ${
-                                isFormCollapsed ? "p-3 sm:p-4 md:p-6" : "p-2 sm:p-3 md:p-4"
-                              } rounded-r-lg ${
+                                        className={`p-1 sm:p-2 rounded-md border-l-2 sm:border-l-3 ${
                                 item.status_name === "งานผลิตถูกยกเลิก"
-                                  ? "border-l-red-400 bg-red-100"
-                                  : item.isDraft
-                                    ? "border-l-gray-400 bg-gray-100"
+                                            ? "border-l-red-400 bg-red-50"
                                     : item.recordStatus === "บันทึกเสร็จสิ้น"
                                       ? "border-l-green-400 bg-green-50"
                                       : item.recordStatus === "บันทึกแบบร่าง"
-                                        ? "border-l-gray-400 bg-gray-100"
-                                        : item.recordStatus === "บันทึกสำเร็จ"
-                                          ? "border-l-green-500 bg-green-100"
+                                                ? "border-l-gray-400 bg-gray-50"
                                           : "border-l-gray-400 bg-gray-50"
                               }`}
                             >
-                              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-3">
-                                <div className="space-y-1 sm:space-y-2 flex-1 min-w-0">
-                                  <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                                    <Badge
-                                      variant="outline"
-                                      className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} bg-blue-50 border-blue-300 text-blue-700 font-medium flex-shrink-0`}
+                                        {/* ชื่องานผลิต */}
+                                        <div
+                                          className={`font-medium text-gray-900 ${
+                                            isFormCollapsed ? "text-xs sm:text-sm md:text-base" : "text-xs sm:text-sm"
+                                          } mb-1 leading-tight line-clamp-2`}
                                     >
-                                      {formatProductionDate(viewMode === "weekly" ? item.production_date : selectedDate)}
-                                    </Badge>
-                                    <h3
-                                      className={`font-bold text-gray-900 ${
-                                        isFormCollapsed
-                                          ? "text-sm sm:text-lg md:text-xl"
-                                          : "text-xs sm:text-sm md:text-base"
-                                      } truncate`}
-                                    >
-                                      {getDisplayJobName(item, selectedWeekDay ? selectedDayProduction : weekProduction)}
-                                    </h3>
-                                    <Badge
-                                      variant="outline"
-                                      className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} flex-shrink-0`}
-                                    >
-                                      ห้องผลิต: {getRoomName(item.production_room)}
-                                    </Badge>
-                                    <Badge
-                                      variant="outline"
-                                      className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} flex-shrink-0 ${
-                                        item.status_name === "รอดำเนินการ"
-                                          ? "border-gray-500 text-gray-700"
-                                          : item.status_name === "กำลังดำเนินการ"
-                                            ? "border-blue-500 text-blue-700"
-                                            : item.status_name === "เสร็จสิ้น"
-                                              ? "border-green-500 text-green-700"
-                                              : item.status_name === "งานผลิตถูกยกเลิก"
-                                                ? "border-red-500 text-red-700"
-                                                : item.status_name === "งานพิเศษ"
-                                                  ? "border-orange-500 text-orange-700"
-                                                  : "border-gray-500 text-gray-700"
-                                      }`}
-                                      style={{
-                                        borderColor: item.status_color,
-                                        color: item.status_color
-                                      }}
-                                    >
-                                      {item.status_name || "รอดำเนินการ"}
-                                    </Badge>
+                                          {getDisplayJobName(item, dayProduction)}
                                   </div>
 
-                                  <div className="flex items-center space-x-2 sm:space-x-4">
-                                    {renderStaffAvatars(item.operators, isFormCollapsed)}
-                                  </div>
-
+                                        {/* เวลา */}
                                   <div
-                                    className={`flex items-center space-x-1 sm:space-x-2 ${
-                                      isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"
-                                    }`}
+                                          className={`flex items-center space-x-1 ${
+                                            isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"
+                                          } text-gray-600 mb-1`}
                                   >
                                     <Clock
-                                      className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"} text-gray-400 flex-shrink-0`}
+                                            className={`${
+                                              isFormCollapsed ? "w-2.5 h-2.5 sm:w-3 sm:h-3" : "w-2.5 h-2.5"
+                                            } flex-shrink-0`}
                                     />
-                                    <span className="text-gray-600">{item.start_time} - {item.end_time}</span>
-                                    {(item.notes || item.note) && (
-                                      <span className="text-gray-400 mx-2">|</span>
-                                    )}
-                                    {(item.notes || item.note) && (
-                                      <span className="text-gray-500 truncate max-w-xs">
-                                        <span className="font-medium">หมายเหตุ:</span> {item.notes || item.note}
-                                      </span>
-                                    )}
-                                  </div>
+                                          <span className="truncate">{item.start_time} - {item.end_time}</span>
                                 </div>
 
-                                <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-                                  <Button
-                                    variant="ghost"
-                                    size={isFormCollapsed ? "default" : "sm"}
+                                        {/* หมายเหตุ (ถ้ามี) */}
+                                        {(item.notes || item.note) && (
+                                          <div
                                     className={`${
-                                      item.recordStatus === "บันทึกเสร็จสิ้น"
-                                        ? "text-green-700 bg-green-100 hover:bg-green-200"
-                                        : item.recordStatus === "บันทึกสำเร็จ"
-                                          ? "text-green-700 bg-green-100 hover:bg-green-200"
-                                          : "text-gray-600 bg-gray-200 hover:bg-gray-300"
-                                    } px-2 sm:px-3 py-1`}
+                                              isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"
+                                            } text-gray-500 italic line-clamp-1`}
                                   >
-                                    <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"}`}>
-                                      {item.recordStatus}
-                                    </span>
-                                  </Button>
-                                  <div className="flex space-x-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className={`${isFormCollapsed ? "w-8 h-8 sm:w-10 sm:h-10" : "w-6 h-6 sm:w-8 sm:h-8"}`}
-                                    >
-                                      <Eye
-                                        className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"}`}
-                                      />
-                                    </Button>
-                                    {item.isDraft && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className={`${isFormCollapsed ? "w-8 h-8 sm:w-10 sm:h-10" : "w-6 h-6 sm:w-8 sm:h-8"}`}
-                                        onClick={() => handleEditDraft(item)}
-                                        aria-label="แก้ไขแบบร่าง"
-                                      >
-                                        <Edit
-                                          className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"}`}
-                                        />
-                                      </Button>
-                                    )}
-                                    {!item.isDraft && item.status_name !== "ยกเลิกการผลิต" && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className={`${isFormCollapsed ? "w-8 h-8 sm:w-10 sm:h-10" : "w-6 h-6 sm:w-8 sm:h-8"} text-red-600 hover:bg-red-100`}
-                                        onClick={() => handleCancelProduction(item.id)}
-                                        aria-label="ยกเลิกการผลิต"
-                                      >
-                                        <XCircle
-                                          className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"}`}
-                                        />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
+                                            หมายเหตุ: {item.notes || item.note}
+                                          </div>
+                                        )}
+
+                                        {/* สถานะ */}
+                                        <div className="mt-1">
+                                          <span
+                                            className={`inline-block px-1 sm:px-1.5 py-0.5 rounded text-xs ${
+                                              item.status_name === "รอดำเนินการ"
+                                                ? "bg-gray-100 text-gray-700"
+                                                : item.status_name === "กำลังดำเนินการ"
+                                                  ? "bg-blue-100 text-blue-700"
+                                                  : item.status_name === "เสร็จสิ้น"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : item.status_name === "งานผลิตถูกยกเลิก"
+                                                      ? "bg-red-100 text-red-700"
+                                                      : "bg-gray-100 text-gray-700"
+                                            } truncate`}
+                                          >
+                                            {item.status_name || "รอดำเนินการ"}
+                                          </span>
                               </div>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="text-center py-6 sm:py-8 text-gray-500">
+                                  <div className="flex items-center justify-center h-full text-gray-400">
+                                    <div className="text-center">
                           <Calendar
-                            className={`${isFormCollapsed ? "w-12 h-12 sm:w-16 sm:h-16" : "w-8 h-8 sm:w-12 sm:h-12"} mx-auto mb-3 sm:mb-4 text-gray-300`}
+                                        className={`${
+                                          isFormCollapsed ? "w-6 h-6 sm:w-8 sm:h-8" : "w-4 h-4 sm:w-6 sm:h-6"
+                                        } mx-auto mb-2 opacity-50`}
                           />
-                          <p className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}>
-                            {selectedWeekDay ? "ไม่มีงานผลิตในวันนี้" : "ไม่มีงานผลิตในสัปดาห์นี้"}
-                          </p>
+                                      <p className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"}`}>ไม่มีงาน</p>
+                                    </div>
                         </div>
                       )}
                     </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    
                   </div>
                 ) : (
                   <div className="space-y-2 sm:space-y-3">
@@ -2201,7 +2200,7 @@ export default function MedicalAppointmentDashboard() {
                                       variant="outline"
                                       className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} bg-blue-50 border-blue-300 text-blue-700 font-medium flex-shrink-0`}
                                     >
-                                      {formatProductionDate(viewMode === "weekly" ? item.production_date : selectedDate)}
+                                      {formatProductionDate(item.production_date)}
                                     </Badge>
                                     <h3
                                       className={`font-bold text-gray-900 ${
@@ -2545,3 +2544,4 @@ export default function MedicalAppointmentDashboard() {
     </div>
   )
 }
+

@@ -379,6 +379,14 @@ class DraftWorkPlan {
   }
   static async create(data) {
     const { production_date, job_code, job_name, start_time, end_time, machine_id, production_room_id, notes, workflow_status_id, operators } = data;
+    // เช็คซ้ำก่อน insert
+    const [existing] = await pool.execute(
+      'SELECT * FROM work_plan_drafts WHERE production_date = ? AND job_code = ? AND job_name = ? LIMIT 1',
+      [production_date, job_code, job_name]
+    );
+    if (existing.length > 0) {
+      return existing[0]; // ถ้ามีอยู่แล้ว return draft เดิม
+    }
     const [result] = await pool.execute(
       'INSERT INTO work_plan_drafts (production_date, job_code, job_name, start_time, end_time, machine_id, production_room_id, notes, workflow_status_id, operators) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [production_date, job_code, job_name, start_time, end_time, machine_id, production_room_id, notes || '', workflow_status_id || 1, JSON.stringify(operators || [])]
