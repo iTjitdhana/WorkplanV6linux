@@ -1270,6 +1270,13 @@ export default function MedicalAppointmentDashboard() {
     if (viewMode !== "daily") return;
     if (!selectedDate) return;
     if (isCreatingRef.current) return;
+    
+    // เพิ่มการตรวจสอบเพื่อป้องกันการสร้างซ้ำ
+    const lastCreatedDate = sessionStorage.getItem('lastCreatedDate');
+    if (lastCreatedDate === selectedDate) {
+      console.log(`[AUTO-DRAFT] Already created drafts for date: ${selectedDate}`);
+      return;
+    }
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
       { job_code: 'B', job_name: 'เบิกของส่งสาขา  - สด' },
@@ -1312,9 +1319,13 @@ export default function MedicalAppointmentDashboard() {
       }
       await loadAllProductionData();
       isCreatingRef.current = false;
+      
+      // บันทึกวันที่ที่สร้างแล้ว
+      sessionStorage.setItem('lastCreatedDate', selectedDate);
+      console.log(`[AUTO-DRAFT] Created drafts for date: ${selectedDate}`);
     };
     createMissingDrafts();
-  }, [selectedDate, viewMode]);
+  }, [selectedDate]);
 
   // เพิ่มฟังก์ชัน syncWorkOrder
   const syncWorkOrder = async (date: string) => {
