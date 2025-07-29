@@ -1271,12 +1271,7 @@ export default function MedicalAppointmentDashboard() {
     if (!selectedDate) return;
     if (isCreatingRef.current) return;
     
-    // เพิ่มการตรวจสอบเพื่อป้องกันการสร้างซ้ำ
-    const lastCreatedDate = sessionStorage.getItem('lastCreatedDate');
-    if (lastCreatedDate === selectedDate) {
-      console.log(`[AUTO-DRAFT] Already created drafts for date: ${selectedDate}`);
-      return;
-    }
+    // ไม่ต้องใช้ sessionStorage แล้ว เพราะจะเช็คจาก database โดยตรง
     const defaultDrafts = [
       { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
       { job_code: 'B', job_name: 'เบิกของส่งสาขา  - สด' },
@@ -1285,44 +1280,64 @@ export default function MedicalAppointmentDashboard() {
     ];
     const createMissingDrafts = async () => {
       isCreatingRef.current = true;
-      await loadAllProductionData();
-      const latestData = productionData;
-      const dayJobs = latestData.filter(item => item.production_date === selectedDate);
-      for (const draft of defaultDrafts) {
-        const exists = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name);
-        if (!exists) {
-          const existsInPlan = dayJobs.some(item => item.job_code === draft.job_code && item.job_name === draft.job_name && !item.isDraft);
-          if (existsInPlan) {
-            console.log(`[AUTO-DRAFT] Already exists in plan: ${draft.job_code} ${draft.job_name}`);
-            continue;
-          }
-          console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              production_date: selectedDate,
-              job_code: draft.job_code,
-              job_name: draft.job_name,
-              workflow_status_id: 1,
-              operators: [],
-              start_time: '',
-              end_time: '',
-              machine_id: null,
-              production_room_id: null,
-              notes: '',
-            })
-          });
-        } else {
-          console.log(`[AUTO-DRAFT] Already exists: ${draft.job_code} ${draft.job_name}`);
-        }
-      }
-      await loadAllProductionData();
-      isCreatingRef.current = false;
       
-      // บันทึกวันที่ที่สร้างแล้ว
-      sessionStorage.setItem('lastCreatedDate', selectedDate);
-      console.log(`[AUTO-DRAFT] Created drafts for date: ${selectedDate}`);
+      try {
+        // ดึงข้อมูล drafts จาก database โดยตรง
+        const draftsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`);
+        const draftsData = await draftsResponse.json();
+        const existingDrafts = draftsData.data || [];
+        
+        // กรอง drafts ที่มีในวันที่เลือก
+        const dayDrafts = existingDrafts.filter((draft: any) => draft.production_date === selectedDate);
+        
+        console.log(`[AUTO-DRAFT] Checking drafts for date: ${selectedDate}`);
+        console.log(`[AUTO-DRAFT] Found ${dayDrafts.length} existing drafts`);
+        
+        for (const draft of defaultDrafts) {
+          // เช็คว่ามี draft นี้ใน database แล้วหรือไม่
+          const exists = dayDrafts.some((existingDraft: any) => 
+            existingDraft.job_code === draft.job_code && 
+            existingDraft.job_name === draft.job_name
+          );
+          
+          if (!exists) {
+            console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                production_date: selectedDate,
+                job_code: draft.job_code,
+                job_name: draft.job_name,
+                workflow_status_id: 1,
+                operators: [],
+                start_time: '',
+                end_time: '',
+                machine_id: null,
+                production_room_id: null,
+                notes: '',
+              })
+            });
+            
+            if (response.ok) {
+              console.log(`[AUTO-DRAFT] Successfully created: ${draft.job_code} ${draft.job_name}`);
+            } else {
+              console.error(`[AUTO-DRAFT] Failed to create: ${draft.job_code} ${draft.job_name}`);
+            }
+          } else {
+            console.log(`[AUTO-DRAFT] Already exists in database: ${draft.job_code} ${draft.job_name}`);
+          }
+        }
+        
+        // โหลดข้อมูลใหม่หลังจากสร้าง drafts
+        await loadAllProductionData();
+        
+        console.log(`[AUTO-DRAFT] Completed creating drafts for date: ${selectedDate}`);
+      } catch (error) {
+        console.error('[AUTO-DRAFT] Error creating drafts:', error);
+      } finally {
+        isCreatingRef.current = false;
+      }
     };
     createMissingDrafts();
   }, [selectedDate]);
