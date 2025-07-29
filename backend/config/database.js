@@ -7,23 +7,23 @@ const isLocalhost = process.env.DB_HOST === 'localhost' || process.env.DB_HOST =
 
 // Configuration สำหรับ environments ต่างๆ
 const dbConfig = {
-  // ถ้าเป็น production และไม่ได้ระบุ host ให้ใช้ localhost
-  host: process.env.DB_HOST || (isDevelopment ? '192.168.0.94' : 'localhost'),
-  user: process.env.DB_USER || (isDevelopment ? 'jitdhana' : 'root'),
-  password: process.env.DB_PASSWORD || (isDevelopment ? 'iT123454$' : ''),
+  // Remote MySQL configuration
+  host: process.env.DB_HOST || '192.168.0.94',
+  user: process.env.DB_USER || 'jitdhana',
+  password: process.env.DB_PASSWORD || 'iT12345$',
   database: process.env.DB_NAME || 'esp_tracker',
   port: process.env.DB_PORT || 3306,
   connectionLimit: 10,
-  // ลบ invalid options ที่ทำให้เกิด warnings
-  // acquireTimeout: 60000,  // ไม่ support ใน mysql2
-  // timeout: 60000,         // ไม่ support ใน mysql2  
-  // reconnect: true,        // ไม่ support ใน mysql2
-  // ใช้ options ที่ถูกต้องแทน
+  // Connection pool settings
   idleTimeout: 60000,
   queueLimit: 0,
-  // เพิ่ม options สำหรับแก้ปัญหา connection
+  // Remote connection settings
   ssl: false,
-  // ใช้ authPlugins API ใหม่แทน authSwitchHandler ที่ deprecated
+  // Connection timeout
+  connectTimeout: 60000,
+  acquireTimeout: 60000,
+  timeout: 60000,
+  // Authentication
   authPlugins: {
     mysql_native_password: () => {
       console.log('🔄 Using mysql_native_password authentication');
