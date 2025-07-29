@@ -34,15 +34,42 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // CORS
+const allowedOrigins = [
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  'http://192.168.0.161:5000',
+  process.env.FRONTEND_URL,
+  'http://localhost:3011',
+  'http://127.0.0.1:3011',
+  'http://192.168.0.94:3011',
+  // Network access origins
+  /^http:\/\/192\.168\.\d+\.\d+:3011$/,  // Allow any 192.168.x.x IP
+  /^http:\/\/10\.\d+\.\d+\.\d+:3011$/,   // Allow any 10.x.x.x IP
+  /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3011$/  // Allow 172.16-31.x.x IP
+];
+
 app.use(cors({
-  origin: [
-    'http://localhost:5000',
-    'http://127.0.0.1:5000',
-    'http://192.168.0.161:5000',
-    process.env.FRONTEND_URL,
-    'http://localhost:3011',
-    'http://192.168.0.94:3011'  // เพิ่ม IP address สำหรับ frontend
-  ].filter(Boolean),
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    for (let allowedOrigin of allowedOrigins) {
+      if (typeof allowedOrigin === 'string' && allowedOrigin === origin) {
+        return callback(null, true);
+      }
+      if (allowedOrigin instanceof RegExp && allowedOrigin.test(origin)) {
+        return callback(null, true);
+      }
+    }
+    
+    // Allow if in development mode
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -104,4 +131,4 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-module.exports = app; 
+module.exports = app;
