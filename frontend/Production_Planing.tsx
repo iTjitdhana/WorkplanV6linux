@@ -1207,17 +1207,17 @@ export default function MedicalAppointmentDashboard() {
 
       // 3. เตรียมข้อมูลสำหรับ Log_แผนผลิต (แยกแถวตามผู้ปฏิบัติงาน)
       const logRows: string[][] = [];
-      const today = new Date();
       
-      // แก้ไขวันที่ให้เป็นปี 2025 แทน 2568
-      const dateString = today.toLocaleDateString('en-GB', { 
+      // ใช้ selectedDate แทน today เพื่อให้วันที่ตรงกับข้อมูลงาน
+      const selectedDateObj = new Date(selectedDate);
+      const dateString = selectedDateObj.toLocaleDateString('en-GB', { 
         weekday: 'long', 
         year: 'numeric', 
         month: 'numeric', 
         day: 'numeric' 
       });
-      const dateValue = today.toLocaleDateString('en-GB'); // DD/MM/YYYY
-      const timeStamp = today.toLocaleString('en-GB') + ', ' + today.toLocaleTimeString('en-GB');
+      const dateValue = selectedDateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
+      const timeStamp = new Date().toLocaleString('en-GB') + ', ' + new Date().toLocaleTimeString('en-GB');
 
       // หาข้อมูลงาน A B C D ที่มีข้อมูลจริงๆ ในฐานข้อมูล (ทั้ง work_plans และ work_plan_drafts)
       const defaultJobsData = productionData.filter(item => 
