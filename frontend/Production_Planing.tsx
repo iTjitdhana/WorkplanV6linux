@@ -1208,15 +1208,86 @@ export default function MedicalAppointmentDashboard() {
       // 3. เตรียมข้อมูลสำหรับ Log_แผนผลิต (แยกแถวตามผู้ปฏิบัติงาน)
       const logRows: string[][] = [];
       const today = new Date();
-      const dateString = today.toLocaleDateString('th-TH', { 
+      
+      // แก้ไขวันที่ให้เป็นปี 2025 แทน 2568
+      const dateString = today.toLocaleDateString('en-GB', { 
         weekday: 'long', 
         year: 'numeric', 
         month: 'numeric', 
         day: 'numeric' 
-      }).replace('พ.ศ.', '').trim();
+      });
       const dateValue = today.toLocaleDateString('en-GB'); // DD/MM/YYYY
       const timeStamp = today.toLocaleString('en-GB') + ', ' + today.toLocaleTimeString('en-GB');
 
+      // หาข้อมูลงาน A B C D ที่มีข้อมูลจริงๆ ในฐานข้อมูล (ทั้ง work_plans และ work_plan_drafts)
+      const defaultJobsData = productionData.filter(item => 
+        item.production_date === selectedDate && 
+        defaultCodes.includes(item.job_code)
+      );
+
+      console.log("🔍 [DEBUG] ข้อมูลงาน A B C D ที่หาได้:", defaultJobsData);
+      console.log("🔍 [DEBUG] selectedDate:", selectedDate);
+      console.log("🔍 [DEBUG] defaultCodes:", defaultCodes);
+      console.log("🔍 [DEBUG] productionData ทั้งหมด:", productionData.filter(item => item.production_date === selectedDate));
+
+      // ถ้าไม่มีข้อมูลงาน A B C D ในฐานข้อมูล ให้ใช้ข้อมูล default
+      if (defaultJobsData.length === 0) {
+        const defaultJobs = [
+          { job_code: 'A', job_name: 'เบิกของส่งสาขา  - ผัก' },
+          { job_code: 'B', job_name: 'เบิกของส่งสาขา  - สด' },
+          { job_code: 'C', job_name: 'เบิกของส่งสาขา  - แห้ง' },
+          { job_code: 'D', job_name: 'ตวงสูตร' }
+        ];
+
+        // เพิ่มงาน A B C D ใน Log_แผนผลิต (ไม่มีข้อมูลคนและเวลา)
+        defaultJobs.forEach((defaultJob) => {
+          logRows.push([
+            dateString, // วันที่
+            dateValue, // Date Value
+            defaultJob.job_code, // เลขที่งาน (A, B, C, D)
+            defaultJob.job_name, // ชื่องาน
+            "", // ผู้ปฏิบัติงาน (ว่าง)
+            "", // เวลาเริ่มต้น (ว่าง)
+            "", // เวลาสิ้นสุด (ว่าง)
+            "" // ห้อง (ว่าง)
+          ]);
+        });
+      } else {
+        // ถ้ามีข้อมูลงาน A B C D ในฐานข้อมูล ให้ใช้ข้อมูลจริง
+        defaultJobsData.forEach((item) => {
+          const operators = (item.operators || "").split(", ").map((s: string) => s.trim()).filter(Boolean);
+          
+          if (operators.length === 0) {
+            // ถ้าไม่มีผู้ปฏิบัติงาน ส่ง 1 แถว (8 คอลัมน์)
+            logRows.push([
+              dateString, // วันที่
+              dateValue, // Date Value
+              item.job_code || "", // เลขที่งาน (A, B, C, D)
+              item.job_name || "", // ชื่องาน
+              "", // ผู้ปฏิบัติงาน (ว่าง)
+              item.start_time || "", // เวลาเริ่มต้น
+              item.end_time || "", // เวลาสิ้นสุด
+              getRoomNameByCodeOrId(item.production_room) // ห้อง
+            ]);
+          } else {
+            // ถ้ามีผู้ปฏิบัติงาน ส่งแถวละคน (8 คอลัมน์)
+            operators.forEach((operator: string) => {
+              logRows.push([
+                dateString, // วันที่
+                dateValue, // Date Value
+                item.job_code || "", // เลขที่งาน (A, B, C, D)
+                item.job_name || "", // ชื่องาน
+                operator, // ผู้ปฏิบัติงาน
+                item.start_time || "", // เวลาเริ่มต้น
+                item.end_time || "", // เวลาสิ้นสุด
+                getRoomNameByCodeOrId(item.production_room) // ห้อง
+              ]);
+            });
+          }
+        });
+      }
+
+      // เพิ่มข้อมูลงานอื่นๆ
       filtered.forEach((item) => {
         const operators = (item.operators || "").split(", ").map((s: string) => s.trim()).filter(Boolean);
         
