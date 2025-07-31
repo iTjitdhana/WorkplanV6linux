@@ -1219,6 +1219,13 @@ export default function MedicalAppointmentDashboard() {
       const dateValue = selectedDateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
       const timeStamp = new Date().toLocaleString('en-GB') + ', ' + new Date().toLocaleTimeString('en-GB');
 
+      console.log("🟡 [DEBUG] Date processing:");
+      console.log("🟡 [DEBUG] selectedDate (input):", selectedDate);
+      console.log("🟡 [DEBUG] selectedDateObj:", selectedDateObj);
+      console.log("🟡 [DEBUG] dateString:", dateString);
+      console.log("🟡 [DEBUG] dateValue:", dateValue);
+      console.log("🟡 [DEBUG] timeStamp:", timeStamp);
+
       // หาข้อมูลงาน A B C D ที่มีข้อมูลจริงๆ ในฐานข้อมูล (ทั้ง work_plans และ work_plan_drafts)
       const defaultJobsData = productionData.filter(item => 
         item.production_date === selectedDate && 
@@ -1338,9 +1345,12 @@ export default function MedicalAppointmentDashboard() {
       console.log("🟡 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน:", dateValue);
       console.log("🟡 [DEBUG] Sheet name:", reportSheetName);
       console.log("🟡 [DEBUG] Sheet name length:", reportSheetName.length);
+      console.log("🟡 [DEBUG] selectedDate:", selectedDate);
+      console.log("🟡 [DEBUG] dateValue:", dateValue);
       await sendToGoogleSheet({
         sheetName: reportSheetName,
-        "Date Value": dateValue
+        "Date Value": dateValue,
+        "วันที่": dateString
       });
       console.log("🟢 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน สำเร็จ");
       setIsSubmitting(false);
