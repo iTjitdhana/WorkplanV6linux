@@ -29,7 +29,7 @@ echo ✅ npm version: %NPM_VERSION%
 echo.
 echo 📦 Installing Backend Dependencies...
 cd backend
-call npm install
+call npm install --legacy-peer-deps
 if %errorlevel% neq 0 (
     echo ❌ Failed to install backend dependencies
     pause
@@ -40,7 +40,7 @@ echo ✅ Backend dependencies installed successfully
 echo.
 echo 📦 Installing Frontend Dependencies...
 cd ..\frontend
-call npm install
+call npm install --legacy-peer-deps
 if %errorlevel% neq 0 (
     echo ❌ Failed to install frontend dependencies
     pause

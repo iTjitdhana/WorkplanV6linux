@@ -5,7 +5,7 @@ echo ========================
 
 echo Step 1: Installing dependencies...
 cd frontend
-call npm install
+call npm install --legacy-peer-deps
 if %errorlevel% neq 0 (
     echo ❌ Failed to install frontend dependencies
     pause
@@ -26,7 +26,7 @@ echo ✅ Frontend built successfully!
 echo.
 echo Step 3: Installing Backend dependencies...
 cd backend
-call npm install
+call npm install --legacy-peer-deps
 if %errorlevel% neq 0 (
     echo ❌ Failed to install backend dependencies
     pause
