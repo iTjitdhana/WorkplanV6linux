@@ -25,6 +25,9 @@ const systemMonitor = require('./monitoring');
 const app = express();
 const PORT = process.env.PORT || 3101;
 
+// Determine host based on environment
+const HOST = process.env.NODE_ENV === 'production' ? (process.env.PRODUCTION_HOST || '192.168.0.94') : 'localhost';
+
 // Security middleware
 app.use(helmet());
 
@@ -143,8 +146,8 @@ app.use(errorMonitor);
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📊 API Documentation: http://192.168.0.94:${PORT}/api`);
-  console.log(`🌐 Network access: http://192.168.0.94:${PORT}/api`);
+  console.log(`📊 API Documentation: http://${HOST}:${PORT}/api`);
+  console.log(`🌐 Network access: http://${HOST}:${PORT}/api`);
   
   // เริ่มต้น monitoring system
   systemMonitor.start();

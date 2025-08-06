@@ -404,7 +404,7 @@ export default function MedicalAppointmentDashboard() {
       "bg-red-100 border-red-200", // อาทิตย์ - สีแดง
       "bg-yellow-100 border-yellow-200", // จันทร์ - สีเหลือง
       "bg-pink-100 border-pink-200", // อังคาร - สีชมพู
-      "bg-green-100 border-green-200", // พุธ - สีเขียว
+      "bg-emerald-200 border-emerald-300", // พุธ - สีเขียวเข้ม
       "bg-orange-100 border-orange-200", // พฤหัสบดี - สีส้ม
       "bg-blue-100 border-blue-200", // ศุกร์ - สีฟ้า
       "bg-purple-100 border-purple-200", // เสาร์ - สีม่วง
@@ -418,7 +418,7 @@ export default function MedicalAppointmentDashboard() {
       "text-red-800", // อาทิตย์
       "text-yellow-800", // จันทร์
       "text-pink-800", // อังคาร
-      "text-green-800", // พุธ
+      "text-emerald-900", // พุธ - สีเขียวเข้ม
       "text-orange-800", // พฤหัสบดี
       "text-blue-800", // ศุกร์
       "text-purple-800", // เสาร์
@@ -2410,7 +2410,7 @@ export default function MedicalAppointmentDashboard() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center space-x-2 text-sm sm:text-base md:text-lg">
                     <User className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                    <span>เพิ่มรายการใหม่</span>
+                    <span className="leading-7 text-2xl">เพิ่มงานที่ต้องการผลิต</span>
                   </CardTitle>
                   <Button
                     variant="ghost"
@@ -2433,35 +2433,38 @@ export default function MedicalAppointmentDashboard() {
                         type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full px-4 py-3 text-sm border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 bg-white shadow-sm hover:border-gray-300"
+                        className="pl-8 sm:pl-10 text-sm"
                       />
-                      {/* <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" /> */}
+                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
                     </div>
                   </div>
 
                   {/* Autocomplete Job Name/Code */}
                   <div className="space-y-2 relative">
-                    <Label className="text-xs sm:text-sm font-bold text-gray-700">ค้นหารายการ (พิมพ์เพื่อค้นหา)</Label>
-                    <SearchBox
-                      value={jobQuery}
-                      onChange={setJobQuery}
-                      onSelect={(item: SearchOption) => {
-                        justSelectedFromDropdownRef.current = true;
-                        setJobCode(item.job_code);
-                        setJobName(item.job_name);
-                        setJobQuery(item.job_name);
-                      }}
-                      cacheRef={searchCacheRef}
-                    />
+                    <Label className="text-xs sm:text-sm font-bold text-gray-700">เพิ่มงานผลิต</Label>
+                    <div className="relative">
+                      <SearchBox
+                        value={jobQuery}
+                        onChange={setJobQuery}
+                        onSelect={(item: SearchOption) => {
+                          justSelectedFromDropdownRef.current = true;
+                          setJobCode(item.job_code);
+                          setJobName(item.job_name);
+                          setJobQuery(item.job_name);
+                        }}
+                        cacheRef={searchCacheRef}
+                      />
+                      <Search className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                    </div>
                   </div>
 
                   {/* Staff Positions */}
                   <div className="space-y-3 sm:space-y-4">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">ผู้ปฏิบัติงาน (1-4 คน)</Label>
-                      {/* <Button variant="link" size="sm" className="text-green-600 p-0 h-auto text-xs">
+                      <Button variant="link" size="sm" className="text-green-600 p-0 h-auto text-xs">
                         ล้างข้อมูลทั้งหมด
-                      </Button> */}
+                      </Button>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -2514,31 +2517,37 @@ export default function MedicalAppointmentDashboard() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">เวลาเริ่ม</Label>
-                      <Select value={startTime || "__none__"} onValueChange={val => setStartTime(val === "__none__" ? "" : val)}>
-                        <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="เลือกเวลาเริ่ม..." />
-                        </SelectTrigger>
-                        <SelectContent className={notoSansThai.className}>
-                          <SelectItem value="__none__" className={notoSansThai.className}>เลือกเวลาเริ่ม...</SelectItem>
-                          {timeOptions.map(t => (
-                            <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="relative">
+                        <Select value={startTime || "__none__"} onValueChange={val => setStartTime(val === "__none__" ? "" : val)}>
+                          <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="เลือกเวลาเริ่ม..." />
+                          </SelectTrigger>
+                          <SelectContent className={notoSansThai.className}>
+                            <SelectItem value="__none__" className={notoSansThai.className}>เลือกเวลาเริ่ม...</SelectItem>
+                            {timeOptions.map(t => (
+                              <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">เวลาสิ้นสุด</Label>
-                      <Select value={endTime || "__none__"} onValueChange={val => setEndTime(val === "__none__" ? "" : val)}>
-                        <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="เลือกเวลาสิ้นสุด..." />
-                        </SelectTrigger>
-                        <SelectContent className={notoSansThai.className}>
-                          <SelectItem value="__none__" className={notoSansThai.className}>เลือกเวลาสิ้นสุด...</SelectItem>
-                          {timeOptions.map(t => (
-                            <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="relative">
+                        <Select value={endTime || "__none__"} onValueChange={val => setEndTime(val === "__none__" ? "" : val)}>
+                          <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="เลือกเวลาสิ้นสุด..." />
+                          </SelectTrigger>
+                          <SelectContent className={notoSansThai.className}>
+                            <SelectItem value="__none__" className={notoSansThai.className}>เลือกเวลาสิ้นสุด...</SelectItem>
+                            {timeOptions.map(t => (
+                              <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                      </div>
                     </div>
                   </div>
 
@@ -2573,11 +2582,11 @@ export default function MedicalAppointmentDashboard() {
                   </div>
 
                   {/* Submit Buttons */}
-                  <div className="pt-3 sm:pt-4">
-                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <div className="pt-4 sm:pt-6">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                       <Button
                         variant="outline"
-                        className="flex-1 border-gray-300 text-gray-600 hover:bg-gray-50 bg-transparent text-sm"
+                        className="flex-1 border-2 border-gray-400 text-gray-700 hover:bg-gray-100 bg-white text-sm font-medium py-2 px-4"
                         onClick={() => {
                           console.log('🔧 Button clicked!');
                           handleSaveDraft();
@@ -2587,7 +2596,7 @@ export default function MedicalAppointmentDashboard() {
                         {isSubmitting ? "กำลังบันทึก..." : "บันทึกแบบร่าง"}
                       </Button>
                       <Button
-                        className="flex-1 bg-green-700 hover:bg-green-800 text-white text-sm"
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 shadow-md"
                         onClick={handleSubmit}
                         disabled={isSubmitting}
                       >
@@ -2818,27 +2827,20 @@ export default function MedicalAppointmentDashboard() {
                     <Calendar
                       className={`${isFormCollapsed ? "w-5 h-5 sm:w-6 sm:h-6" : "w-4 h-4 sm:w-5 sm:h-5"} text-green-600`}
                     />
-                    <span>รายการแผนผลิต</span>
+                    <span className="text-2xl">รายการแผนผลิต</span>
                   </CardTitle>
                   <div className="flex items-center space-x-2">
                     {viewMode === "daily" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSyncDrafts}
-                        disabled={isSubmitting}
-                        className="bg-white border-green-600 text-green-700 hover:bg-green-50 flex items-center space-x-1 sm:space-x-2 h-7 sm:h-8 md:h-9"
-                      >
-                        <RefreshCw className={`${isFormCollapsed ? "w-3 h-3 sm:w-4 sm:h-4" : "w-3 h-3"}`} />
-                        <span
-                          className={`${
-                            isFormCollapsed ? "text-xs sm:text-sm md:text-base" : "text-xs sm:text-sm"
-                          } hidden sm:inline`}
-                        >
-                          พิมพ์ใบงานผลิต
-                        </span>
-                        <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} sm:hidden`}>พิมพ์</span>
-                      </Button>
+                                          <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSyncDrafts}
+                      disabled={isSubmitting}
+                      className="bg-white border-green-600 text-green-700 hover:bg-green-50 flex items-center space-x-1 sm:space-x-2"
+                    >
+                      <RefreshCw className={`${isFormCollapsed ? "w-3 h-3 sm:w-4 sm:h-4" : "w-3 h-3"}`} />
+                      <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"}`}>พิมพ์ใบงานผลิต</span>
+                    </Button>
                     )}
                     <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
                       <Button
@@ -2888,7 +2890,7 @@ export default function MedicalAppointmentDashboard() {
                         >
                           {weekRange}
                         </h3>
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className={`text-gray-600 mt-1 ${isFormCollapsed ? "text-sm" : "text-xs"}`}>
                           รวมงานทั้งสัปดาห์: {weekProduction.length} งาน
                         </p>
                       </div>
@@ -2916,139 +2918,138 @@ export default function MedicalAppointmentDashboard() {
 
                     {/* Weekly Calendar Table */}
                     {!isLoadingData && (
-                    <div className="overflow-x-auto">
-                      <div className="min-w-full">
-                                                {/* Header Row */}
-                        <div className="grid grid-cols-6 gap-1 mb-0">
-                      {weekDates.map((date, index) => {
+                      <div className="overflow-x-auto">
+                        <div className="min-w-full">
+                          {/* Header Row */}
+                          <div className="grid grid-cols-6 gap-1 mb-2">
+                            {weekDates.map((date, index) => {
                               const dateStr = formatDateForAPI(date)
                               const dayProduction = productionData.filter((item) => formatDateForAPI(item.production_date) === dateStr)
-                        const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
+                              const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
 
-                        return (
-                              <div
-                            key={index}
-                                className={`${getDayBackgroundColor(date)} rounded-lg p-1 sm:p-2 text-center min-w-0`}
-                          >
-                              <div
-                                  className={`${
-                                      isFormCollapsed ? "text-sm sm:text-base md:text-lg" : "text-sm sm:text-base"
-                                  } font-medium ${getDayTextColor(date)} truncate`}
-                              >
-                                {getDayName(date)}
-                              </div>
-                              <div
-                                className={`${
-                                      isFormCollapsed ? "text-base sm:text-xl md:text-2xl" : "text-base sm:text-xl"
-                                  } font-bold ${getDayTextColor(date)}`}
-                              >
-                                    {date.getDate()}
-                                  </div>
+                              return (
+                                <div key={index} className={`${getDayBackgroundColor(date)} rounded-lg p-2 text-center`}>
+                                  {/* ชื่อวัน - ขนาดใหญ่ขึ้น */}
                                   <div
-                                    className={`${
-                                      isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"
-                                    } ${getDayTextColor(date)} opacity-90 mt-1 font-medium`}
+                                    className={`${isFormCollapsed ? "text-lg sm:text-xl font-bold" : "text-base sm:text-lg font-bold"} ${getDayTextColor(date)} mb-2`}
                                   >
-                                    {date.toLocaleDateString("th-TH", { month: "long" })}
-                              </div>
+                                    {getDayName(date)}
+                                  </div>
+
+                                  {/* วันที่และเดือนในบรรทัดเดียวกัน */}
+                                  <div className="flex items-center justify-center space-x-1 mb-2">
+                                    <div
+                                      className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} font-semibold ${getDayTextColor(date)}`}
+                                    >
+                                      {date.getDate()}
+                                    </div>
+                                    <div
+                                      className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} ${getDayTextColor(date)} opacity-90`}
+                                    >
+                                      {date.toLocaleDateString("th-TH", { month: "short" })}
+                                    </div>
+                                  </div>
+
                                   <div
-                                    className={`${
-                                    isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"
-                                  } ${getDayTextColor(date)} opacity-75 mt-1`}
+                                    className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} ${getDayTextColor(date)} opacity-75 mt-1`}
                                   >
                                     {filteredDayProduction.length} งาน
                                   </div>
                                 </div>
-                        )
-                      })}
-                    </div>
+                              )
+                            })}
+                          </div>
 
-                        {/* Production Content Grid */}
+                          {/* Production Content Grid */}
                           <div className="grid grid-cols-6 gap-1">
-                          {weekDates.map((date, index) => {
+                            {weekDates.map((date, index) => {
                               const dateStr = formatDateForAPI(date)
                               const dayProduction = productionData.filter((item) => formatDateForAPI(item.production_date) === dateStr)
-                            const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
+                              const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
 
-                                                          return (
+                              return (
                                 <div
                                   key={index}
-                                  className={`border border-gray-200 rounded-lg p-0 bg-white ${isFormCollapsed ? 'min-h-32' : 'min-h-24'}`}
+                                  className="border border-gray-200 rounded-lg p-2 bg-white min-h-[200px] sm:min-h-[400px] flex flex-col"
                                 >
-                                                                {filteredDayProduction.length > 0 ? (
-                                  <div className="space-y-1 pt-0">
-                                    {filteredDayProduction.map((item) => (
-                                                                    <div
+                                  {filteredDayProduction.length > 0 ? (
+                                    <div className="space-y-2 flex-1">
+                                      {filteredDayProduction.map((item, itemIndex) => (
+                                        <div
                                           key={item.id}
-                                          className={`border-l-4 ${
+                                          className={`p-2 border-l-4 min-h-[140px] flex flex-col ${
                                             item.status === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
-                                              ? "border-l-red-400 bg-red-50"
+                                              ? "border-l-red-500 bg-red-50"
                                               : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
                                                 ? "border-l-green-500 bg-green-50"
                                                 : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
                                                   ? "border-l-gray-500 bg-gray-50"
                                                   : "border-l-gray-500 bg-gray-50"
-                                          } mb-1`}
+                                          }`}
                                         >
-                                                                                    {/* ชื่องานผลิต - ตัดคำถ้ายาว */}
-                                          <div className="font-bold text-gray-900 text-lg mb-2 leading-tight">
-                                            <span className="underline">
-                                              งานที่ {filteredDayProduction.findIndex(j => j.id === item.id) + 1}
-                                            </span>
-                                            <span className="ml-1">
-                                              : {item.job_name}
-                                            </span>
+                                          {/* ชื่องานผลิต */}
+                                          <div
+                                            className={`font-medium text-gray-900 ${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} mb-1 leading-tight flex-1`}
+                                          >
+                                            <span className="underline">งานที่ {itemIndex + 1} :</span> {item.job_name}
                                           </div>
 
-                                                                                    {/* หมายเหตุ - บรรทัดใหม่ (ถ้ามี) */}
+                                          {/* เวลา */}
+                                          <div
+                                            className={`flex items-center space-x-1 ${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-gray-600 mb-2`}
+                                          >
+                                            <Clock
+                                              className={`${isFormCollapsed ? "w-3 h-3" : "w-2.5 h-2.5"} flex-shrink-0`}
+                                            />
+                                            <span>{item.start_time?.substring(0, 5) || "08:00"} - {(item.end_time || "17:00:00").substring(0, 5)}</span>
+                                          </div>
+
+                                          {/* หมายเหตุ (ถ้ามี) */}
                                           {(item.notes || item.note) && (
-                                            <div className="text-sm text-red-600 font-semibold mb-2 bg-red-50 px-2 py-1 rounded border-l-4 border-red-400">
+                                            <div
+                                              className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-gray-500 italic mb-2`}
+                                            >
                                               หมายเหตุ: {item.notes || item.note}
                                             </div>
                                           )}
 
-                                          {/* เวลา - บรรทัดใหม่ */}
-                                          <div className="text-sm text-blue-600 font-semibold mb-2">
-                                            {item.start_time?.substring(0, 5) || "08:00"} - {(item.end_time || "17:00:00").substring(0, 5)}
-                                          </div>
-
-                                                                                    {/* สถานะ - บรรทัดใหม่ */}
+                                          {/* สถานะ */}
                                           <div className="mt-auto">
                                             <span
-                                              className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                                                item.status_name === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
+                                              className={`inline-block px-1.5 py-0.5 rounded text-xs ${
+                                                item.status === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
                                                   ? "bg-red-100 text-red-700"
-                                                : item.status_name === "กำลังดำเนินการ"
+                                                  : item.status_name === "กำลังดำเนินการ"
                                                     ? "bg-blue-100 text-blue-700"
                                                     : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
-                                                    ? "bg-green-100 text-green-700"
+                                                      ? "bg-green-100 text-green-700"
                                                       : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
                                                         ? "bg-gray-100 text-gray-700"
                                                         : "bg-gray-100 text-gray-700"
                                               }`}
-                                          >
-                                            {item.status_name || "รอดำเนินการ"}
-                                          </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                                  <div className="flex items-center justify-center h-full text-gray-400">
-                                    <div className="text-center">
-                          <Calendar
-                                          className={`${isFormCollapsed ? "w-8 h-8" : "w-6 h-6"} mx-auto mb-2 opacity-50`}
-                          />
-                                        <p className={`${isFormCollapsed ? "text-xs" : "text-xs"}`}>ไม่มีงานผลิต</p>
+                                            >
+                                              {item.status_name || "รอดำเนินการ"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
-                        </div>
-                      )}
-                    </div>
-                            )
-                          })}
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full text-gray-400">
+                                      <div className="text-center">
+                                        <Calendar
+                                          className={`${isFormCollapsed ? "w-8 h-8" : "w-6 h-6"} mx-auto mb-2 opacity-50`}
+                                        />
+                                        <p className={`${isFormCollapsed ? "text-xs" : "text-xs"}`}>ไม่มีงานผลิต</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
                     )}
                   </div>
                 ) : (

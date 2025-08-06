@@ -1,34 +1,25 @@
 @echo off
-chcp 65001 >nul
-echo Starting Production System
-echo ========================
-
-echo Step 1: Stopping existing processes...
-taskkill /f /im node.exe >nul 2>&1
-echo ✅ Stopped existing Node.js processes
-
+echo Starting Frontend and Backend in PRODUCTION mode...
 echo.
-echo Step 2: Starting Backend Server...
-cd backend
-start "Backend Server" cmd /k "npm start"
 
-echo Waiting for Backend to start...
-timeout /t 5 /nobreak >nul
+REM Set environment variables for production
+set NODE_ENV=production
 
-echo Step 3: Starting Frontend Server (Production Mode)...
-cd ..\frontend
-start "Frontend Server" cmd /k "npm start"
+REM Start Backend in background
+start "Backend Server (Prod)" cmd /k "cd backend && set NODE_ENV=production && npm start"
 
-echo.
-echo ✅ Production servers started!
-echo.
-echo 🌐 Frontend (Local): http://localhost:3011
-echo 🌐 Frontend (Network): http://192.168.0.94:3011
-echo.
-echo 🔧 Backend (Local): http://localhost:3101
-echo 🔧 Backend (Network): http://192.168.0.94:3101
-echo.
-echo ✅ All devices on network can now access: http://192.168.0.94:3011
-echo Wait 30 seconds for servers to fully start
+REM Wait a moment for backend to start
+timeout /t 3 /nobreak > nul
 
-pause
+REM Start Frontend in background
+start "Frontend Server (Prod)" cmd /k "cd frontend && npm start"
+
+echo Both servers are starting in PRODUCTION mode...
+echo.
+echo 🔧 Backend API: http://192.168.0.94:3101 (Network)
+echo 🌐 Frontend: http://192.168.0.94:3011 (Network)
+echo.
+echo ✅ Production mode - using 192.168.0.94
+echo.
+echo Press any key to exit this window...
+pause > nul

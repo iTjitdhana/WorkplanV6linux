@@ -13,13 +13,14 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3101,
-        DB_HOST: 'localhost',
-        DB_USER: 'root',
-        DB_PASSWORD: 'your_production_password',
-        DB_NAME: 'workplan',
+        DB_HOST: '192.168.0.94',  // เปลี่ยนเป็น IP ของ database server
+        DB_USER: 'jitdhana',
+        DB_PASSWORD: 'iT12345$',
+        DB_NAME: 'esp_tracker',
         DB_PORT: 3306,
         API_RATE_LIMIT: 100,
-        CORS_ORIGINS: 'http://192.168.0.94:3011,http://your-domain.com'
+        PRODUCTION_HOST: '192.168.0.161',  // IP ของ server ที่รัน backend
+        CORS_ORIGINS: 'http://192.168.0.161:3011,http://192.168.0.94:3011'
       },
       error_file: './logs/err.log',
       out_file: './logs/out.log',
@@ -40,7 +41,7 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3011,
-        NEXT_PUBLIC_API_URL: 'http://192.168.0.94:3101',
+        NEXT_PUBLIC_API_URL: 'http://192.168.0.161:3101',  // เปลี่ยนเป็น IP ของ backend server
         NEXT_PUBLIC_APP_ENV: 'production',
         NEXT_PUBLIC_APP_VERSION: '1.0.0'
       },
