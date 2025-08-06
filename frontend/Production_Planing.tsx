@@ -1,19 +1,23 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Clock,
   Edit,
   Eye,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   RefreshCw,
   Search,
   User,
   XCircle,
+  BarChart3,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,6 +31,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Noto_Sans_Thai } from "next/font/google"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SearchBox, SearchOption } from "./components/SearchBox";
+import { createSafeDate, formatDateForDisplay, formatDateForAPI, formatDateThaiShort } from "@/lib/dateUtils";
+import Link from "next/link";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -48,10 +54,10 @@ const notoSansThai = Noto_Sans_Thai({
 const hasJobNumberPrefix = (name: string) => /^([A-D]|\d+)\s/.test(name);
 
 export default function MedicalAppointmentDashboard() {
-  // Helper function for API URL
+  // Helper function for API URL - ใช้ relative URLs เพื่อเรียก frontend API routes
   const getApiUrl = (endpoint: string) => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101';
-    return `${baseUrl}${endpoint}`;
+    // ใช้ backend URL โดยตรง
+    return `http://localhost:3101${endpoint}`;
   };
 
   // เปลี่ยน default selectedDate เป็นวันที่ปัจจุบัน (dynamic)
@@ -90,6 +96,9 @@ export default function MedicalAppointmentDashboard() {
   const [selectedMachine, setSelectedMachine] = useState("");
   const justSelectedFromDropdownRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [showWorkerDetails, setShowWorkerDetails] = useState(false); // เพิ่ม state สำหรับเปิด/ปิดรายละเอียด
+  const [showTimeTable, setShowTimeTable] = useState(false); // เพิ่ม state สำหรับเปิด/ปิด Time Table Popup (default ปิด)
+  const [syncModeEnabled, setSyncModeEnabled] = useState(false); // เพิ่ม state สำหรับ sync mode
   
   // เพิ่ม cache สำหรับผลลัพธ์การค้นหา
   const searchCacheRef = useRef<Map<string, {job_code: string, job_name: string}[]>>(new Map());
@@ -156,10 +165,11 @@ export default function MedicalAppointmentDashboard() {
 
   // state สำหรับข้อมูลแผนผลิตจริง
   const [productionData, setProductionData] = useState<any[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   
   // ดึงข้อมูลแผนผลิตจริงและแบบร่างมารวมกัน
   useEffect(() => {
-    loadAllProductionData();
+      loadAllProductionData();
   }, []);
 
   // Fetch dropdown data on mount
@@ -168,7 +178,7 @@ export default function MedicalAppointmentDashboard() {
     console.log('API URL:', process.env.NEXT_PUBLIC_API_URL);
     
     // Fetch users
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`)
+    fetch(`/api/users`)
       .then(res => {
         console.log('Users API response status:', res.status);
         return res.json();
@@ -183,7 +193,7 @@ export default function MedicalAppointmentDashboard() {
       });
     
     // Fetch machines
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/machines`)
+    fetch(`/api/machines`)
       .then(res => {
         console.log('Machines API response status:', res.status);
         return res.json();
@@ -198,7 +208,7 @@ export default function MedicalAppointmentDashboard() {
       });
     
     // Fetch production rooms
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/production-rooms`)
+    fetch(`/api/production-rooms`)
       .then(res => {
         console.log('Rooms API response status:', res.status);
         return res.json();
@@ -266,7 +276,7 @@ export default function MedicalAppointmentDashboard() {
     const timeoutId = setTimeout(() => {
       abortControllerRef.current = new AbortController();
 
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/process-steps/search?query=${encodeURIComponent(debouncedJobQuery)}`, {
+             fetch(`/api/process-steps/search?query=${encodeURIComponent(debouncedJobQuery)}`, {
         signal: abortControllerRef.current.signal
       })
         .then(res => res.json())
@@ -330,7 +340,8 @@ export default function MedicalAppointmentDashboard() {
     const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1) // Adjust for Monday start
     startOfWeek.setDate(diff)
 
-    for (let i = 0; i < 7; i++) {
+    // เพิ่มเฉพาะ 6 วัน (จันทร์-เสาร์) ไม่รวมอาทิตย์
+    for (let i = 0; i < 6; i++) {
       const day = new Date(startOfWeek)
       day.setDate(startOfWeek.getDate() + i)
       week.push(day)
@@ -345,19 +356,31 @@ export default function MedicalAppointmentDashboard() {
     setSelectedWeekDay(null) // Reset selected day when navigating weeks
   }
 
+
+
+
+
+  const formatDateForGoogleSheet = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? createSafeDate(date) : date;
+    return dateObj.toLocaleDateString('th-TH', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
+  const formatDateForValue = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? createSafeDate(date) : date;
+    return dateObj.toLocaleDateString('th-TH'); // DD/MM/YYYY
+  };
+
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString("th-TH", {
-      day: "2-digit",
-      month: "2-digit",
-    })
+    return formatDateForDisplay(date, 'short');
   }
 
   const formatFullDate = (date: Date) => {
-    return date.toLocaleDateString("th-TH", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
+    return formatDateForDisplay(date, 'full');
   }
 
   const formatProductionDate = (dateStr: string) => {
@@ -436,12 +459,12 @@ export default function MedicalAppointmentDashboard() {
   }
 
   const weekDates = getWeekDates(currentWeek)
-  const weekRange = `${formatFullDate(weekDates[0])} - ${formatFullDate(weekDates[6])}`
+  const weekRange = `${formatDateForDisplay(weekDates[0], 'full')} - ${formatDateForDisplay(weekDates[5], 'full')}`
 
   // Get production data for current week
   const getWeekProduction = () => {
-    const weekStart = weekDates[0].toISOString().split("T")[0];
-    const weekEnd = weekDates[6].toISOString().split("T")[0];
+    const weekStart = formatDateForAPI(weekDates[0]);
+    const weekEnd = formatDateForAPI(weekDates[5]);
     const defaultCodes = ['A', 'B', 'C', 'D'];
     const filteredData = productionData
       .filter((item) => {
@@ -474,9 +497,12 @@ export default function MedicalAppointmentDashboard() {
     const targetDate = viewMode === "daily" ? selectedDate : selectedWeekDay;
     if (!targetDate) return [];
     const defaultCodes = ['A', 'B', 'C', 'D'];
-    const normalizeDate = (dateStr: string) => dateStr ? dateStr.split('T')[0] : '';
+    const normalizeDate = (dateStr: string) => {
+      if (!dateStr) return '';
+      return formatDateForAPI(dateStr);
+    };
     const dayData = productionData.filter(item => normalizeDate(item.production_date) === normalizeDate(targetDate));
-
+    
     // งาน default (A,B,C,D)
     let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
@@ -510,8 +536,21 @@ export default function MedicalAppointmentDashboard() {
     return [...defaultDrafts, ...normalJobs, ...specialJobs, ...draftJobs];
   };
 
-  const weekProduction = getWeekProduction()
-  const selectedDayProduction = getSelectedDayProduction()
+  // Use useMemo to recalculate when productionData changes
+  const weekProduction = useMemo(() => {
+    const result = getWeekProduction();
+    console.log('📊 [DEBUG] weekProduction length:', result.length);
+    console.log('📊 [DEBUG] weekProduction sample:', result.slice(0, 3));
+    return result;
+  }, [productionData, currentWeek]);
+
+  const selectedDayProduction = useMemo(() => {
+    const result = getSelectedDayProduction();
+    console.log('🎯 [DEBUG] selectedDayProduction useMemo recalculated');
+    console.log('🎯 [DEBUG] selectedDayProduction length:', result.length);
+    console.log('🎯 [DEBUG] selectedDayProduction sample:', result.slice(0, 3));
+    return result;
+  }, [productionData, selectedDate, selectedWeekDay, viewMode]);
 
   // เพิ่มฟังก์ชันส่งข้อมูลไป Google Sheet
   const sendToGoogleSheet = async (data: any) => {
@@ -697,7 +736,7 @@ export default function MedicalAppointmentDashboard() {
         work_order: workOrder // เพิ่มลำดับงาน
       };
       console.log("[DEBUG] requestBody:", requestBody);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`, {
+      const res = await fetch(`/api/work-plans/drafts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
@@ -799,9 +838,9 @@ export default function MedicalAppointmentDashboard() {
       };
       
       console.log('📅 Request body:', requestBody);
-      console.log('📅 API URL:', `${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`);
+      console.log('📅 API URL:', `/api/work-plans/drafts`);
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts`, {
+      const res = await fetch(`/api/work-plans/drafts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
@@ -828,21 +867,30 @@ export default function MedicalAppointmentDashboard() {
   };
 
   // Helper function to get room name from room code or ID
-  const getRoomName = (roomCodeOrId: string) => {
-    if (!roomCodeOrId || roomCodeOrId === 'ไม่ระบุ') return 'ไม่ระบุ';
+  const getRoomName = (roomCodeOrId: string | number) => {
+    if (!roomCodeOrId || roomCodeOrId === 'ไม่ระบุ') {
+      console.log('🏠 [DEBUG] getRoomName - No room data:', roomCodeOrId);
+      return 'ไม่ระบุ';
+    }
     
-    // console.log('🔍 getRoomName input:', roomCodeOrId, 'type:', typeof roomCodeOrId);
-    // console.log('🔍 Available rooms:', rooms.map(r => ({ id: r.id, room_code: r.room_code, room_name: r.room_name })));
+    console.log('🏠 [DEBUG] getRoomName input:', roomCodeOrId, 'type:', typeof roomCodeOrId);
+    console.log('🏠 [DEBUG] Available rooms:', rooms.map(r => ({ id: r.id, room_code: r.room_code, room_name: r.room_name })));
+    
     // ลองหาโดยใช้ room_code ก่อน
     let room = rooms.find(r => r.room_code === roomCodeOrId);
     
-    // หากไม่เจอ ลองหาโดยใช้ ID
+    // หากไม่เจอ ลองหาโดยใช้ ID (รองรับทั้ง string และ number)
     if (!room) {
       room = rooms.find(r => r.id.toString() === roomCodeOrId.toString());
     }
     
-    const result = room ? room.room_name : roomCodeOrId;
-    // console.log('🔍 getRoomName result:', result);
+    // หากไม่เจอ ลองหาโดยใช้ room_name (กรณีที่ส่งชื่อมาเลย)
+    if (!room) {
+      room = rooms.find(r => r.room_name === roomCodeOrId);
+    }
+    
+    const result = room ? room.room_name : (typeof roomCodeOrId === 'number' ? roomCodeOrId.toString() : roomCodeOrId);
+    console.log('🏠 [DEBUG] getRoomName result:', result);
     return result;
   };
 
@@ -856,8 +904,8 @@ export default function MedicalAppointmentDashboard() {
           isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"
         }`}
       >
-        <span className="text-gray-500 font-medium flex-shrink-0">หมายเหตุ:</span>
-        <span className="text-gray-600 break-words">
+        <span className="text-red-600 font-semibold flex-shrink-0">หมายเหตุ:</span>
+        <span className="text-red-600 font-semibold bg-red-50 px-2 py-1 rounded border-l-2 border-red-400">
           {item.notes || item.note}
         </span>
       </div>
@@ -866,59 +914,40 @@ export default function MedicalAppointmentDashboard() {
 
 
 
+
+
   // Helper function to render staff avatars
   const renderStaffAvatars = (staff: string, isFormCollapsed: boolean) => {
-    console.log('🔍 [DEBUG] renderStaffAvatars called with staff:', staff);
-    if (!staff) {
+    if (!staff || staff.trim() === "") {
       return (
-        <span className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} text-gray-400`}>
-          ไม่มีข้อมูลผู้ปฏิบัติงาน
+        <span className="text-sm sm:text-base text-gray-500">
+          ไม่มีผู้ปฏิบัติงาน
         </span>
       );
     }
     const staffList = staff.split(", ");
-    console.log('🔍 [DEBUG] staffList:', staffList);
     
     return (
-      <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
-        <div className="flex -space-x-1 sm:-space-x-2">
-          {staffList.map((person, index) => {
-            // หา id_code จาก name
-            const user = users.find(u => u.name === person);
-            const idCode = user?.id_code;
-            console.log('🔍 [DEBUG] Person:', person, 'User:', user, 'ID Code:', idCode);
-            
-            return (
+      <div className="flex items-center space-x-2 sm:space-x-3">
+        <div className="flex -space-x-2">
+          {staffList.map((person, index) => (
             <Avatar
               key={index}
-                className={`${
-                  isFormCollapsed
-                    ? "w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-14 lg:h-14"
-                    : "w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10"
-                } border-2 border-white shadow-sm flex-shrink-0`}
+              className={`${isFormCollapsed ? "w-12 h-12 sm:w-14 sm:h-14" : "w-10 h-10 sm:w-12 sm:h-12"} border-2 border-white shadow-sm`}
               >
                 <AvatarImage
-                  src={(() => {
-                    const imageSrc = staffImages[person] || (idCode && staffImages[idCode]) || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`;
-                    console.log('🔍 [DEBUG] Image src for', person, ':', imageSrc);
-                    return imageSrc;
-                  })()}
+                src={staffImages[person] || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
                   alt={person}
                   className="object-cover object-center avatar-image"
                   style={{ imageRendering: "crisp-edges" }}
                 />
-              <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
+              <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
                 {person.charAt(0)}
               </AvatarFallback>
             </Avatar>
-            );
-          })}
+          ))}
         </div>
-        <span
-          className={`${
-            isFormCollapsed ? "text-xs sm:text-sm md:text-base lg:text-lg" : "text-xs sm:text-sm"
-          } text-gray-600 truncate min-w-0`}
-        >
+        <span className={`${isFormCollapsed ? "text-base sm:text-lg" : "text-sm sm:text-base"} truncate text-slate-900`}>
           ผู้ปฏิบัติงาน: {staff}
         </span>
       </div>
@@ -928,6 +957,11 @@ export default function MedicalAppointmentDashboard() {
   const [editDraftModalOpen, setEditDraftModalOpen] = useState(false);
   const [editDraftData, setEditDraftData] = useState<any | null>(null);
   const [editDraftId, setEditDraftId] = useState<string>("");
+  
+  // State สำหรับ modal แสดงรายละเอียดการผลิต
+  const [productionDetailsModalOpen, setProductionDetailsModalOpen] = useState(false);
+  const [productionDetailsData, setProductionDetailsData] = useState<any | null>(null);
+  const [productionLogs, setProductionLogs] = useState<any[]>([]);
 
   // State สำหรับฟอร์มใน modal edit draft
   const [editJobName, setEditJobName] = useState("");
@@ -1039,14 +1073,42 @@ export default function MedicalAppointmentDashboard() {
 
   const handleEditDraft = (draftItem: any) => {
     console.log('✏️ Opening edit modal for draft item:', draftItem);
-    console.log('✏️ Operators data:', {
-      operators: draftItem.operators,
-      operatorsType: typeof draftItem.operators,
-      operatorsLength: draftItem.operators?.length
-    });
-    setEditDraftData(draftItem);
-    setEditDraftId(draftItem.id.replace('draft_', ''));
+    
+    // ใช้ข้อมูลจริงแทนข้อมูล test
+    const realData = {
+      id: draftItem.id,
+      job_name: draftItem.job_name,
+      job_code: draftItem.job_code,
+      operators: draftItem.operators || [],
+      start_time: draftItem.start_time,
+      end_time: draftItem.end_time,
+      production_date: draftItem.production_date,
+      machine_id: draftItem.machine_id,
+      production_room_id: draftItem.production_room_id,
+      production_room: draftItem.production_room,
+      machine_code: draftItem.machine_code,
+      notes: draftItem.notes || draftItem.note || "",
+      workflow_status_id: draftItem.workflow_status_id
+    };
+    
+    console.log('✏️ Using real data:', realData);
+    
+    // ตั้งค่า state ก่อน
+    setEditDraftData(realData);
+    setEditDraftId(realData.id.toString());
+    
+    // เปิด modal หลังจากตั้งค่า state แล้ว
+    console.log('✏️ Setting modal open to true');
     setEditDraftModalOpen(true);
+    
+    // ตรวจสอบ state หลังจากตั้งค่า
+    setTimeout(() => {
+      console.log('✏️ Modal state check:', {
+        editDraftModalOpen: true,
+        editDraftData: realData,
+        editDraftId: realData.id.toString()
+      });
+    }, 100);
   };
 
   const validateEditDraft = () => {
@@ -1102,7 +1164,12 @@ export default function MedicalAppointmentDashboard() {
         workflow_status_id: workflowStatusId,
         operators: operatorsToSend
       };
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts/${editDraftData.id.replace('draft_', '')}`, {
+      // ตรวจสอบว่า editDraftData.id เป็น string และมี replace method
+      const draftId = editDraftData.id && typeof editDraftData.id === 'string' 
+        ? editDraftData.id.replace('draft_', '') 
+        : String(editDraftData.id || '');
+      
+      const res = await fetch(`/api/work-plans/drafts/${draftId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
@@ -1153,12 +1220,14 @@ export default function MedicalAppointmentDashboard() {
           // ฟังก์ชันแปลงรหัส/ID ห้องเป็นชื่อห้อง
     const getRoomNameByCodeOrId = (codeOrId: string) => {
       if (!codeOrId) return "";
+      // ใช้ข้อมูลจาก Frontend
       const room = rooms.find(r => r.room_code === codeOrId || r.id?.toString() === codeOrId?.toString());
       return room?.room_name || codeOrId;
     };
     // ฟังก์ชันแปลง ID เครื่องเป็นชื่อเครื่อง
     const getMachineNameById = (machineId: string) => {
       if (!machineId) return "";
+      // ใช้ข้อมูลจาก Frontend
       const machine = machines.find(m => m.id?.toString() === machineId?.toString());
       return machine?.machine_name || machineId;
     };
@@ -1198,25 +1267,25 @@ export default function MedicalAppointmentDashboard() {
       // 2. ส่ง batch ไป 1.ใบสรุปงาน v.4
       console.log("🟡 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4:", summaryRows.length, "แถว");
       console.log("🟡 [DEBUG] ข้อมูล summaryRows:", summaryRows);
-      await sendToGoogleSheet({
-        sheetName: "1.ใบสรุปงาน v.4",
-        rows: summaryRows,
-        clearSheet: true
-      });
-      console.log("🟢 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4 สำเร็จ");
+      try {
+        await sendToGoogleSheet({
+          sheetName: "1.ใบสรุปงาน v.4",
+          rows: summaryRows,
+          clearSheet: true
+        });
+        console.log("🟢 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4 สำเร็จ");
+      } catch (error) {
+        console.error("🔴 [DEBUG] เกิดข้อผิดพลาดในการส่งข้อมูลไป 1.ใบสรุปงาน v.4:", error);
+        throw error; // Re-throw เพื่อให้ caller จับได้
+      }
 
       // 3. เตรียมข้อมูลสำหรับ Log_แผนผลิต (แยกแถวตามผู้ปฏิบัติงาน)
       const logRows: string[][] = [];
       
       // ใช้ selectedDate แทน today เพื่อให้วันที่ตรงกับข้อมูลงาน
-      const selectedDateObj = new Date(selectedDate);
-      const dateString = selectedDateObj.toLocaleDateString('en-GB', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'numeric', 
-        day: 'numeric' 
-      });
-      const dateValue = selectedDateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
+       const selectedDateObj = createSafeDate(selectedDate);
+       const dateString = formatDateForGoogleSheet(selectedDateObj);
+       const dateValue = formatDateForValue(selectedDateObj);
       const timeStamp = new Date().toLocaleString('en-GB') + ', ' + new Date().toLocaleTimeString('en-GB');
 
       console.log("🟡 [DEBUG] Date processing:");
@@ -1331,12 +1400,17 @@ export default function MedicalAppointmentDashboard() {
       if (logRows.length > 0) {
         console.log("🟡 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต:", logRows.length, "แถว");
         console.log("🟡 [DEBUG] ข้อมูล logRows:", logRows);
-        await sendToGoogleSheet({
-          sheetName: "Log_แผนผลิต",
-          rows: logRows,
-          clearSheet: true
-        });
-        console.log("🟢 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต สำเร็จ");
+        try {
+          await sendToGoogleSheet({
+            sheetName: "Log_แผนผลิต",
+            rows: logRows,
+            clearSheet: true
+          });
+          console.log("🟢 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต สำเร็จ");
+        } catch (error) {
+          console.error("🔴 [DEBUG] เกิดข้อผิดพลาดในการส่งข้อมูลไป Log_แผนผลิต:", error);
+          throw error; // Re-throw เพื่อให้ caller จับได้
+        }
       } else {
         console.log("🟡 [DEBUG] ไม่มีข้อมูล logRows ที่จะส่ง");
       }
@@ -1347,12 +1421,17 @@ export default function MedicalAppointmentDashboard() {
       console.log("🟡 [DEBUG] Sheet name length:", reportSheetName.length);
       console.log("🟡 [DEBUG] selectedDate:", selectedDate);
       console.log("🟡 [DEBUG] dateValue:", dateValue);
-      await sendToGoogleSheet({
-        sheetName: reportSheetName,
-        "Date Value": dateValue,
-        "วันที่": dateString
-      });
-      console.log("🟢 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน สำเร็จ");
+      try {
+        await sendToGoogleSheet({
+          sheetName: reportSheetName,
+          "Date Value": dateValue,
+          "วันที่": dateString
+        });
+        console.log("🟢 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน สำเร็จ");
+      } catch (error) {
+        console.error("🔴 [DEBUG] เกิดข้อผิดพลาดในการอัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน:", error);
+        throw error; // Re-throw เพื่อให้ caller จับได้
+      }
       setIsSubmitting(false);
       
       // เพิ่มการ reload productionData หลัง sync สำเร็จ
@@ -1424,6 +1503,59 @@ export default function MedicalAppointmentDashboard() {
     console.log('🔴 [DEBUG] handleCancelProduction completed');
   };
 
+  const handleViewProductionDetails = async (item: any) => {
+    console.log('👁️ [DEBUG] handleViewProductionDetails called with item:', item);
+    
+    setProductionDetailsData(item);
+    setProductionDetailsModalOpen(true);
+    
+    // ดึงข้อมูล logs สำหรับงานนี้
+    try {
+      const response = await fetch(`/api/logs?work_plan_id=${item.id}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setProductionLogs(data.data || []);
+        console.log('👁️ [DEBUG] Production logs loaded:', data.data);
+      } else {
+        console.log('👁️ [DEBUG] Failed to load logs:', data.message);
+        setProductionLogs([]);
+      }
+    } catch (error) {
+      console.error('👁️ [DEBUG] Error loading production logs:', error);
+      setProductionLogs([]);
+    }
+  };
+
+  // ฟังก์ชันช่วยแปลงเวลาจาก seconds เป็นรูปแบบที่อ่านได้
+  const formatDuration = (seconds: number) => {
+    if (!seconds) return "ไม่ระบุ";
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours} ชม. ${minutes} นาที`;
+    } else if (minutes > 0) {
+      return `${minutes} นาที ${remainingSeconds} วินาที`;
+    } else {
+      return `${remainingSeconds} วินาที`;
+    }
+  };
+
+  // ฟังก์ชันช่วยแปลง timestamp เป็นเวลา
+  const formatTime = (timestamp: string) => {
+    if (!timestamp) return "ไม่ระบุ";
+    
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
   const handleDeleteDraft = async (draftId: string) => {
     console.log('🗑️ Attempting to delete draft with ID:', draftId);
     console.log('🗑️ Edit draft data:', editDraftData);
@@ -1435,8 +1567,8 @@ export default function MedicalAppointmentDashboard() {
     setIsSubmitting(true);
     setMessage("");
     try {
-          console.log('🗑️ Making DELETE request to:', `${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts/${draftId}`);
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-plans/drafts/${draftId}`, {
+          console.log('🗑️ Making DELETE request to:', `/api/work-plans/drafts/${draftId}`);
+    const res = await fetch(`/api/work-plans/drafts/${draftId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
     });
@@ -1568,6 +1700,7 @@ export default function MedicalAppointmentDashboard() {
   // เพิ่มฟังก์ชันโหลดข้อมูลทั้งหมด
   const loadAllProductionData = async () => {
     try {
+      setIsLoadingData(true);
       // if (selectedDate) {
       //   await syncWorkOrder(selectedDate);
       // }
@@ -1639,7 +1772,7 @@ export default function MedicalAppointmentDashboard() {
             status: status,
             recordStatus: recordStatus,
             isPrinted: isPrinted,
-            production_room: d.production_room_id || d.production_room || 'ไม่ระบุ',
+            production_room: d.production_room_name || d.production_room_id || d.production_room || 'ไม่ระบุ',
             machine_id: d.machine_id || '',
             notes: d.notes || '',
           };
@@ -1701,17 +1834,21 @@ export default function MedicalAppointmentDashboard() {
             recordStatus: p.recordStatus === 'แผนจริง' || !p.recordStatus ? 'บันทึกสำเร็จ' : p.recordStatus,
             isPrinted: true, // งานที่ sync แล้วถือว่าพิมพ์แล้ว
             operators: operatorNames, // เพิ่ม operators ที่ parse แล้ว
-            production_room: (draft && (draft.production_room_id || draft.production_room)) || p.production_room || 'ไม่ระบุ',
+            production_room: (draft && (draft.production_room_name || draft.production_room_id || draft.production_room)) || p.production_room_id || p.production_room || 'ไม่ระบุ',
             machine_id: (draft && draft.machine_id) || p.machine_id || '',
             notes: (draft && draft.notes) || p.notes || '',
           };
         })
       ];
-      setProductionData(allData);
-      isCreatingRef.current = false; // reset flag หลังโหลดข้อมูลเสร็จ
-    } catch (error) {
-      console.error('Error loading production data:', error);
-    }
+             setProductionData(allData);
+       console.log('📊 [DEBUG] All production data loaded:', allData.length, 'items');
+       console.log('📊 [DEBUG] Sample data:', allData.slice(0, 3));
+       isCreatingRef.current = false; // reset flag หลังโหลดข้อมูลเสร็จ
+     } catch (error) {
+       console.error('Error loading production data:', error);
+     } finally {
+       setIsLoadingData(false);
+     }
   };
 
   const [showErrorDialog, setShowErrorDialog] = useState(false);
@@ -1722,22 +1859,139 @@ export default function MedicalAppointmentDashboard() {
   // ฟังก์ชันแปลงชื่อแสดงผลงาน (เติม prefix เฉพาะตอนแสดงผลเท่านั้น, ใช้ is_special)
   const getDisplayJobName = (item: any, jobsOfDay: any[]) => {
     const defaultCodes = ['A', 'B', 'C', 'D'];
+    
+    // ถ้าเป็นงาน A, B, C, D ให้แสดงแค่ job_code
     if (defaultCodes.includes(item.job_code)) {
-      return item.job_name;
+      return item.job_code;
     }
-    if (item.is_special === 1 && !item.isDraft) {
-      // งานพิเศษ: เฉพาะที่ sync แล้ว
-      const specialJobs = jobsOfDay.filter(j => j.is_special === 1 && !defaultCodes.includes(j.job_code) && !j.isDraft);
-      const specialIndex = specialJobs.findIndex(j => j.id === item.id) + 1;
-      return `งานพิเศษที่ ${specialIndex} ${item.job_name}`;
-    } else if (item.is_special !== 1 && !item.isDraft) {
-      // งานปกติ: เฉพาะที่ sync แล้ว
-      const normalJobs = jobsOfDay.filter(j => j.is_special !== 1 && !defaultCodes.includes(j.job_code) && !j.isDraft);
-      const normalIndex = normalJobs.findIndex(j => j.id === item.id) + 1;
-      return `งานที่ ${normalIndex} ${item.job_name}`;
-    }
-    // งาน draft ที่ยังไม่ sync
-    return item.job_name;
+    
+    // สำหรับงานอื่นๆ ให้หาลำดับในรายการของวันนั้น
+    const sameDayJobs = jobsOfDay.filter(j => 
+      j.production_date === item.production_date && 
+      !defaultCodes.includes(j.job_code)
+    );
+    
+    // เรียงตามลำดับการแสดงผล
+    const sortedJobs = getSortedDailyProduction(sameDayJobs);
+    const jobIndex = sortedJobs.findIndex(j => j.id === item.id);
+    
+    return jobIndex >= 0 ? `งานที่ ${jobIndex + 1}` : `งานที่ ${item.id}`;
+  };
+
+  // ฟังก์ชันคำนวณข้อมูลสรุปการลงคนลงเวลา
+  const calculateDailySummary = (jobs: any[]) => {
+    // กรองเฉพาะงานที่มีผู้ปฏิบัติงานและเวลา
+    const validJobs = jobs.filter(job => 
+      job.operators && 
+      job.operators.length > 0 && 
+      job.start_time && 
+      job.end_time
+    );
+
+    // รวบรวมผู้ปฏิบัติงานทั้งหมดที่ไม่ซ้ำในวันนั้น
+    const allWorkers = new Set<string>();
+    
+    // คำนวณเวลาที่ใช้จริง (คน-ชั่วโมง)
+    let totalUsedTime = 0;
+    let totalWorkHours = 0;
+
+    // สร้าง Map สำหรับเก็บเวลาของแต่ละคน
+    const workerHours = new Map<string, number>();
+
+    validJobs.forEach(job => {
+      // เพิ่มผู้ปฏิบัติงานในงานนี้เข้าไปใน Set (ไม่ซ้ำ)
+      const workers = job.operators.split(', ').filter((w: string) => w.trim());
+      workers.forEach((worker: string) => allWorkers.add(worker));
+
+      // คำนวณเวลาที่ใช้ในงานนี้ (หักเวลาพักเที่ยง)
+      const startTime = new Date(`2000-01-01 ${job.start_time}`);
+      const endTime = new Date(`2000-01-01 ${job.end_time}`);
+      let durationHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+      
+      // ตรวจสอบว่าข้ามเที่ยงหรือไม่ (12:00-13:00)
+      const lunchStart = new Date(`2000-01-01 12:00`);
+      const lunchEnd = new Date(`2000-01-01 13:00`);
+      
+      // ถ้างานข้ามเที่ยง ให้หัก 45 นาที (0.75 ชั่วโมง)
+      if (startTime < lunchEnd && endTime > lunchStart) {
+        durationHours -= 0.75; // หัก 45 นาที
+      }
+      
+      // คำนวณคน-ชั่วโมง (จำนวนคน × เวลาที่ใช้)
+      const workerCount = workers.length;
+      totalUsedTime += durationHours * workerCount;
+
+      // เพิ่มเวลาสำหรับแต่ละคน
+      workers.forEach((worker: string) => {
+        const currentHours = workerHours.get(worker) || 0;
+        workerHours.set(worker, currentHours + durationHours);
+      });
+    });
+
+    // จำนวนผู้ปฏิบัติงานที่ไม่ซ้ำในวันนั้น
+    const totalWorkers = allWorkers.size;
+
+    // คำนวณชั่วโมงงาน (จำนวนผู้ปฏิบัติงาน × 8 ชั่วโมง)
+    totalWorkHours = totalWorkers * 8;
+
+    // คำนวณ Capacity (%)
+    const capacityPercentage = totalWorkHours > 0 ? (totalUsedTime / totalWorkHours) * 100 : 0;
+
+    // สร้างรายการข้อมูลของแต่ละคน
+    const workerDetails = Array.from(allWorkers).map(worker => {
+      const hours = workerHours.get(worker) || 0;
+      const quota = 8; // โคต้า 8 ชั่วโมง
+      const maxQuota = 8.5; // เกิน 8 ชั่วโมง 30 นาที ให้ถือว่าเต็มเวลา
+      const remaining = Math.max(0, quota - hours);
+      
+      let status, displayHours, displayText;
+      
+      if (hours >= maxQuota) {
+        // เกิน 8.5 ชั่วโมง ให้แสดงว่าเต็มเวลา
+        status = 'full';
+        displayHours = quota;
+        displayText = 'ได้รับงานเต็มเวลา';
+      } else if (remaining <= 2) {
+        // เหลือ 0-2 ชั่วโมง
+        status = 'limited';
+        displayHours = hours;
+        displayText = `เหลือ ${remaining.toFixed(1)} ชม.`;
+      } else {
+        // เหลือมากกว่า 2 ชั่วโมง
+        status = 'available';
+        displayHours = hours;
+        displayText = `เหลือ ${remaining.toFixed(1)} ชม.`;
+      }
+      
+      return {
+        name: worker,
+        hours: hours,
+        quota: quota,
+        remaining: remaining,
+        status: status,
+        displayHours: displayHours,
+        displayText: displayText
+      };
+    }).sort((a, b) => b.hours - a.hours); // เรียงตามเวลาจากมากไปน้อย
+
+    return {
+      totalWorkers,
+      totalWorkHours,
+      totalUsedTime,
+      capacityPercentage,
+      validJobsCount: validJobs.length,
+      uniqueWorkers: Array.from(allWorkers), // เพิ่มรายชื่อผู้ปฏิบัติงานที่ไม่ซ้ำ
+      lunchBreakDeduction: 0.75, // ข้อมูลเวลาพักเที่ยงที่หัก
+      availableWorkers: users
+        .filter(user => !allWorkers.has(user.name)) // คนที่ไม่ได้ทำงาน
+        .filter(user => !['RD', 'จรัญ', 'พี่สัญญา'].includes(user.name)) // กรองพนักงานเสริมออก
+        .map(user => user.name), // คนที่ว่างงาน (เฉพาะผู้ปฏิบัติงานหลัก)
+      availableSupportStaff: users
+        .filter(user => !allWorkers.has(user.name)) // คนที่ไม่ได้ทำงาน
+        .filter(user => ['RD', 'จรัญ', 'พี่สัญญา'].includes(user.name)) // เฉพาะพนักงานเสริม
+        .map(user => user.name), // พนักงานเสริมที่ว่าง
+      workerDetails: workerDetails // รายละเอียดของแต่ละคน
+    };
   };
 
   // เพิ่มฟังก์ชันเรียงลำดับงานแบบเดียวกับ Draft
@@ -1848,6 +2102,269 @@ export default function MedicalAppointmentDashboard() {
     ];
   };
 
+  // ฟังก์ชันสร้าง time slots 30 นาที
+  function generateTimeSlots(start = "08:00", end = "17:00", step = 30) {
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const result = [];
+    let [h, m] = start.split(":").map(Number);
+    const [endH, endM] = end.split(":").map(Number);
+    
+    while (h < endH || (h === endH && m <= endM)) {
+      const timeSlot = `${pad(h)}:${pad(m)}`;
+      
+      // ข้ามเวลาพักเที่ยง 12:30-13:15
+      if (timeSlot === "12:30") {
+        result.push("12:30-13:15"); // เพิ่มคอลัมน์เวลาพักเที่ยง
+        // ข้ามไปที่ 13:15
+        h = 13;
+        m = 15;
+        continue;
+      }
+      
+      result.push(timeSlot);
+      m += step;
+      if (m >= 60) { h++; m = m - 60; }
+    }
+    return result;
+  }
+
+  // ฟังก์ชันเตรียมข้อมูล Time Table
+  function getTimeTableData(jobs: any[], users: any[]) {
+    // กรองเฉพาะผู้ปฏิบัติงานหลัก
+    const mainUsers = users.filter(u => !["RD", "จรัญ", "พี่สัญญา"].includes(u.name));
+    const timeSlots = generateTimeSlots();
+    
+    // สลับตำแหน่ง แมน กับ แจ็ค (แมนขึ้นก่อน)
+    const sortedUsers = mainUsers.sort((a, b) => {
+      if (a.name === "แมน") return -1;
+      if (b.name === "แมน") return 1;
+      if (a.name === "แจ็ค") return 1;
+      if (b.name === "แจ็ค") return -1;
+      return a.name.localeCompare(b.name);
+    });
+    
+    // เตรียมข้อมูลแต่ละคน
+    const data = sortedUsers.map(user => {
+      // หางานที่ user นี้ทำ
+      const userJobs = jobs.filter(job => {
+        if (!job.operators || !job.start_time || !job.end_time) return false;
+        return job.operators.split(", ").includes(user.name);
+      });
+      
+      // สร้างข้อมูล slot ที่มีการ merge งานต่อเนื่อง
+      const slots = timeSlots.map((slot, slotIndex) => {
+        // ตรวจสอบว่าเป็นเวลาพักเที่ยงหรือไม่
+        if (slot === "12:30-13:15") {
+          return {
+            hasJob: false,
+            jobName: "",
+            jobCode: "",
+            isStart: false,
+            isEnd: false,
+            colspan: 1,
+            isLunchBreak: true
+          };
+        }
+        
+        // หางานที่ตรงกับ slot นี้
+        const jobInfo = userJobs.find(job => {
+          return slot >= job.start_time && slot < job.end_time;
+        });
+        
+        if (!jobInfo) {
+          return {
+            hasJob: false,
+            jobName: "",
+            jobCode: "",
+            isStart: false,
+            isEnd: false,
+            colspan: 1,
+            isLunchBreak: false
+          };
+        }
+        
+        // คำนวณ colspan สำหรับงานต่อเนื่อง
+        const jobStartSlotIndex = timeSlots.findIndex(s => s >= jobInfo.start_time);
+        const jobEndSlotIndex = timeSlots.findIndex(s => s >= jobInfo.end_time);
+        const colspan = jobEndSlotIndex > jobStartSlotIndex ? jobEndSlotIndex - jobStartSlotIndex : 1;
+        
+        // ตรวจสอบว่าเป็น slot แรกของงานนี้หรือไม่
+        const isStart = slotIndex === jobStartSlotIndex;
+        
+        // ตรวจสอบว่าเป็น slot สุดท้ายของงานนี้หรือไม่
+        const isEnd = slotIndex === jobStartSlotIndex + colspan - 1;
+        
+        return {
+          hasJob: true,
+          jobName: jobInfo.job_name,
+          jobCode: jobInfo.job_code,
+          isStart,
+          isEnd,
+          colspan: isStart ? colspan : 1,
+          isLunchBreak: false
+        };
+      });
+      
+      return { name: user.name, slots };
+    });
+    return { timeSlots, data };
+  }
+
+  // สีสำหรับแต่ละคน
+  const workerColors = {
+    "ป้าน้อย": "bg-blue-400",
+    "พี่ตุ่น": "bg-green-400", 
+    "พี่ภา": "bg-yellow-400",
+    "สาม": "bg-purple-400",
+    "อาร์ม": "bg-pink-400",
+    "เอ": "bg-indigo-400",
+    "แจ็ค": "bg-orange-400",
+    "แมน": "bg-red-400",
+    "โอเล่": "bg-teal-400"
+  };
+
+  // คอมโพเนนต์ TimeTable
+  function TimeTable({ jobs, users, staffImages }: { jobs: any[], users: any[], staffImages: any }) {
+    const { timeSlots, data } = getTimeTableData(jobs, users);
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-max border text-sm shadow-lg">
+          <thead>
+            <tr>
+              <th className="p-2 border bg-gray-100 text-left font-semibold text-sm">ชื่อ</th>
+              {timeSlots.map((slot, idx) => (
+                <th 
+                  key={slot} 
+                  className={`p-2 border text-center font-bold text-base min-w-[80px] ${
+                    slot === "12:30-13:15" 
+                      ? "bg-orange-200 text-orange-800" 
+                      : "bg-blue-100 text-blue-800"
+                  }`}
+                >
+                  {slot === "12:30-13:15" ? "พักเที่ยง" : slot}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, idx) => (
+              <tr key={row.name}>
+                <td className="p-2 border bg-white whitespace-nowrap">
+                  <div className="flex items-center space-x-2">
+                    <img src={staffImages[row.name] || "/placeholder-user.jpg"} alt={row.name} className="w-6 h-6 rounded-full object-cover" />
+                    <span className="font-semibold text-sm">{row.name}</span>
+                  </div>
+                </td>
+                {row.slots.map((slot, i) => {
+                  // ข้าม slot ที่ไม่ใช่จุดเริ่มต้นของงาน
+                  if (slot.hasJob && !slot.isStart) {
+                    return null;
+                  }
+                  
+                  return (
+                    <td 
+                      key={i} 
+                      colSpan={slot.hasJob ? slot.colspan : 1}
+                      className={`border p-3 relative min-h-[50px] ${
+                        slot.isLunchBreak 
+                          ? "bg-gray-200 text-gray-600" 
+                          : slot.hasJob 
+                            ? workerColors[row.name as keyof typeof workerColors] || "bg-green-400" 
+                            : "bg-white"
+                      }`}
+                    >
+                      {slot.isLunchBreak && (
+                        <div className="flex items-center justify-center text-base font-bold min-h-[50px]">
+                          <span className="text-center leading-tight">
+                            พักเที่ยง
+                          </span>
+                        </div>
+                      )}
+                      {slot.hasJob && (
+                        <div className="flex items-center justify-center text-white text-sm font-medium min-h-[50px] overflow-hidden">
+                          <span className="text-center leading-tight" title={slot.jobName}>
+                            {slot.jobName}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // Debug Modal state
+  useEffect(() => {
+    console.log('🔍 Modal state changed:', { editDraftModalOpen, editDraftData: !!editDraftData });
+  }, [editDraftModalOpen, editDraftData]);
+
+  // โหลดข้อมูลเมื่อ component mount
+  useEffect(() => {
+    loadAllProductionData();
+    loadSettings(); // เพิ่มการโหลดการตั้งค่า
+  }, []);
+
+  // ฟังก์ชันโหลดการตั้งค่า
+  const loadSettings = async () => {
+    try {
+      const response = await fetch('/api/settings');
+      const data = await response.json();
+      if (data.success && data.data) {
+        setSyncModeEnabled(data.data.syncModeEnabled || false);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  // ฟังก์ชันจัดการสถานะงาน
+  const getJobStatus = (item: any) => {
+    // งานที่มี workflow_status_id = 2 (บันทึกเสร็จสิ้น) ควรแสดงเป็น "บันทึกเสร็จสิ้น"
+    if (item.workflow_status_id === 2 || item.workflow_status_id === "2") {
+      return "บันทึกเสร็จสิ้น";
+    }
+    
+    // งานที่มี workflow_status_id = 1 (แบบร่าง) ควรแสดงเป็น "แบบร่าง"
+    if (item.workflow_status_id === 1 || item.workflow_status_id === "1") {
+      return "แบบร่าง";
+    }
+    
+    // งานพิเศษที่มี status_id = 10 และ "บันทึกเสร็จสิ้น"
+    if ((item.status_id === 10 || item.status_id === "10") && 
+        (item.recordStatus === "บันทึกเสร็จสิ้น" || item.recordStatus === "เสร็จสิ้น" || item.recordStatus === "บันทึกสำเร็จ")) {
+      return "พิมพ์แล้ว";
+    }
+    
+    // งานที่มี recordStatus เป็น "บันทึกสำเร็จ" ควรเป็น "พิมพ์แล้ว"
+    if (item.recordStatus === "บันทึกสำเร็จ") {
+      return "พิมพ์แล้ว";
+    }
+    
+    // งานที่มี status_id = 3 หรือ recordStatus เป็น "กำลังดำเนินการ"
+    if ((item.status_id === 3 || item.status_id === "3") || 
+        (item.recordStatus === "กำลังดำเนินการ" || item.recordStatus === "ดำเนินการ")) {
+      return "กำลังดำเนินการ";
+    }
+    
+    // งานปกติที่มีใน Table work_plans (ไม่ใช่ draft) และไม่มี workflow_status_id = 2 ควรเป็น "พิมพ์แล้ว"
+    if (!item.isDraft && item.workflow_status_id && item.workflow_status_id !== 2) {
+      return "พิมพ์แล้ว";
+    }
+    
+    return item.recordStatus;
+  };
+
+  // ฟังก์ชันตรวจสอบว่าควรแสดง label "งานพิเศษ" หรือไม่
+  const shouldShowSpecialJobLabel = (item: any) => {
+    // แสดง label "งานพิเศษ" ทุกครั้งที่ status_id เป็น 10
+    return (item.status_id === 10 || item.status_id === "10");
+  };
+
   return (
     <div className={`min-h-screen bg-gray-200 ${notoSansThai.className} flex flex-col`}>
       {/* Header */}
@@ -1863,7 +2380,11 @@ export default function MedicalAppointmentDashboard() {
               </h1>
             </div>
             <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
-              <span className="hidden md:block text-sm text-green-100">ระบบจัดการข้อมูล</span>
+              <Link href="/dashboard">
+                <span className="hidden md:block text-sm text-green-100 hover:text-white cursor-pointer transition-colors duration-200">
+                  ระบบจัดการข้อมูล
+                </span>
+              </Link>
 
               <div className="flex items-center space-x-1 sm:space-x-2">
                 <span className="hidden sm:block text-xs sm:text-sm text-white">ผู้ใช้: Admin</span>
@@ -1880,32 +2401,24 @@ export default function MedicalAppointmentDashboard() {
       {/* Main Content */}
       <div className="flex-1 w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-8 pt-17 sm:pt-20 md:pt-24">
         <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 md:gap-6 lg:gap-8">
-          {/* Left Panel - Schedule Form */}
+                    {/* Left Panel - Schedule Form */}
           <div
-            className={`transition-all duration-300 ${isFormCollapsed ? "lg:w-16" : "w-full lg:w-2/5"} ${isFormCollapsed && "hidden lg:block"}`}
+            className={`transition-all duration-300 ${isFormCollapsed ? "lg:w-0 lg:overflow-hidden" : "w-full lg:w-2/5"}`}
           >
             <Card className="shadow-lg bg-white h-fit">
-              <CardHeader
-                className={`pb-3 sm:pb-4 ${isFormCollapsed ? "flex justify-center items-center min-h-[60px] sm:min-h-[80px]" : ""}`}
-              >
-                <div className={`flex items-center ${isFormCollapsed ? "justify-center" : "justify-between"}`}>
-                  {!isFormCollapsed && (
-                    <CardTitle className="flex items-center space-x-2 text-sm sm:text-base md:text-lg">
-                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                      <span>เพิ่มรายการใหม่</span>
-                    </CardTitle>
-                  )}
+              <CardHeader className="pb-3 sm:pb-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2 text-sm sm:text-base md:text-lg">
+                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                    <span>เพิ่มรายการใหม่</span>
+                  </CardTitle>
                   <Button
                     variant="ghost"
-                    size="lg"
+                    size="sm"
                     onClick={() => setIsFormCollapsed(!isFormCollapsed)}
-                    className="text-white bg-green-800 hover:bg-green-900 border-2 border-green-600 rounded-full w-8 h-8 sm:w-10 sm:h-10 p-0 flex items-center justify-center flex-shrink-0"
+                    className="text-white bg-green-600 hover:bg-green-700 border-2 border-green-500 rounded-full w-8 h-8 sm:w-10 sm:h-10 p-0 flex items-center justify-center flex-shrink-0 transition-all duration-300 shadow-lg hover:shadow-xl"
                   >
-                    {isFormCollapsed ? (
-                      <PanelLeftOpen className="w-3 h-3 sm:w-4 sm:h-4" />
-                    ) : (
-                      <PanelLeftClose className="w-4 h-4 sm:w-5 sm:h-5" />
-                    )}
+                    <PanelLeftClose className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Button>
                 </div>
               </CardHeader>
@@ -2085,7 +2598,186 @@ export default function MedicalAppointmentDashboard() {
                 </CardContent>
               )}
             </Card>
+            {/* Dashboard Card แยกออกมา */}
+            {!isFormCollapsed && (
+              <Card className="shadow-lg bg-white mt-8">
+                <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <CardTitle className="flex items-center space-x-2 text-sm sm:text-base md:text-lg">
+                    <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                    <span>Dashboard การลงคนลงเวลา</span>
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowTimeTable(true)}
+                    className="text-xs px-2 py-1 whitespace-nowrap border-blue-300 text-blue-600 hover:bg-blue-50"
+                  >
+                    แสดงตารางเวลาการทำงาน
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                      const summary = calculateDailySummary(getSelectedDayProduction());
+                      return (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
+                            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                              <div className="text-blue-600 font-medium">จำนวนผู้ปฏิบัติงาน</div>
+                              <div className="text-2xl font-bold text-blue-700">{summary.totalWorkers} คน</div>
+                            </div>
+                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                              <div className="text-green-600 font-medium">ชั่วโมงงาน</div>
+                              <div className="text-2xl font-bold text-green-700">{summary.totalWorkHours.toFixed(1)} ชม.</div>
+                            </div>
+                            <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                              <div className="text-orange-600 font-medium">เวลาที่ใช้ลงงาน</div>
+                              <div className="text-2xl font-bold text-orange-700">{summary.totalUsedTime.toFixed(1)} ชม.</div>
+                              <div className="text-xs text-orange-600 mt-1">(หักพักเที่ยง 45 นาที)</div>
+                            </div>
+                            <div className={`p-3 rounded-lg border ${
+                              summary.capacityPercentage > 100 
+                                ? 'bg-red-50 border-red-200' 
+                                : summary.capacityPercentage >= 80 
+                                  ? 'bg-green-50 border-green-200'
+                                  : 'bg-yellow-50 border-yellow-200'
+                            }`}>
+                              <div className={`font-medium ${
+                                summary.capacityPercentage > 100 
+                                  ? 'text-red-600' 
+                                  : summary.capacityPercentage >= 80 
+                                    ? 'text-green-600'
+                                    : 'text-yellow-600'
+                              }`}>Capacity</div>
+                              <div className={`text-2xl font-bold ${
+                                summary.capacityPercentage > 100 
+                                  ? 'text-red-700' 
+                                  : summary.capacityPercentage >= 80 
+                                    ? 'text-green-700'
+                                    : 'text-yellow-700'
+                              }`}>
+                                {summary.capacityPercentage.toFixed(1)}%
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* รายชื่อผู้ปฏิบัติงาน */}
+                          <div className="bg-gray-50 p-3 rounded-lg border">
+                            <div className="text-gray-600 font-bold text-base mb-2">รายชื่อผู้ปฏิบัติงาน ({summary.totalWorkers} คน)</div>
+                            <div className="text-sm text-gray-700">
+                              {summary.uniqueWorkers.join(', ')}
+                            </div>
+                          </div>
+
+                          {/* คนที่ว่างงาน - แสดงเฉพาะเมื่อมีคนว่าง */}
+                          {summary.availableWorkers.length > 0 && (
+                            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                              <div className="text-blue-600 font-medium mb-2">ผู้ปฏิบัติงานหลักที่ว่าง ({summary.availableWorkers.length} คน)</div>
+                              <div className="text-sm text-blue-700">
+                                {summary.availableWorkers.join(', ')}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* รายละเอียดของแต่ละคน */}
+                          <div 
+                            className="bg-gray-50 p-3 rounded-lg border cursor-pointer hover:bg-gray-100 transition-colors"
+                            onClick={() => setShowWorkerDetails(!showWorkerDetails)}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-gray-600 font-medium">รายละเอียดการทำงานของแต่ละคน</div>
+                              {/* ลบปุ่มแสดงตารางเวลาการทำงานออก เหลือแค่ปุ่ม toggle รายละเอียด */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // ป้องกันการ trigger onClick ของ parent
+                                  setShowWorkerDetails(!showWorkerDetails);
+                                }}
+                                className="p-1 h-6 w-6"
+                              >
+                                {showWorkerDetails ? (
+                                  <ChevronUp className="w-4 h-4" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </div>
+                            {showWorkerDetails && (
+                              <div className="space-y-2">
+                                {summary.workerDetails.map((worker, index) => (
+                                <div key={index} className={`p-3 rounded border text-xs ${
+                                  worker.status === 'full' 
+                                    ? 'bg-red-50 border-red-200'
+                                    : worker.status === 'limited'
+                                      ? 'bg-yellow-50 border-yellow-200'
+                                      : 'bg-green-50 border-green-200'
+                                }`}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                      <Avatar className="w-8 h-8">
+                                        <AvatarImage
+                                          src={staffImages[worker.name] || "/placeholder-user.jpg"}
+                                          alt={worker.name}
+                                          className="object-cover object-center"
+                                        />
+                                        <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                          {worker.name.substring(0, 2)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="font-medium text-sm">{worker.name}</span>
+                                    </div>
+                                    <span className={`font-bold text-sm ${
+                                      worker.status === 'full' 
+                                        ? 'text-red-600'
+                                        : worker.status === 'limited'
+                                          ? 'text-yellow-600'
+                                          : 'text-green-600'
+                                    }`}>
+                                      {worker.displayHours.toFixed(1)} / {worker.quota} ชม.
+                                    </span>
+                                  </div>
+                                  <div className={`text-xs mt-2 ml-11 ${
+                                    worker.status === 'full' 
+                                      ? 'text-red-600'
+                                      : worker.status === 'limited'
+                                        ? 'text-yellow-600'
+                                        : 'text-green-600'
+                                  }`}>
+                                    {worker.displayText}
+                                  </div>
+                                </div>
+                              ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Status Indicator */}
+                          <div className="bg-gray-50 p-3 rounded-lg border">
+                            <div className="text-gray-600 font-medium mb-2">สถานะการลงคนลงเวลา</div>
+                            <div className={`text-sm font-medium p-2 rounded ${
+                              summary.capacityPercentage > 100 
+                                ? 'text-red-700 bg-red-100 border border-red-200' 
+                                : summary.capacityPercentage >= 80 
+                                  ? 'text-green-700 bg-green-100 border border-green-200'
+                                  : 'text-yellow-700 bg-yellow-100 border border-yellow-200'
+                            }`}>
+                              {summary.capacityPercentage > 100 
+                                ? '⚠️ เกินความสามารถ (เกิน 100%) - ควรเพิ่มคนหรือลดงาน' 
+                                : summary.capacityPercentage >= 80 
+                                  ? '✅ การลงคนลงเวลาสมบูรณ์ (80-100%) - ใช้งานเต็มที่'
+                                  : '⚡ การลงคนลงเวลาต่ำ (ต่ำกว่า 80%) - ควรเพิ่มงานหรือลดคน'
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                </CardContent>
+              </Card>
+            )}
           </div>
+
+
 
           {/* Mobile Toggle Button */}
           {isFormCollapsed && (
@@ -2101,8 +2793,20 @@ export default function MedicalAppointmentDashboard() {
             </div>
           )}
 
+          {/* Desktop Toggle Button - Tab Style */}
+          {isFormCollapsed && (
+            <div className="hidden lg:block fixed left-0 top-32 z-40 group">
+              <div className="bg-white rounded-r-lg shadow-lg border-r-2 border-green-200 hover:w-64 transition-all duration-300 w-10 h-20 flex items-center justify-center cursor-pointer hover:shadow-xl hover:bg-green-50" onClick={() => setIsFormCollapsed(false)}>
+                <div className="flex items-center justify-center w-full h-full group-hover:justify-start group-hover:px-4">
+                  <PanelLeftOpen className="w-4 h-4 text-green-600 group-hover:mr-3 group-hover:w-5 group-hover:h-5 transition-all duration-300" />
+                  <span className="hidden group-hover:inline text-green-600 font-semibold whitespace-nowrap text-sm animate-fade-in">เพิ่มรายการใหม่</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Right Panel - Schedule View */}
-          <div className={`transition-all duration-300 ${isFormCollapsed ? "flex-1" : "w-full lg:w-3/5"}`}>
+          <div className={`transition-all duration-300 ${isFormCollapsed ? "w-full lg:ml-0" : "w-full lg:w-3/5"}`}>
             <Card className="shadow-lg bg-white">
               <CardHeader className="pb-3 sm:pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -2117,6 +2821,25 @@ export default function MedicalAppointmentDashboard() {
                     <span>รายการแผนผลิต</span>
                   </CardTitle>
                   <div className="flex items-center space-x-2">
+                    {viewMode === "daily" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSyncDrafts}
+                        disabled={isSubmitting}
+                        className="bg-white border-green-600 text-green-700 hover:bg-green-50 flex items-center space-x-1 sm:space-x-2 h-7 sm:h-8 md:h-9"
+                      >
+                        <RefreshCw className={`${isFormCollapsed ? "w-3 h-3 sm:w-4 sm:h-4" : "w-3 h-3"}`} />
+                        <span
+                          className={`${
+                            isFormCollapsed ? "text-xs sm:text-sm md:text-base" : "text-xs sm:text-sm"
+                          } hidden sm:inline`}
+                        >
+                          พิมพ์ใบงานผลิต
+                        </span>
+                        <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} sm:hidden`}>พิมพ์</span>
+                      </Button>
+                    )}
                     <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
                       <Button
                         variant={viewMode === "daily" ? "default" : "ghost"}
@@ -2139,23 +2862,6 @@ export default function MedicalAppointmentDashboard() {
                         รายสัปดาห์
                       </Button>
                     </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSyncDrafts}
-                        disabled={isSubmitting}
-                      className="bg-white border-green-600 text-green-700 hover:bg-green-50 flex items-center space-x-1 sm:space-x-2 h-7 sm:h-8 md:h-9"
-                      >
-                      <RefreshCw className={`${isFormCollapsed ? "w-3 h-3 sm:w-4 sm:h-4" : "w-3 h-3"}`} />
-                      <span
-                        className={`${
-                          isFormCollapsed ? "text-xs sm:text-sm md:text-base" : "text-xs sm:text-sm"
-                        } hidden sm:inline`}
-                      >
-                        พิมพ์ใบงานผลิต
-                      </span>
-                      <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} sm:hidden`}>พิมพ์</span>
-                      </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -2182,6 +2888,9 @@ export default function MedicalAppointmentDashboard() {
                         >
                           {weekRange}
                         </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          รวมงานทั้งสัปดาห์: {weekProduction.length} งาน
+                        </p>
                       </div>
                       <Button
                         variant="outline"
@@ -2195,14 +2904,25 @@ export default function MedicalAppointmentDashboard() {
                       </Button>
                     </div>
 
+                    {/* Loading Indicator */}
+                    {isLoadingData && (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="text-center">
+                          <RefreshCw className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">กำลังโหลดข้อมูล...</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Weekly Calendar Table */}
+                    {!isLoadingData && (
                     <div className="overflow-x-auto">
                       <div className="min-w-full">
-                        {/* Header Row */}
-                        <div className="grid grid-cols-7 gap-1 mb-2">
+                                                {/* Header Row */}
+                        <div className="grid grid-cols-6 gap-1 mb-0">
                       {weekDates.map((date, index) => {
-                        const dateStr = date.toISOString().split("T")[0]
-                        const dayProduction = productionData.filter((item) => item.production_date === dateStr)
+                              const dateStr = formatDateForAPI(date)
+                              const dayProduction = productionData.filter((item) => formatDateForAPI(item.production_date) === dateStr)
                         const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
 
                         return (
@@ -2212,17 +2932,24 @@ export default function MedicalAppointmentDashboard() {
                           >
                               <div
                                   className={`${
-                                    isFormCollapsed ? "text-xs sm:text-sm md:text-base" : "text-xs sm:text-sm"
+                                      isFormCollapsed ? "text-sm sm:text-base md:text-lg" : "text-sm sm:text-base"
                                   } font-medium ${getDayTextColor(date)} truncate`}
                               >
                                 {getDayName(date)}
                               </div>
                               <div
                                 className={`${
-                                    isFormCollapsed ? "text-sm sm:text-lg md:text-xl" : "text-sm sm:text-lg"
+                                      isFormCollapsed ? "text-base sm:text-xl md:text-2xl" : "text-base sm:text-xl"
                                   } font-bold ${getDayTextColor(date)}`}
                               >
-                                {formatDate(date)}
+                                    {date.getDate()}
+                                  </div>
+                                  <div
+                                    className={`${
+                                      isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"
+                                    } ${getDayTextColor(date)} opacity-90 mt-1 font-medium`}
+                                  >
+                                    {date.toLocaleDateString("th-TH", { month: "long" })}
                               </div>
                                   <div
                                     className={`${
@@ -2237,95 +2964,71 @@ export default function MedicalAppointmentDashboard() {
                     </div>
 
                         {/* Production Content Grid */}
-                        <div className="grid grid-cols-7 gap-1">
+                          <div className="grid grid-cols-6 gap-1">
                           {weekDates.map((date, index) => {
-                            const dateStr = date.toISOString().split("T")[0]
-                            const dayProduction = productionData.filter((item) => item.production_date === dateStr)
+                              const dateStr = formatDateForAPI(date)
+                              const dayProduction = productionData.filter((item) => formatDateForAPI(item.production_date) === dateStr)
                             const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
 
-                            return (
-                              <div
-                                key={index}
-                                className="border border-gray-200 rounded-lg p-1 sm:p-2 bg-white min-h-[150px] sm:min-h-[200px] md:min-h-[250px] lg:min-h-[300px] overflow-hidden"
-                              >
-                                {filteredDayProduction.length > 0 ? (
-                        <div className="space-y-1 sm:space-y-2">
+                                                          return (
+                                <div
+                                  key={index}
+                                  className={`border border-gray-200 rounded-lg p-0 bg-white ${isFormCollapsed ? 'min-h-32' : 'min-h-24'}`}
+                                >
+                                                                {filteredDayProduction.length > 0 ? (
+                                  <div className="space-y-1 pt-0">
                                     {filteredDayProduction.map((item) => (
-                            <div
-                              key={item.id}
-                                        className={`p-1 sm:p-2 rounded-md border-l-2 sm:border-l-3 ${
-                                item.status_name === "ยกเลิกการผลิต"
-                                            ? "border-l-red-400 bg-red-50"
-                                    : item.status_name === "เสร็จสิ้น"
-                                      ? "border-l-green-400 bg-green-50"
-                                      : item.status_name === "กำลังดำเนินการ"
-                                        ? "border-l-yellow-400 bg-yellow-50"
-                                        : item.status_name === "รอดำเนินการ"
-                                          ? "border-l-gray-400 bg-gray-50"
-                                      : item.recordStatus === "บันทึกแบบร่าง"
-                                            ? "border-l-gray-400 bg-gray-50"
-                                          : "border-l-gray-400 bg-gray-50"
-                              }`}
-                            >
-                                        {/* ชื่องานผลิต */}
-                                        <div
-                                          className={`font-medium text-gray-900 ${
-                                            isFormCollapsed ? "text-xs sm:text-sm md:text-base" : "text-xs sm:text-sm"
-                                          } mb-1 leading-tight line-clamp-2`}
-                                    >
-                                          {getDisplayJobName(item, dayProduction)}
-                                  </div>
-
-                                        {/* เวลา */}
-                                  <div
-                                          className={`flex items-center space-x-1 ${
-                                            isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"
-                                          } text-gray-600 mb-1`}
-                                  >
-                                    <Clock
-                                            className={`${
-                                              isFormCollapsed ? "w-2.5 h-2.5 sm:w-3 sm:h-3" : "w-2.5 h-2.5"
-                                            } flex-shrink-0`}
-                                    />
-                                          <span className="truncate">{item.start_time} - {item.end_time}</span>
-                                </div>
-
-                                        {/* หมายเหตุ (ถ้ามี) */}
-                                        {(item.notes || item.note) && (
-                                          <div
-                                    className={`${
-                                              isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"
-                                            } text-gray-500 italic line-clamp-1`}
-                                  >
-                                            หมายเหตุ: {item.notes || item.note}
+                                                                    <div
+                                          key={item.id}
+                                          className={`border-l-4 ${
+                                            item.status === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
+                                              ? "border-l-red-400 bg-red-50"
+                                              : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
+                                                ? "border-l-green-500 bg-green-50"
+                                                : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
+                                                  ? "border-l-gray-500 bg-gray-50"
+                                                  : "border-l-gray-500 bg-gray-50"
+                                          } mb-1`}
+                                        >
+                                                                                    {/* ชื่องานผลิต - ตัดคำถ้ายาว */}
+                                          <div className="font-bold text-gray-900 text-lg mb-2 leading-tight">
+                                            <span className="underline">
+                                              งานที่ {filteredDayProduction.findIndex(j => j.id === item.id) + 1}
+                                            </span>
+                                            <span className="ml-1">
+                                              : {item.job_name}
+                                            </span>
                                           </div>
-                                        )}
 
-                                        {/* สถานะ */}
-                                        <div className="mt-1 flex items-center justify-between">
-                                          <span
-                                            className={`inline-block px-1 sm:px-1.5 py-0.5 rounded text-xs ${
-                                              item.status_name === "รอดำเนินการ"
-                                                ? "status-pending"
+                                                                                    {/* หมายเหตุ - บรรทัดใหม่ (ถ้ามี) */}
+                                          {(item.notes || item.note) && (
+                                            <div className="text-sm text-red-600 font-semibold mb-2 bg-red-50 px-2 py-1 rounded border-l-4 border-red-400">
+                                              หมายเหตุ: {item.notes || item.note}
+                                            </div>
+                                          )}
+
+                                          {/* เวลา - บรรทัดใหม่ */}
+                                          <div className="text-sm text-blue-600 font-semibold mb-2">
+                                            {item.start_time?.substring(0, 5) || "08:00"} - {(item.end_time || "17:00:00").substring(0, 5)}
+                                          </div>
+
+                                                                                    {/* สถานะ - บรรทัดใหม่ */}
+                                          <div className="mt-auto">
+                                            <span
+                                              className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                                item.status_name === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
+                                                  ? "bg-red-100 text-red-700"
                                                 : item.status_name === "กำลังดำเนินการ"
-                                                  ? "bg-yellow-100 text-yellow-700"
-                                                  : item.status_name === "เสร็จสิ้น"
+                                                    ? "bg-blue-100 text-blue-700"
+                                                    : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
                                                     ? "bg-green-100 text-green-700"
-                                                    : item.status_name === "ยกเลิกการผลิต"
-                                                      ? "bg-red-100 text-red-700"
-                                                      : "status-pending"
-                                            } truncate`}
+                                                      : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
+                                                        ? "bg-gray-100 text-gray-700"
+                                                        : "bg-gray-100 text-gray-700"
+                                              }`}
                                           >
                                             {item.status_name || "รอดำเนินการ"}
                                           </span>
-                                          
-                                          {/* แสดงจุดสีเขียวถ้าพิมพ์แล้ว (เฉพาะงานที่ sync แล้ว) */}
-                                          {item.isPrinted && !item.isDraft && (
-                                            <div className="flex items-center space-x-1">
-                                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                              <span className="text-xs text-green-600">พิมพ์แล้ว</span>
-                                            </div>
-                                          )}
                               </div>
                             </div>
                           ))}
@@ -2334,11 +3037,9 @@ export default function MedicalAppointmentDashboard() {
                                   <div className="flex items-center justify-center h-full text-gray-400">
                                     <div className="text-center">
                           <Calendar
-                                        className={`${
-                                          isFormCollapsed ? "w-6 h-6 sm:w-8 sm:h-8" : "w-4 h-4 sm:w-6 sm:h-6"
-                                        } mx-auto mb-2 opacity-50`}
+                                          className={`${isFormCollapsed ? "w-8 h-8" : "w-6 h-6"} mx-auto mb-2 opacity-50`}
                           />
-                                      <p className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"}`}>ไม่มีงาน</p>
+                                        <p className={`${isFormCollapsed ? "text-xs" : "text-xs"}`}>ไม่มีงานผลิต</p>
                                     </div>
                         </div>
                       )}
@@ -2348,14 +3049,23 @@ export default function MedicalAppointmentDashboard() {
                         </div>
                       </div>
                     </div>
-
-                    <Separator />
-
-                    
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2 sm:space-y-3">
+                    {/* Loading Indicator */}
+                    {isLoadingData && (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="text-center">
+                          <RefreshCw className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">กำลังโหลดข้อมูล...</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Daily View */}
+                    {!isLoadingData && (
+                      <>
                     <div
                       className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 ${
                         isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"
@@ -2384,29 +3094,29 @@ export default function MedicalAppointmentDashboard() {
                               isFormCollapsed ? "text-sm sm:text-lg md:text-xl" : "text-xs sm:text-sm md:text-base"
                             }`}
                           >
-                            งานผลิตวันที่ {formatFullDate(new Date(selectedDate))} จำนวน {dailyProduction.length} งาน
+                                                         งานผลิตวันที่ {formatDateForDisplay(new Date(selectedDate), 'full')} จำนวน {dailyProduction.length} งาน
                           </h4>
 
-                          {getSortedDailyProduction(dailyProduction).map((item) => (
+                          {getSortedDailyProduction(dailyProduction).map((item) => {
+                            console.log('🎯 [DEBUG] Rendering card for item:', {
+                              id: item.id,
+                              job_name: item.job_name,
+                              operators: item.operators,
+                              production_room: item.production_room,
+                              operators_type: typeof item.operators
+                            });
+                            return (
                             <div
                               key={item.id}
                               className={`border-l-4 ${
-                                isFormCollapsed ? "p-3 sm:p-4 md:p-6" : "p-2 sm:p-3 md:p-4"
-                              } rounded-r-lg ${
-                                item.status_name === "ยกเลิกการผลิต"
-                                  ? "border-l-red-400 bg-red-100"
-                                  : item.isDraft
-                                    ? "border-l-gray-400 bg-gray-100"
-                                    : item.status_name === "เสร็จสิ้น"
+                                item.status === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
+                                  ? "border-l-red-400 bg-red-50"
+                                  : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
                                       ? "border-l-green-400 bg-green-50"
-                                      : item.status_name === "กำลังดำเนินการ"
-                                        ? "border-l-yellow-400 bg-yellow-50"
-                                        : item.status_name === "รอดำเนินการ"
-                                          ? "border-l-gray-400 bg-gray-50"
-                                      : item.recordStatus === "บันทึกแบบร่าง"
-                                        ? "border-l-gray-400 bg-gray-100"
+                                      : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
+                                      ? "border-l-gray-400 bg-gray-50"
                                           : "border-l-gray-400 bg-gray-50"
-                              }`}
+                              } ${isFormCollapsed ? "p-3 sm:p-4 md:p-6" : "p-2 sm:p-3 md:p-4"} rounded-r-lg`}
                             >
                               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-3">
                                 <div className="space-y-1 sm:space-y-2 flex-1 min-w-0">
@@ -2415,7 +3125,7 @@ export default function MedicalAppointmentDashboard() {
                                       variant="outline"
                                       className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} bg-blue-50 border-blue-300 text-blue-700 font-medium flex-shrink-0`}
                                     >
-                                      {formatProductionDate(item.production_date)}
+                                      {formatDateThaiShort(item.production_date)}
                                     </Badge>
                                     <h3
                                       className={`font-bold text-gray-900 ${
@@ -2424,7 +3134,7 @@ export default function MedicalAppointmentDashboard() {
                                           : "text-xs sm:text-sm md:text-base"
                                       } truncate`}
                                     >
-                                      {getDisplayJobName(item, selectedDayProduction)}
+                                      {getDisplayJobName(item, dailyProduction)}: {item.job_name}
                                     </h3>
                                     <Badge
                                       variant="outline"
@@ -2432,117 +3142,191 @@ export default function MedicalAppointmentDashboard() {
                                     >
                                       ห้องผลิต: {getRoomName(item.production_room)}
                                     </Badge>
-                                    <Badge
-                                      variant="outline"
-                                      className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} flex-shrink-0 ${
-                                        item.status_name === "รอดำเนินการ"
-                                          ? "status-pending"
-                                          : item.status_name === "กำลังดำเนินการ"
-                                            ? "border-yellow-500 text-yellow-700"
-                                            : item.status_name === "เสร็จสิ้น"
-                                              ? "border-green-500 text-green-700"
-                                              : item.status_name === "ยกเลิกการผลิต"
+                                    <div className="flex items-center space-x-2">
+                                      <Badge
+                                        variant="outline"
+                                        className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} ${
+                                          item.status_name === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
                                                 ? "border-red-500 text-red-700"
-                                                : item.status_name === "งานพิเศษ"
-                                                  ? "border-orange-500 text-orange-700"
-                                                  : "status-pending"
-                                      }`}
-                                    >
-                                      {item.status_name || "รอดำเนินการ"}
-                                    </Badge>
+                                            : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
+                                              ? "border-gray-500 text-gray-700"
+                                              : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
+                                                ? "border-green-500 text-green-700"
+                                                : "border-gray-500 text-gray-700"
+                                        } flex-shrink-0`}
+                                      >
+                                        {item.status_name}
+                                      </Badge>
+                                      <Badge
+                                        variant="outline"
+                                        className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} ${
+                                          getJobStatus(item) === "พิมพ์แล้ว"
+                                            ? "border-green-500 text-green-700 bg-green-50"
+                                            : getJobStatus(item) === "บันทึกเสร็จสิ้น" || getJobStatus(item) === "บันทึกสำเร็จ"
+                                              ? "border-green-500 text-green-700 bg-green-50"
+                                              : "border-gray-500 text-gray-700 bg-gray-50"
+                                        } flex-shrink-0`}
+                                      >
+                                        {getJobStatus(item)}
+                                      </Badge>
+                                      {/* แสดง label "งานพิเศษ" เมื่อเปิดโหมดงานพิเศษ */}
+                                      {shouldShowSpecialJobLabel(item) && (
+                                        <Badge
+                                          variant="secondary"
+                                          className="bg-yellow-100 text-yellow-800 border-yellow-300 flex-shrink-0"
+                                        >
+                                          งานพิเศษ
+                                        </Badge>
+                                      )}
+                                    </div>
                                   </div>
 
-                                  <div className="flex items-center space-x-2 sm:space-x-4">
+                                  {/* Staff and Planner Section - ในแถวเดียวกัน */}
+                                  <div className="flex items-center justify-between">
+                                    {/* Staff Section - ด้านซ้าย */}
+                                    <div className="flex items-center space-x-2 sm:space-x-3">
                                     {renderStaffAvatars(item.operators, isFormCollapsed)}
                                   </div>
 
-                                  <div
-                                    className={`flex items-center space-x-1 sm:space-x-2 ${
-                                      isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"
-                                    }`}
+                                    {/* ผู้วางแผนการผลิต - ด้านขวาสุด */}
+                                    <div className="flex items-center space-x-2">
+                                      <div className="flex -space-x-2">
+                                        {/* แสดงผู้ตรวจสอบ: จิ๋ว สำหรับแบบร่าง, จิ๋ว+จรัญ สำหรับเสร็จสิ้น */}
+                                        {(item.recordStatus === "บันทึกแบบร่าง" || item.recordStatus === "แบบร่าง") ? (
+                                          <Avatar
+                                            className={`${isFormCollapsed ? "w-12 h-12 sm:w-14 sm:h-14" : "w-10 h-10 sm:w-12 sm:h-12"} border-2 border-white shadow-sm`}
+                                          >
+                                            <AvatarImage
+                                              src="/images/staff/จิ๋ว.jpg"
+                                              alt="จิ๋ว"
+                                              className="object-cover object-center avatar-image"
+                                              style={{ imageRendering: "crisp-edges" }}
+                                            />
+                                            <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                              จิ
+                                            </AvatarFallback>
+                                          </Avatar>
+                                        ) : (
+                                          <>
+                                            <Avatar
+                                              className={`${isFormCollapsed ? "w-12 h-12 sm:w-14 sm:h-14" : "w-10 h-10 sm:w-12 sm:h-12"} border-2 border-white shadow-sm`}
+                                            >
+                                              <AvatarImage
+                                                src="/images/staff/จิ๋ว.jpg"
+                                                alt="จิ๋ว"
+                                                className="object-cover object-center avatar-image"
+                                                style={{ imageRendering: "crisp-edges" }}
+                                              />
+                                              <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                                จิ
+                                              </AvatarFallback>
+                                            </Avatar>
+                                            <Avatar
+                                              className={`${isFormCollapsed ? "w-12 h-12 sm:w-14 sm:h-14" : "w-10 h-10 sm:w-12 sm:h-12"} border-2 border-white shadow-sm`}
+                                            >
+                                              <AvatarImage
+                                                src="/images/staff/จรัญ.jpg"
+                                                alt="จรัญ"
+                                                className="object-cover object-center avatar-image"
+                                                style={{ imageRendering: "crisp-edges" }}
+                                              />
+                                              <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                                จ
+                                              </AvatarFallback>
+                                            </Avatar>
+                                          </>
+                                        )}
+                                      </div>
+                                      <span
+                                        className={`${isFormCollapsed ? "text-base sm:text-lg" : "text-sm sm:text-base"} text-slate-900`}
+                                      >
+                                        ตรวจสอบแผนการผลิต: {(item.recordStatus === "บันทึกแบบร่าง" || item.recordStatus === "แบบร่าง") ? "จิ๋ว ✔" : "จิ๋ว, จรัญ ✔✔"}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between">
+                                    <div
+                                      className={`flex items-center space-x-1 sm:space-x-2 ${isFormCollapsed ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}
                                   >
                                     <Clock
                                       className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"} text-gray-400 flex-shrink-0`}
                                     />
-                                    <span className="text-gray-600">{item.start_time} - {item.end_time}</span>
-                                    {(item.notes || item.note) && (
-                                      <span className="text-gray-400 mx-2">|</span>
-                                    )}
-                                    {(item.notes || item.note) && (
-                                      <span className="text-gray-500 truncate max-w-xs">
-                                        <span className="font-medium">หมายเหตุ:</span> {item.notes || item.note}
+                                      <span className="text-blue-600 font-semibold">
+                                        {item.start_time?.substring(0, 5) || "08:00"} - {(item.end_time || "17:00:00").substring(0, 5)}
+                                      </span>
+                                      {/* หมายเหตุ (ถ้ามี) - อยู่บรรทัดเดียวกับเวลา */}
+                                      {item.notes && (
+                                        <span
+                                          className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} text-red-600 font-semibold ml-3 bg-red-50 px-2 py-1 rounded border-l-2 border-red-400`}
+                                        >
+                                          หมายเหตุ: {item.notes}
                                       </span>
                                     )}
                                   </div>
                                 </div>
-
-                                <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-                                  {/* แสดงจุดสีเขียวถ้าพิมพ์แล้ว แทนปุ่ม */}
-                                  {item.isPrinted && !item.isDraft ? (
-                                    <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-green-50 rounded-md">
-                                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                      <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-green-700`}>
-                                        พิมพ์แล้ว
-                                      </span>
                                     </div>
-                                  ) : (
-                                  <Button
-                                    variant="ghost"
-                                    size={isFormCollapsed ? "default" : "sm"}
-                                    className={`${
-                                      item.recordStatus === "บันทึกเสร็จสิ้น"
-                                        ? "text-green-700 bg-green-100 hover:bg-green-200"
-                                        : item.recordStatus === "บันทึกสำเร็จ"
-                                          ? "text-green-700 bg-green-100 hover:bg-green-200"
-                                          : "text-gray-600 bg-gray-200 hover:bg-gray-300"
-                                    } px-2 sm:px-3 py-1`}
-                                  >
-                                    <span className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"}`}>
-                                      {item.recordStatus}
-                                    </span>
-                                  </Button>
-                                  )}
-                                  <div className="flex space-x-1">
+
+                                <div className="flex flex-col items-end space-y-2 flex-shrink-0">
+                                  {/* ปุ่ม */}
+                                  <div className="flex items-center space-x-1 sm:space-x-2">
+                                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                                      {/* เพิ่มปุ่มสำหรับรายการที่มี จิ๋ว เพียงคนเดียวในการตรวจสอบ */}
+                                      {(item.recordStatus === "บันทึกแบบร่าง" || item.recordStatus === "แบบร่าง" || item.recordStatus === "รอดำเนินการ") && (
+                                        <>
                                     <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className={`${isFormCollapsed ? "w-8 h-8 sm:w-10 sm:h-10" : "w-6 h-6 sm:w-8 sm:h-8"}`}
-                                    >
-                                      <Eye
-                                        className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"}`}
-                                      />
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleEditDraft(item)}
+                                            className="border-2 border-gray-300 text-gray-600 hover:bg-gray-50 bg-white text-xs font-medium px-2 py-1"
+                                          >
+                                            <Edit className="w-3 h-3" />
                                     </Button>
-                                    {item.isDraft && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className={`${isFormCollapsed ? "w-8 h-8 sm:w-10 sm:h-10" : "w-6 h-6 sm:w-8 sm:h-8"}`}
-                                        onClick={() => handleEditDraft(item)}
-                                        aria-label="แก้ไขแบบร่าง"
-                                      >
-                                        <Edit
-                                          className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"}`}
-                                        />
-                                      </Button>
-                                    )}
-                                    {!item.isDraft && item.status_name !== "ยกเลิกการผลิต" && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className={`${isFormCollapsed ? "w-8 h-8 sm:w-10 sm:h-10" : "w-6 h-6 sm:w-8 sm:h-8"} text-red-600 hover:bg-red-100`}
-                                        onClick={() => handleCancelProduction(item.id)}
-                                        aria-label="ยกเลิกการผลิต"
-                                      >
-                                        <XCircle
-                                          className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"}`}
-                                        />
-                                      </Button>
+                                        </>
+                                      )}
+                                      {/* เพิ่มปุ่มสำหรับรายการที่มี จิ๋ว, จรัญ ในการตรวจสอบ */}
+                                      {(item.recordStatus === "บันทึกเสร็จสิ้น" || item.recordStatus === "เสร็จสิ้น" || item.recordStatus === "บันทึกสำเร็จ") && (
+                                        <>
+                                      {/* แสดงปุ่มรูปตาสำหรับงานที่มีสถานะ "กำลังดำเนินการ" */}
+                                      {getJobStatus(item) === "กำลังดำเนินการ" && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleViewProductionDetails(item)}
+                                            className="border-2 border-blue-300 text-blue-600 hover:bg-blue-50 bg-white text-xs font-medium px-2 py-1"
+                                          >
+                                            <Eye className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                      {/* เปลี่ยนปุ่มดินสอเป็นปุ่มกากบาทเมื่อสถานะเป็น "พิมพ์แล้ว" */}
+                                      {getJobStatus(item) === "พิมพ์แล้ว" ? (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleCancelProduction(item.id)}
+                                            className="border-2 border-red-300 text-red-600 hover:bg-red-50 bg-white text-xs font-medium px-2 py-1"
+                                          >
+                                            <XCircle className="w-3 h-3" />
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleEditDraft(item)}
+                                            className="border-2 border-gray-300 text-gray-600 hover:bg-gray-50 bg-white text-xs font-medium px-2 py-1"
+                                          >
+                                            <Edit className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                        </>
                                     )}
                                   </div>
                                 </div>
                               </div>
                             </div>
-                          ))}
+                            </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="text-center py-6 sm:py-8 text-gray-500">
@@ -2550,11 +3334,13 @@ export default function MedicalAppointmentDashboard() {
                             className={`${isFormCollapsed ? "w-12 h-12 sm:w-16 sm:h-16" : "w-8 h-8 sm:w-12 sm:h-12"} mx-auto mb-3 sm:mb-4 text-gray-300`}
                           />
                           <p className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}>
-                            ไม่มีงานผลิตในวันที่ {formatFullDate(new Date(selectedDate))}
+                                                         ไม่มีงานผลิตในวันที่ {formatDateForDisplay(new Date(selectedDate), 'full')}
                           </p>
                         </div>
                       );
                     })()}
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -2580,6 +3366,110 @@ export default function MedicalAppointmentDashboard() {
           <DialogHeader>
             <DialogTitle className={notoSansThai.className}>แก้ไขแบบร่างงานผลิต</DialogTitle>
           </DialogHeader>
+
+      {/* Modal สำหรับแสดงรายละเอียดการผลิต */}
+      <Dialog open={productionDetailsModalOpen} onOpenChange={setProductionDetailsModalOpen}>
+        <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto ${notoSansThai.className}`}>
+          <DialogHeader>
+            <DialogTitle className={notoSansThai.className}>รายละเอียดการผลิต</DialogTitle>
+          </DialogHeader>
+          {productionDetailsData && (
+            <div className="space-y-6">
+              {/* ข้อมูลงาน */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div>
+                    <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>ชื่องาน</Label>
+                    <p className={`text-lg font-semibold text-gray-900 ${notoSansThai.className}`}>
+                      {productionDetailsData.job_name}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>หมายเหตุ</Label>
+                    <p className={`text-sm text-gray-600 ${notoSansThai.className}`}>
+                      {productionDetailsData.notes || productionDetailsData.note || "ไม่มีหมายเหตุ"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>ผู้ปฏิบัติงาน</Label>
+                    <p className={`text-sm text-gray-600 ${notoSansThai.className}`}>
+                      {productionDetailsData.operators || "ไม่ระบุ"}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>เวลาเริ่มต้นตามแผนผลิต</Label>
+                    <p className={`text-lg font-semibold text-blue-600 ${notoSansThai.className}`}>
+                      {productionDetailsData.start_time || "ไม่ระบุ"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>เวลาสิ้นสุดตามแผนผลิต</Label>
+                    <p className={`text-lg font-semibold text-blue-600 ${notoSansThai.className}`}>
+                      {productionDetailsData.end_time || "ไม่ระบุ"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ข้อมูลจาก Logs */}
+              <div>
+                <Label className={`text-lg font-bold text-gray-700 ${notoSansThai.className}`}>ข้อมูลการผลิตตามจริง</Label>
+                {productionLogs.length > 0 ? (
+                  <div className="mt-3 space-y-3">
+                    {productionLogs.map((log, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div className="mb-3">
+                          <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>ขั้นตอนที่ {log.process_number}</Label>
+                          <p className={`text-sm text-gray-600 ${notoSansThai.className}`}>
+                            {log.process_description || "ไม่ระบุ"}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>เวลาเริ่มต้นตามจริง</Label>
+                            <p className={`text-sm text-green-600 ${notoSansThai.className}`}>
+                              {formatTime(log.start_time)}
+                            </p>
+                          </div>
+                          <div>
+                            <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>เวลาสิ้นสุดตามจริง</Label>
+                            <p className={`text-sm text-green-600 ${notoSansThai.className}`}>
+                              {formatTime(log.stop_time)}
+                            </p>
+                          </div>
+                          <div>
+                            <Label className={`text-sm font-bold text-gray-700 ${notoSansThai.className}`}>เวลาที่ใช้</Label>
+                            <p className={`text-sm text-purple-600 ${notoSansThai.className}`}>
+                              {formatDuration(log.used_time)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <p className={`text-sm text-gray-500 text-center ${notoSansThai.className}`}>
+                      ไม่มีข้อมูลการผลิตตามจริง
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setProductionDetailsModalOpen(false)}
+              className={notoSansThai.className}
+            >
+              ปิด
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 py-2">
             {/* คอลัมน์ซ้าย */}
             <div className="space-y-3">
@@ -2774,8 +3664,31 @@ export default function MedicalAppointmentDashboard() {
             <Button onClick={() => setShowSuccessDialog(false)} className={`w-full bg-green-600 hover:bg-green-700 text-white ${notoSansThai.className}`}>ตกลง</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
+              </Dialog>
 
+        {/* Time Table Popup Dialog */}
+        <Dialog open={showTimeTable} onOpenChange={setShowTimeTable}>
+          <DialogContent className="max-w-7xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Clock className="w-5 h-5 text-green-600" />
+                <span>ตารางเวลาการทำงาน - {formatDateForDisplay(new Date(selectedDate), 'full')}</span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-4">
+              <TimeTable
+                jobs={getSelectedDayProduction()}
+                users={users}
+                staffImages={staffImages}
+              />
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setShowTimeTable(false)}>
+                ปิด
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    )
+}

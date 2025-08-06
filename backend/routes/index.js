@@ -6,6 +6,8 @@ const userRoutes = require('./userRoutes');
 const machineRoutes = require('./machineRoutes');
 const productionRoomRoutes = require('./productionRoomRoutes');
 const productionStatusRoutes = require('./productionStatusRoutes');
+const newJobsRoutes = require('./newJobsRoutes');
+const googleSheetProxy = require('./googleSheetProxy');
 
 const router = express.Router();
 
@@ -17,6 +19,8 @@ router.use('/users', userRoutes);
 router.use('/machines', machineRoutes);
 router.use('/production-rooms', productionRoomRoutes);
 router.use('/production-statuses', productionStatusRoutes);
+router.use('/new-jobs', newJobsRoutes);
+router.use('/send-to-google-sheet', googleSheetProxy);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

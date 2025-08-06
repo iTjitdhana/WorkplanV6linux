@@ -8,6 +8,19 @@ const { testConnection } = require('./config/database');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const googleSheetProxy = require('./routes/googleSheetProxy');
+const userRoutes = require('./routes/userRoutes');
+const workPlanRoutes = require('./routes/workPlanRoutes');
+const logRoutes = require('./routes/logRoutes');
+const machineRoutes = require('./routes/machineRoutes');
+const productionRoomRoutes = require('./routes/productionRoomRoutes');
+const productionStatusRoutes = require('./routes/productionStatusRoutes');
+const newJobsRoutes = require('./routes/newJobsRoutes');
+const processStepRoutes = require('./routes/processStepRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
+const monitoringRoutes = require('./routes/monitoringRoutes');
+const { requestMonitor, errorMonitor, activeUserMonitor } = require('./middleware/monitoringMiddleware');
+const systemMonitor = require('./monitoring');
 
 const app = express();
 const PORT = process.env.PORT || 3101;
@@ -47,7 +60,14 @@ const allowedOrigins = [
   // Network access origins
   /^http:\/\/192\.168\.\d+\.\d+:3011$/,  // Allow any 192.168.x.x IP
   /^http:\/\/10\.\d+\.\d+\.\d+:3011$/,   // Allow any 10.x.x.x IP
-  /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3011$/  // Allow 172.16-31.x.x IP
+  /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3011$/,  // Allow 172.16-31.x.x IP
+  // เพิ่ม port 3000 สำหรับ Next.js development
+  /^http:\/\/192\.168\.\d+\.\d+:3000$/,  // Allow any 192.168.x.x IP on port 3000
+  /^http:\/\/10\.\d+\.\d+\.\d+:3000$/,   // Allow any 10.x.x.x IP on port 3000
+  /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/,  // Allow 172.16-31.x.x IP on port 3000
+  // เพิ่ม localhost สำหรับ development
+  /^http:\/\/localhost:\d+$/,  // Allow any localhost port
+  /^http:\/\/127\.0\.0\.1:\d+$/  // Allow any 127.0.0.1 port
 ];
 
 app.use(cors({
@@ -81,6 +101,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Monitoring middleware
+app.use(requestMonitor);
+app.use(activeUserMonitor);
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -89,7 +113,18 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api', routes);
-app.use('/api', googleSheetProxy);
+app.use('/api/users', userRoutes);
+app.use('/api/work-plans', workPlanRoutes);
+app.use('/api/logs', logRoutes);
+app.use('/api/machines', machineRoutes);
+app.use('/api/production-rooms', productionRoomRoutes);
+app.use('/api/production-statuses', productionStatusRoutes);
+app.use('/api/new-jobs', newJobsRoutes);
+app.use('/api/process-steps', processStepRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/send-to-google-sheet', googleSheetProxy);
+app.use('/api/monitoring', monitoringRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -102,25 +137,18 @@ app.use('*', (req, res) => {
 // Error handling middleware
 app.use(errorHandler);
 
-// Start server
-const startServer = async () => {
-  try {
-    // Test database connection
-    await testConnection();
-    
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔗 API URL: http://192.168.0.94:${PORT}/api`);
-      console.log(`🔗 Local API URL: http://localhost:${PORT}/api`);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-};
+// Error monitoring middleware (ต้องอยู่หลัง routes)
+app.use(errorMonitor);
 
-startServer();
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`📊 API Documentation: http://localhost:${PORT}/api`);
+  
+  // เริ่มต้น monitoring system
+  systemMonitor.start();
+  console.log('🔍 Real-time monitoring system started');
+});
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

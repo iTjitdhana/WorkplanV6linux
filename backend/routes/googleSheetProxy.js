@@ -1,8 +1,8 @@
-const express = require('express');
+  const express = require('express');
 const router = express.Router();
 const fetch = require('node-fetch');
 
-router.post('/send-to-google-sheet', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     console.log("[Proxy] ส่งข้อมูลไป Google Sheet:", req.body);
     console.log("[Proxy] Sheet Name:", req.body.sheetName);

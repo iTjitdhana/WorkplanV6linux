@@ -24,13 +24,33 @@
   background-color: #f9fafb !important;
 }
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
+/* Font family จะถูกกำหนดโดย Tailwind CSS และ Next.js font optimization */
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  /* Line clamp utilities for text truncation */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+  
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
   }
 }
 
@@ -69,6 +89,7 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --font-noto-sans-thai: 'Noto Sans Thai', 'Noto Sans', 'Inter', system-ui, sans-serif;
   }
   .dark {
     --background: 0 0% 3.9%;

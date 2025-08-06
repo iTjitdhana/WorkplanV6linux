@@ -42,7 +42,8 @@ router.delete('/drafts/:id', DraftWorkPlanController.delete);
 router.post('/sync-drafts-to-plans', DraftWorkPlanController.syncDraftsToPlans);
 
 // Work plan routes
-router.get('/', WorkPlanController.getAll);
+router.get('/search', WorkPlanController.searchWorkPlans);
+router.get('/', WorkPlanController.getAllWorkPlans);
 router.get('/:id', WorkPlanController.getById);
 router.post('/', workPlanValidation, WorkPlanController.create);
 router.put('/:id', workPlanValidation, WorkPlanController.update);

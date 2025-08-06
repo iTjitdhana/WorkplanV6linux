@@ -35,12 +35,47 @@ export default function TrackerPage() {
   // Load workplans by date
   useEffect(() => {
     setIsLoading(true);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101';
-    fetch(`${apiUrl}/api/work-plans?date=${date}`)
+    fetch(`/api/work-plans?date=${date}`)
       .then(res => res.json())
       .then(data => {
-        console.log('[DEBUG] Loaded workplans:', data);
-        setWorkplans((data.data || []).filter((wp: any) => wp.status_name !== 'งานผลิตถูกยกเลิก'));
+        console.log('[DEBUG] Loaded workplans (raw from API):', data);
+        console.log('[DEBUG] Workplans data (raw from API):', data.data);
+        console.log('[DEBUG] Requested date (from state):', date);
+        if (data.data && data.data.length > 0) {
+          console.log('[DEBUG] First workplan sample (raw from API):', data.data[0]);
+          console.log('[DEBUG] All workplans production dates (raw from API):', data.data.map((wp: any) => wp.production_date));
+        }
+        const filteredWorkplans = (data.data || []).filter((wp: any) => {
+          // กรองงานที่ถูกยกเลิก
+          if (wp.status_name === 'งานผลิตถูกยกเลิก') {
+            console.log('[DEBUG] Filtering out cancelled workplan:', wp.job_name);
+            return false;
+          }
+          // กรองเฉพาะงานของวันที่เลือก
+          const wpDate = wp.production_date; // อาจเป็น ISO string หรือ 'YYYY-MM-DD' string
+          // แปลง wpDate เป็นรูปแบบ 'YYYY-MM-DD' เพื่อเปรียบเทียบ
+          let wpDateFormatted = wpDate;
+          if (wpDate && typeof wpDate === 'string') {
+            // ถ้าเป็น ISO string ให้ตัดเอาเฉพาะวันที่
+            if (wpDate.includes('T')) {
+              wpDateFormatted = wpDate.split('T')[0];
+            }
+          }
+          console.log('[DEBUG] Comparing dates:', { 
+            originalWpDate: wpDate, 
+            formattedWpDate: wpDateFormatted, 
+            requestedDate: date, 
+            isEqual: wpDateFormatted === date 
+          });
+          if (wpDateFormatted !== date) {
+            console.log('[DEBUG] Filtering out workplan with different date:', wpDateFormatted, 'vs', date);
+            return false;
+          }
+          console.log('[DEBUG] Keeping workplan:', wp.job_name, 'with date:', wpDate);
+          return true;
+        });
+        console.log('[DEBUG] Filtered workplans (after frontend filter):', filteredWorkplans);
+        setWorkplans(filteredWorkplans);
       })
       .finally(() => setIsLoading(false));
     setSelectedWorkplan(null);
@@ -54,10 +89,9 @@ export default function TrackerPage() {
   useEffect(() => {
     if (!selectedWorkplan) return;
     setIsLoading(true);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101';
     Promise.all([
-      fetch(`${apiUrl}/api/process-steps?job_code=${selectedWorkplan.job_code}`).then(res => res.json()),
-      fetch(`${apiUrl}/api/logs/work-plan/${selectedWorkplan.id}`).then(res => res.json())
+      fetch(`/api/process-steps?job_code=${selectedWorkplan.job_code}`).then(res => res.json()),
+      fetch(`/api/logs/work-plan/${selectedWorkplan.id}`).then(res => res.json())
     ]).then(([steps, logs]) => {
       console.log('[DEBUG] Loaded process steps:', steps);
       console.log('[DEBUG] Loaded process logs:', logs);
@@ -135,20 +169,16 @@ export default function TrackerPage() {
     console.log("[DEBUG] handleFinishProduction called for workplan:", selectedWorkplan.id);
     
     try {
-      const apiUrl = 'http://localhost:3101'; // Hardcode URL เพื่อแก้ปัญหา
-      
-      console.log("[DEBUG] API URL:", apiUrl);
       console.log("[DEBUG] Workplan ID:", selectedWorkplan.id);
-      console.log("[DEBUG] Full URL:", `${apiUrl}/api/work-plans/${selectedWorkplan.id}/status`);
+      console.log("[DEBUG] Full URL:", `/api/work-plans/${selectedWorkplan.id}/status`);
       
       // อัปเดตสถานะงานเป็น "เสร็จสิ้น" (status_id = 4)
-      const res = await fetch(`${apiUrl}/api/work-plans/${selectedWorkplan.id}/status`, {
+      const res = await fetch(`/api/work-plans/${selectedWorkplan.id}/status`, {
         method: "PATCH",
         headers: { 
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        mode: 'cors',
         body: JSON.stringify({ status_id: 4 }) // 4 = เสร็จสิ้น
       });
       
@@ -165,7 +195,7 @@ export default function TrackerPage() {
       
       // Reload workplans เพื่ออัปเดตสถานะ
       console.log("[DEBUG] Reloading workplans...");
-      const workplansRes = await fetch(`${apiUrl}/api/work-plans?date=${date}`);
+      const workplansRes = await fetch(`/api/work-plans?date=${date}`);
       const workplansData = await workplansRes.json();
       setWorkplans((workplansData.data || []).filter((wp: any) => wp.status_name !== 'งานผลิตถูกยกเลิก'));
       
@@ -220,8 +250,7 @@ export default function TrackerPage() {
         timestamp
       });
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101';
-      const res = await fetch(`${apiUrl}/api/logs`, {
+      const res = await fetch(`/api/logs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -245,7 +274,7 @@ export default function TrackerPage() {
       
       // reload logs
       console.log("[DEBUG] Reloading logs...");
-      const logs = await fetch(`${apiUrl}/api/logs/work-plan/${selectedWorkplan.id}`).then(r => r.json());
+      const logs = await fetch(`/api/logs/work-plan/${selectedWorkplan.id}`).then(r => r.json());
       console.log("[DEBUG] Reloaded logs:", logs);
       setProcessLogs(logs.data || []);
       
@@ -382,15 +411,26 @@ export default function TrackerPage() {
                   }}
                 >
                   <option value="">กรุณาเลือก</option>
-                  {workplans.map(wp => (
-                    <option key={wp.id} value={wp.id}>{wp.job_name}</option>
-                  ))}
+                  {workplans.map(wp => {
+                    console.log('[DEBUG] Workplan option:', { id: wp.id, job_name: wp.job_name, job_code: wp.job_code, production_date: wp.production_date });
+                    const displayDate = wp.production_date ? new Date(wp.production_date).toLocaleDateString('th-TH') : 'ไม่ระบุวันที่';
+                    return (
+                      <option key={wp.id} value={wp.id}>
+                        {wp.job_name || wp.job_code || 'ไม่ระบุชื่อ'} ({displayDate})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
-              {selectedWorkplan && selectedWorkplan.operators && (
+              {selectedWorkplan && (selectedWorkplan.operators || selectedWorkplan.operators_from_join) && (
                 <div className="mt-2 text-gray-700 text-base">
                   <span className="font-semibold">ผู้ปฏิบัติงาน:</span> {(() => {
                     try {
+                      // ใช้ operators_from_join ก่อน (ข้อมูลจาก JOIN)
+                      if (selectedWorkplan.operators_from_join) {
+                        return selectedWorkplan.operators_from_join;
+                      }
+                      // ถ้าไม่มี ให้ใช้ operators จาก field เดิม
                       if (typeof selectedWorkplan.operators === 'string') {
                         return selectedWorkplan.operators;
                       } else if (Array.isArray(selectedWorkplan.operators)) {

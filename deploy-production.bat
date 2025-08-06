@@ -1,107 +1,121 @@
 @echo off
-echo ========================================
-echo 🚀 Production Deployment
-echo ========================================
-
-echo.
-echo 📋 ขั้นตอนการ Deploy:
-echo 1. Build Frontend
-echo 2. Setup Production Environment
-echo 3. Start PM2 Processes
-echo 4. Health Check
+echo Production Deployment
+echo =====================
 echo.
 
-REM ตรวจสอบ Node.js
-echo 🔍 ตรวจสอบ Node.js...
+echo Step 1: Checking Prerequisites...
+echo.
+
+REM Check Node.js
 node --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ❌ ไม่พบ Node.js กรุณาติดตั้ง Node.js ก่อน
+if %errorlevel% equ 0 (
+    echo ✓ Node.js is installed
+    node --version
+) else (
+    echo ✗ Node.js not found. Please install Node.js first.
     pause
     exit /b 1
 )
-echo ✅ Node.js พร้อมใช้งาน
 
-REM ตรวจสอบ PM2
-echo 🔍 ตรวจสอบ PM2...
-pm2 --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ❌ ไม่พบ PM2 กรุณาติดตั้ง PM2 ก่อน
-    echo 💡 รันคำสั่ง: npm install -g pm2
+REM Check npm
+npm --version >nul 2>&1
+if %errorlevel% equ 0 (
+    echo ✓ npm is installed
+    npm --version
+) else (
+    echo ✗ npm not found
     pause
     exit /b 1
 )
-echo ✅ PM2 พร้อมใช้งาน
 
 echo.
-echo 📦 Building Frontend...
-cd frontend
-call npm run build
-if %errorlevel% neq 0 (
-    echo ❌ Frontend build failed
-    pause
-    exit /b 1
-)
-echo ✅ Frontend build successful
+echo Step 2: Creating Environment Files...
 
+REM Create backend .env
+echo NODE_ENV=production > backend\.env
+echo PORT=3101 >> backend\.env
+echo DB_HOST=localhost >> backend\.env
+echo DB_USER=root >> backend\.env
+echo DB_PASSWORD=iT12345$ >> backend\.env
+echo DB_NAME=esp_tracker_empty >> backend\.env
+echo DB_PORT=3306 >> backend\.env
+echo API_RATE_LIMIT=1000 >> backend\.env
+echo FRONTEND_URL=http://localhost:3011 >> backend\.env
+echo ✓ Backend .env created
+
+REM Create frontend .env.local
+echo NEXT_PUBLIC_API_URL=http://localhost:3101 > frontend\.env.local
+echo NODE_ENV=production >> frontend\.env.local
+echo ✓ Frontend .env.local created
+
+echo.
+echo Step 3: Installing Backend Dependencies...
+cd backend
+call npm install --production
+if %errorlevel% equ 0 (
+    echo ✓ Backend dependencies installed
+) else (
+    echo ✗ Backend dependencies installation failed
+    pause
+)
 cd ..
 
 echo.
-echo 🔧 Setting up Production Environment...
-if not exist "logs" mkdir logs
-
-REM ตรวจสอบไฟล์ .env ใน backend
-if not exist "backend\.env" (
-    echo ⚠️ ไม่พบไฟล์ backend\.env
-    echo 💡 กรุณาสร้างไฟล์ backend\.env และตั้งค่า database
-    pause
-)
-
-echo.
-echo 🚀 Starting Production with PM2...
-pm2 start ecosystem.config.js --env production
-
-if %errorlevel% neq 0 (
-    echo ❌ PM2 start failed
-    pause
-    exit /b 1
-)
-
-echo.
-echo 📊 PM2 Status:
-pm2 status
-
-echo.
-echo 🔍 Health Check...
-timeout /t 3 /nobreak >nul
-
-REM ทดสอบ backend health
-echo 📡 ทดสอบ Backend API...
-curl -s http://localhost:3101/api/work-plans >nul 2>&1
+echo Step 4: Installing Frontend Dependencies...
+cd frontend
+call npm install
 if %errorlevel% equ 0 (
-    echo ✅ Backend API ทำงานปกติ
+    echo ✓ Frontend dependencies installed
 ) else (
-    echo ⚠️ Backend API อาจมีปัญหา
+    echo ✗ Frontend dependencies installation failed
+    pause
 )
+cd ..
 
 echo.
-echo 🎯 Production Deployment Complete!
+echo Step 5: Building Frontend...
+cd frontend
+call npm run build
+if %errorlevel% equ 0 (
+    echo ✓ Frontend built successfully
+) else (
+    echo ✗ Frontend build failed
+    pause
+)
+cd ..
+
 echo.
-echo 🌐 URLs:
-echo - Frontend: http://localhost:3011
-echo - Backend: http://localhost:3101
-echo - Tracker: http://localhost:3011/tracker
-echo.
-echo 📋 PM2 Commands:
-echo - pm2 status (ดูสถานะ)
-echo - pm2 logs (ดู logs)
-echo - pm2 restart all (restart ทั้งหมด)
-echo - pm2 stop all (หยุดทั้งหมด)
-echo - pm2 delete all (ลบทั้งหมด)
-echo.
-echo 📊 Monitoring:
-echo - pm2 monit (ดู performance)
-echo - pm2 show workplan-backend (ดูรายละเอียด backend)
-echo - pm2 show workplan-frontend (ดูรายละเอียด frontend)
+echo ========================================
+echo 🚀 Deployment Completed!
+echo ========================================
 echo.
 
-pause 
+echo Next Steps:
+echo.
+echo 1. Make sure MySQL is running
+echo 2. Start the servers:
+echo.
+echo    Option A - Use batch files:
+echo    start-production.bat
+echo.
+echo    Option B - Manual start:
+echo    Terminal 1: cd backend ^&^& npm start
+echo    Terminal 2: cd frontend ^&^& npm start
+echo.
+echo 3. Access the application:
+echo    Frontend: http://localhost:3011
+echo    Backend API: http://localhost:3101
+echo.
+
+set /p startNow=Would you like to start the servers now? (y/n): 
+
+if /i "%startNow%"=="y" (
+    echo.
+    echo Starting production servers...
+    call start-production.bat
+) else (
+    echo.
+    echo To start servers later, run: start-production.bat
+    echo.
+    pause
+)

@@ -1,348 +1,232 @@
-# 🚀 Production Deployment Guide for WorkplansV4
+# 🚀 Production Deployment Guide
 
-## 📋 Overview
+## 📋 ขั้นตอนการ Deploy Production
 
-คู่มือการ deploy ระบบ WorkplansV4 ใน Production Mode สำหรับ Windows Server
+### 1. การเตรียมระบบ
 
-## 🎯 Quick Start
+#### ✅ **ความต้องการระบบ:**
+- Node.js (v16 หรือสูงกว่า)
+- npm (v8 หรือสูงกว่า)
+- MySQL Server (v8.0 หรือสูงกว่า)
+- Windows 10/11 หรือ Windows Server
 
-### หลังจาก Git Pull
+#### ✅ **การตรวจสอบระบบ:**
+```powershell
+# ตรวจสอบ Node.js
+node --version
 
-```cmd
-# 1. Pull latest changes
-git pull origin main
+# ตรวจสอบ npm
+npm --version
 
-# 2. Run production deployment
-production-deploy.bat
+# ตรวจสอบ MySQL
+mysql --version
 ```
 
-### หรือใช้ Update Script
+### 2. การ Deploy แบบอัตโนมัติ
 
-```cmd
-# ใช้ update script ที่สร้างขึ้น
-update-production.bat
+#### 🚀 **วิธีที่ 1: Deploy ครบทุกขั้นตอน**
+```powershell
+.\deploy-production.ps1
 ```
 
-## 🔧 Scripts ที่สร้างขึ้น
-
-### ไฟล์หลัก
-- `production-deploy.bat` - Script หลักสำหรับ production deployment
-- `ecosystem.config.js` - PM2 configuration file
-
-### Management Scripts
-- `start-production.bat` - Start all applications
-- `stop-production.bat` - Stop all applications  
-- `restart-production.bat` - Restart all applications
-- `status-production.bat` - Check application status
-- `logs-production.bat` - View application logs
-- `update-production.bat` - Update from git and redeploy
-
-## 📁 Directory Structure
-
-```
-WorkplansV4/
-├── backend/
-│   ├── .env                    # Backend environment variables
-│   ├── package.json
-│   └── server.js
-├── frontend/
-│   ├── .env.local              # Frontend environment variables
-│   ├── package.json
-│   └── next.config.mjs
-├── logs/                       # Application logs
-│   ├── backend-error.log
-│   ├── backend-out.log
-│   ├── backend-combined.log
-│   ├── frontend-error.log
-│   ├── frontend-out.log
-│   └── frontend-combined.log
-├── ecosystem.config.js         # PM2 configuration
-├── production-deploy.bat       # Main deployment script
-└── [management scripts].bat    # Management scripts
+#### ⚡ **วิธีที่ 2: เริ่มเซิร์ฟเวอร์เท่านั้น**
+```powershell
+.\start-production.ps1
 ```
 
-## ⚙️ Environment Configuration
+#### 🛑 **หยุดเซิร์ฟเวอร์**
+```powershell
+.\stop-production.ps1
+```
 
-### Backend (.env)
+### 3. การ Deploy แบบ Manual
+
+#### **Step 1: ตั้งค่า Environment Variables**
+
+**Backend (.env):**
 ```env
+NODE_ENV=production
+PORT=3101
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=esp_tracker
 DB_PORT=3306
-PORT=3101
-NODE_ENV=production
-FRONTEND_URL=http://localhost:3011
 API_RATE_LIMIT=1000
+FRONTEND_URL=http://localhost:3011
 ```
 
-### Frontend (.env.local)
+**Frontend (.env.local):**
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3101
+NODE_ENV=production
 ```
 
-## 🚀 Deployment Process
+#### **Step 2: Install Dependencies**
+```powershell
+# Backend
+cd backend
+npm install --production
 
-### Step 1: Prerequisites
-- Node.js 18+ installed
-- MySQL server running
-- Git repository cloned
-
-### Step 2: Run Deployment
-```cmd
-production-deploy.bat
+# Frontend
+cd ../frontend
+npm install
 ```
 
-### Step 3: What Happens
-1. **Check Dependencies** - Verify Node.js and PM2
-2. **Stop Existing Apps** - Stop any running PM2 processes
-3. **Update Backend** - Install dependencies and check .env
-4. **Update Frontend** - Install dependencies and build for production
-5. **Create PM2 Config** - Generate ecosystem.config.js
-6. **Start Applications** - Start with PM2 process manager
-7. **Create Scripts** - Generate management scripts
-
-## 📊 PM2 Configuration
-
-### Backend App
-```javascript
-{
-  name: 'workplans-backend',
-  cwd: './backend',
-  script: 'server.js',
-  instances: 1,
-  autorestart: true,
-  watch: false,
-  max_memory_restart: '1G',
-  env: {
-    NODE_ENV: 'production',
-    PORT: 3101
-  },
-  error_file: './logs/backend-error.log',
-  out_file: './logs/backend-out.log',
-  log_file: './logs/backend-combined.log',
-  time: true
-}
-```
-
-### Frontend App
-```javascript
-{
-  name: 'workplans-frontend',
-  cwd: './frontend',
-  script: 'npm',
-  args: 'start',
-  instances: 1,
-  autorestart: true,
-  watch: false,
-  max_memory_restart: '1G',
-  env: {
-    NODE_ENV: 'production',
-    PORT: 3011
-  },
-  error_file: './logs/frontend-error.log',
-  out_file: './logs/frontend-out.log',
-  log_file: './logs/frontend-combined.log',
-  time: true
-}
-```
-
-## 🔄 Update Process
-
-### Manual Update
-```cmd
-# 1. Pull changes
-git pull origin main
-
-# 2. Run deployment
-production-deploy.bat
-```
-
-### Automatic Update
-```cmd
-# Use update script
-update-production.bat
-```
-
-## 📱 Access URLs
-
-- **Frontend**: http://localhost:3011
-- **Backend API**: http://localhost:3101
-- **Tracker**: http://localhost:3011/tracker
-
-## 🔧 Management Commands
-
-### PM2 Commands
-```cmd
-pm2 status          # Check status
-pm2 logs            # View logs
-pm2 restart all     # Restart all
-pm2 stop all        # Stop all
-pm2 monit           # Monitor resources
-pm2 save            # Save current configuration
-```
-
-### Script Commands
-```cmd
-start-production.bat    # Start applications
-stop-production.bat     # Stop applications
-restart-production.bat  # Restart applications
-status-production.bat   # Check status
-logs-production.bat     # View logs
-update-production.bat   # Update and redeploy
-```
-
-## 📝 Logs
-
-### Log Locations
-- **Backend Logs**: `./logs/backend-*.log`
-- **Frontend Logs**: `./logs/frontend-*.log`
-
-### View Logs
-```cmd
-# View all logs
-logs-production.bat
-
-# View specific logs
-pm2 logs workplans-backend
-pm2 logs workplans-frontend
-
-# View log files directly
-type logs\backend-error.log
-type logs\frontend-error.log
-```
-
-## 🛠️ Troubleshooting
-
-### Common Issues
-
-#### 1. Port Already in Use
-```cmd
-# Check what's using the port
-netstat -ano | findstr :3011
-netstat -ano | findstr :3101
-
-# Kill process if needed
-taskkill /PID <process_id> /F
-```
-
-#### 2. MySQL Connection Issues
-- Check MySQL service is running
-- Verify database credentials in `backend/.env`
-- Test connection manually
-
-#### 3. Build Failures
-```cmd
-# Clear npm cache
-npm cache clean --force
-
-# Remove node_modules and reinstall
+#### **Step 3: Build Frontend**
+```powershell
 cd frontend
-rmdir /s node_modules
-npm install --legacy-peer-deps
 npm run build
 ```
 
-#### 4. PM2 Issues
-```cmd
-# Reset PM2
-pm2 kill
-pm2 start ecosystem.config.js
-pm2 save
+#### **Step 4: Database Setup**
+```sql
+-- เพิ่ม Indexes เพื่อประสิทธิภาพ
+mysql -u root -p < optimize-database-indexes.sql
 ```
 
-### Debug Commands
-```cmd
-# Check application status
-status-production.bat
+#### **Step 5: Start Servers**
+```powershell
+# Terminal 1 - Backend
+cd backend
+npm start
 
-# View real-time logs
-logs-production.bat
-
-# Monitor resources
-pm2 monit
-
-# Check environment
-echo %NODE_ENV%
-node --version
-npm --version
+# Terminal 2 - Frontend
+cd frontend
+npm start
 ```
 
-## 🔒 Security Considerations
+## 🌐 การเข้าถึงระบบ
 
-### Production Security
-1. **Change Default Passwords** - Update MySQL password
-2. **Firewall Configuration** - Only open necessary ports
-3. **Environment Variables** - Keep sensitive data in .env files
-4. **Regular Updates** - Keep dependencies updated
-5. **Backup Strategy** - Regular database backups
+### **URLs:**
+- **Frontend**: http://localhost:3011
+- **Backend API**: http://localhost:3101
 
-### Recommended Firewall Rules
-```cmd
-# Allow only necessary ports
-netsh advfirewall firewall add rule name="WorkplansV4 Frontend" dir=in action=allow protocol=TCP localport=3011
-netsh advfirewall firewall add rule name="WorkplansV4 Backend" dir=in action=allow protocol=TCP localport=3101
+### **API Endpoints:**
+- Work Plans: http://localhost:3101/api/work-plans
+- Users: http://localhost:3101/api/users
+- Reports: http://localhost:3101/api/reports
+
+## 🔧 การตั้งค่า Production
+
+### **1. Database Configuration**
+```sql
+-- สร้างผู้ใช้สำหรับ Production
+CREATE USER 'production_user'@'localhost' IDENTIFIED BY 'secure_password';
+GRANT ALL PRIVILEGES ON esp_tracker.* TO 'production_user'@'localhost';
+FLUSH PRIVILEGES;
 ```
 
-## 📈 Performance Optimization
+### **2. Security Settings**
+- เปลี่ยนรหัสผ่าน Database
+- ตั้งค่า Firewall
+- ใช้ HTTPS (ถ้าต้องการ)
 
-### PM2 Settings
-- **Instances**: 1 (can be increased for load balancing)
-- **Memory Limit**: 1GB per app
-- **Auto Restart**: Enabled
-- **Watch Mode**: Disabled (for production)
-
-### Next.js Optimization
-- **Production Build**: Optimized automatically
-- **Static Generation**: Enabled
-- **Image Optimization**: Enabled
-- **Bundle Analysis**: Available in build output
-
-## 🔄 Continuous Deployment
-
-### Automated Update Script
-```cmd
-# Create scheduled task for automatic updates
-schtasks /create /tn "WorkplansV4 Update" /tr "C:\path\to\update-production.bat" /sc daily /st 02:00
+### **3. Performance Optimization**
+```sql
+-- เพิ่ม Indexes
+CREATE INDEX idx_work_plans_production_date ON work_plans(production_date);
+CREATE INDEX idx_work_plans_job_code ON work_plans(job_code);
+CREATE INDEX idx_work_plans_status_id ON work_plans(status_id);
 ```
 
-### Git Hooks (Optional)
-```bash
-# Create post-merge hook for automatic deployment
-echo "production-deploy.bat" > .git/hooks/post-merge
-chmod +x .git/hooks/post-merge
+## 📊 การติดตามระบบ
+
+### **1. Performance Monitoring**
+```powershell
+# รันการทดสอบประสิทธิภาพ
+.\performance-test.ps1
 ```
 
-## 📞 Support
+### **2. Log Monitoring**
+- Backend logs: console output
+- Frontend logs: browser console
+- Database logs: MySQL error log
 
-### Log Locations
-- Application logs: `./logs/`
-- PM2 logs: `pm2 logs`
-- System logs: Windows Event Viewer
+### **3. Health Check**
+```powershell
+# ตรวจสอบสถานะ API
+curl http://localhost:3101/api/work-plans
 
-### Common Commands
-```cmd
-# Quick health check
-status-production.bat
-
-# View recent errors
-pm2 logs --lines 100
-
-# Restart if issues
-restart-production.bat
+# ตรวจสอบสถานะ Frontend
+curl http://localhost:3011
 ```
 
----
+## 🛠️ การแก้ไขปัญหา
 
-## 🎉 Success Checklist
+### **ปัญหา: Port ถูกใช้งานแล้ว**
+```powershell
+# ดู process ที่ใช้ port
+netstat -ano | findstr :3101
+netstat -ano | findstr :3011
 
-- [ ] Node.js 18+ installed
-- [ ] MySQL server running
-- [ ] Database configured
-- [ ] Environment files created
-- [ ] Applications started with PM2
-- [ ] Frontend accessible at http://localhost:3011
-- [ ] Backend API accessible at http://localhost:3101
-- [ ] Management scripts created
-- [ ] Logs directory created
-- [ ] Firewall configured (if needed) 
+# หยุด process
+taskkill /PID <process_id> /F
+```
+
+### **ปัญหา: Database ไม่เชื่อมต่อ**
+```powershell
+# ตรวจสอบ MySQL service
+net start mysql
+
+# ทดสอบการเชื่อมต่อ
+mysql -u root -p -e "SHOW DATABASES;"
+```
+
+### **ปัญหา: Frontend ไม่ build ได้**
+```powershell
+# ลบ cache และ build ใหม่
+cd frontend
+rm -rf .next
+rm -rf node_modules
+npm install
+npm run build
+```
+
+## 🔄 การอัปเดตระบบ
+
+### **1. อัปเดต Code**
+```powershell
+# หยุดเซิร์ฟเวอร์
+.\stop-production.ps1
+
+# อัปเดต code (git pull หรือ copy files)
+
+# Build และเริ่มใหม่
+.\deploy-production.ps1
+```
+
+### **2. อัปเดต Database**
+```sql
+-- รัน migration scripts
+mysql -u root -p esp_tracker < update_schema.sql
+```
+
+## 📈 การ Scale Up
+
+### **1. การเพิ่มประสิทธิภาพ**
+- ใช้ PM2 สำหรับ process management
+- ใช้ Nginx สำหรับ reverse proxy
+- ใช้ Redis สำหรับ caching
+
+### **2. การ Monitor**
+- ติดตั้ง monitoring tools
+- ตั้งค่า alerts
+- สำรองข้อมูลอัตโนมัติ
+
+## 🔐 Security Checklist
+
+- [ ] เปลี่ยนรหัสผ่าน default
+- [ ] ตั้งค่า firewall rules
+- [ ] อัปเดต dependencies
+- [ ] ตั้งค่า HTTPS
+- [ ] จำกัดการเข้าถึง database
+- [ ] สำรองข้อมูลเป็นประจำ
+
+## 📞 การติดต่อ
+
+หากมีปัญหาในการ deploy:
+1. ตรวจสอบ logs ใน console
+2. ใช้ performance test เพื่อ debug
+3. ตรวจสอบ network connectivity
+4. ตรวจสอบ database connection

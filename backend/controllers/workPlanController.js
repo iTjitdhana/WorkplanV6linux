@@ -1,13 +1,81 @@
 const { WorkPlan, DraftWorkPlan } = require('../models/WorkPlan');
 const { validationResult } = require('express-validator');
+const { pool } = require('../config/database');
 
 class WorkPlanController {
-  // Get all work plans
+  // ค้นหางานในระบบ
+  static async searchWorkPlans(req, res) {
+    try {
+      const { code, name } = req.query;
+      
+      let query = `
+        SELECT DISTINCT wp.id, wp.job_code, wp.job_name, wp.production_date
+        FROM work_plans wp
+        WHERE 1=1
+      `;
+      const params = [];
+
+      if (code) {
+        query += ` AND wp.job_code LIKE ?`;
+        params.push(`%${code}%`);
+      }
+
+      if (name) {
+        query += ` AND wp.job_name LIKE ?`;
+        params.push(`%${name}%`);
+      }
+
+      query += ` ORDER BY wp.production_date DESC, wp.id DESC LIMIT 20`;
+
+      const [rows] = await pool.query(query, params);
+      
+      res.json({
+        success: true,
+        data: rows,
+        message: 'ค้นหางานสำเร็จ'
+      });
+    } catch (error) {
+      console.error('Error searching work plans:', error);
+      res.status(500).json({
+        success: false,
+        message: 'เกิดข้อผิดพลาดในการค้นหา'
+      });
+    }
+  }
+
+  // ดึงรายการงานทั้งหมด
+  static async getAllWorkPlans(req, res) {
+    try {
+      const query = `
+        SELECT * FROM work_plans 
+        ORDER BY production_date DESC, id DESC
+      `;
+      
+      const [rows] = await pool.query(query);
+      
+      res.json({
+        success: true,
+        data: rows,
+        message: 'ดึงข้อมูลงานสำเร็จ'
+      });
+    } catch (error) {
+      console.error('Error fetching work plans:', error);
+      res.status(500).json({
+        success: false,
+        message: 'เกิดข้อผิดพลาดในการดึงข้อมูล'
+      });
+    }
+  }
+
+  // Get all work plans (original method for compatibility)
   static async getAll(req, res) {
     try {
       const { date } = req.query;
       console.log('Requested date:', date);
       console.log('Date type:', typeof date);
+      console.log('Query parameters:', req.query);
+      console.log('Full request URL:', req.url);
+      console.log('Request headers:', req.headers);
       
       const workPlans = await WorkPlan.getAll(date);
       console.log('Found work plans:', workPlans.length);

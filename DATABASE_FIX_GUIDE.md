@@ -109,7 +109,6 @@ SHOW TABLES;
 netstat -tlnp | grep 3306
 # หรือ
 ss -tlnp | grep 3306
-
 # ทดสอบ connection จากเครื่องอื่น
 telnet 192.168.0.94 3306
 ```

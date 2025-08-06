@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { formatDateForDatabase } = require('../utils/dateUtils');
 
 class WorkPlan {
   // Get all work plans with operators
@@ -19,26 +20,32 @@ class WorkPlan {
           COALESCE(ps.color, '#FF6B6B') as status_color,
           ff.is_finished,
           ff.updated_at as finished_at,
-          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) as operators_from_join,
-          GROUP_CONCAT(DISTINCT wpo.id_code ORDER BY wpo.id_code) as operator_codes
+          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name SEPARATOR ', ') as operators_from_join,
+          GROUP_CONCAT(DISTINCT wpo.id_code ORDER BY wpo.id_code SEPARATOR ', ') as operator_codes,
+          pr.room_name as production_room_name,
+          m.machine_name as machine_name
         FROM work_plans wp
         LEFT JOIN production_statuses ps ON wp.status_id = ps.id
         LEFT JOIN finished_flags ff ON wp.id = ff.work_plan_id
         LEFT JOIN work_plan_operators wpo ON wp.id = wpo.work_plan_id
         LEFT JOIN users u ON wpo.user_id = u.id OR wpo.id_code = u.id_code
+        LEFT JOIN production_rooms pr ON wp.production_room_id = pr.id
+        LEFT JOIN machines m ON wp.machine_id = m.id
       `;
       
       const params = [];
       if (date) {
-        // แก้ไขการเปรียบเทียบวันที่ให้ถูกต้อง
-        query += ' WHERE DATE(wp.production_date) = ?';
+        // แก้ไขการเปรียบเทียบวันที่ให้ถูกต้อง โดยใช้ CONVERT_TZ เพื่อแปลง timezone
+        query += ' WHERE DATE(CONVERT_TZ(wp.production_date, "UTC", "Asia/Bangkok")) = ?';
         params.push(date);
         console.log('🔍 Query date:', date);
         console.log('🔍 SQL Query:', query);
         console.log('🔍 Params:', params);
+      } else {
+        console.log('⚠️ No date parameter provided, will return all work plans');
       }
       
-      query += ` GROUP BY wp.id 
+      query += ` GROUP BY wp.id, wp.production_date, wp.job_code, wp.job_name, wp.start_time, wp.end_time, wp.notes, wp.operators, wp.status_id, ps.name, ps.color, ff.is_finished, ff.updated_at, pr.room_name, m.machine_name
                  ORDER BY wp.start_time ASC, 
                  CASE 
                    WHEN GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) LIKE 'อ%' THEN 0 
@@ -48,8 +55,14 @@ class WorkPlan {
       
       const [rows] = await pool.execute(query, params);
       console.log('📊 Raw database results:', rows.length, 'rows');
+      console.log('📊 Sample data:', rows.slice(0, 3));
+      if (rows.length > 0) {
+        console.log('📊 Production dates in results:', rows.map(r => r.production_date));
+        console.log('📊 First 3 rows with production_date:', rows.slice(0, 3).map(r => ({ id: r.id, job_name: r.job_name, production_date: r.production_date })));
+      }
       return rows;
     } catch (error) {
+      console.error('Error in main query:', error);
       // Fallback query if status_id column doesn't exist
       console.log('⚠️ Status column not found, using fallback query');
       let fallbackQuery = `
@@ -67,21 +80,25 @@ class WorkPlan {
           '#FF6B6B' as status_color,
           ff.is_finished,
           ff.updated_at as finished_at,
-          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) as operators_from_join,
-          GROUP_CONCAT(DISTINCT wpo.id_code ORDER BY wpo.id_code) as operator_codes
+          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name SEPARATOR ', ') as operators_from_join,
+          GROUP_CONCAT(DISTINCT wpo.id_code ORDER BY wpo.id_code SEPARATOR ', ') as operator_codes,
+          pr.room_name as production_room_name,
+          m.machine_name as machine_name
         FROM work_plans wp
         LEFT JOIN finished_flags ff ON wp.id = ff.work_plan_id
         LEFT JOIN work_plan_operators wpo ON wp.id = wpo.work_plan_id
         LEFT JOIN users u ON wpo.user_id = u.id OR wpo.id_code = u.id_code
+        LEFT JOIN production_rooms pr ON wp.production_room_id = pr.id
+        LEFT JOIN machines m ON wp.machine_id = m.id
       `;
       
       const params = [];
       if (date) {
-        fallbackQuery += ' WHERE DATE(wp.production_date) = ?';
+        fallbackQuery += ' WHERE DATE(CONVERT_TZ(wp.production_date, "UTC", "Asia/Bangkok")) = ?';
         params.push(date);
       }
       
-      fallbackQuery += ` GROUP BY wp.id 
+      fallbackQuery += ` GROUP BY wp.id, wp.production_date, wp.job_code, wp.job_name, wp.start_time, wp.end_time, wp.notes, wp.operators, ff.is_finished, ff.updated_at, pr.room_name, m.machine_name
                          ORDER BY wp.start_time ASC, 
                          CASE 
                            WHEN GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) LIKE 'อ%' THEN 0 
@@ -179,15 +196,7 @@ class WorkPlan {
       console.log('🗄️ Database insert - production_date type:', typeof production_date);
       
       // แปลงวันที่ให้เป็นรูปแบบที่ถูกต้อง
-      let formattedDate = production_date;
-      if (production_date instanceof Date) {
-        formattedDate = production_date.toISOString().split('T')[0];
-      } else if (typeof production_date === 'string') {
-        // ถ้าเป็น string ให้ตรวจสอบรูปแบบ
-        if (production_date.includes('T')) {
-          formattedDate = production_date.split('T')[0];
-        }
-      }
+      let formattedDate = formatDateForDatabase(production_date);
       console.log('🗄️ Formatted date for database:', formattedDate);
       
       // Format times
@@ -244,14 +253,7 @@ class WorkPlan {
       const { production_date, job_code, job_name, start_time, end_time, notes, operators } = workPlanData;
       
       // แปลงวันที่ให้เป็นรูปแบบที่ถูกต้อง
-      let formattedDate = production_date;
-      if (production_date instanceof Date) {
-        formattedDate = production_date.toISOString().split('T')[0];
-      } else if (typeof production_date === 'string') {
-        if (production_date.includes('T')) {
-          formattedDate = production_date.split('T')[0];
-        }
-      }
+      let formattedDate = formatDateForDatabase(production_date);
       
       // Format times
       const formattedStartTime = this.formatTime(start_time);
@@ -416,9 +418,22 @@ class DraftWorkPlan {
   }
   static async update(id, data) {
     const { production_date, job_code, job_name, start_time, end_time, machine_id, production_room_id, notes, workflow_status_id, operators } = data;
+    
+    // ตรวจสอบและจัดการ undefined values
+    const safeProductionDate = production_date || null;
+    const safeJobCode = job_code || null;
+    const safeJobName = job_name || null;
+    const safeStartTime = start_time || null;
+    const safeEndTime = end_time || null;
+    const safeMachineId = machine_id || null;
+    const safeProductionRoomId = production_room_id || null;
+    const safeNotes = notes || '';
+    const safeWorkflowStatusId = workflow_status_id || 1;
+    const safeOperators = operators || [];
+    
     await pool.execute(
       'UPDATE work_plan_drafts SET production_date=?, job_code=?, job_name=?, start_time=?, end_time=?, machine_id=?, production_room_id=?, notes=?, workflow_status_id=?, operators=? WHERE id=?',
-      [production_date, job_code, job_name, start_time, end_time, machine_id, production_room_id, notes || '', workflow_status_id || 1, JSON.stringify(operators || []), id]
+      [safeProductionDate, safeJobCode, safeJobName, safeStartTime, safeEndTime, safeMachineId, safeProductionRoomId, safeNotes, safeWorkflowStatusId, JSON.stringify(safeOperators), id]
     );
     return { id, ...data };
   }
@@ -436,8 +451,11 @@ class DraftWorkPlan {
       
       // ถ้ามีการระบุวันที่ ให้ sync เฉพาะวันที่นั้น
       if (targetDate) {
-        query += ' AND production_date = ?';
-        params.push(targetDate);
+        // แปลงวันที่ให้เป็นรูปแบบที่ถูกต้อง
+        const formattedDate = formatDateForDatabase(targetDate);
+        query += ' AND DATE(production_date) = ?';
+        params.push(formattedDate);
+        console.log('🔄 [DEBUG] Formatted target date:', formattedDate);
       }
       
       query += ' ORDER BY production_date ASC, start_time ASC';
@@ -467,15 +485,16 @@ class DraftWorkPlan {
       // 2. ดึงเวลาซิงค์ล่าสุดของวันนั้น (ก่อน insert log ใหม่)
       let lastSyncTime = null;
       if (targetDate) {
+        const formattedDate = formatDateForDatabase(targetDate);
         const [syncRows] = await connection.execute(
-          'SELECT synced_at FROM workplan_sync_log WHERE production_date = ? ORDER BY synced_at DESC LIMIT 1',
-          [targetDate]
+          'SELECT synced_at FROM workplan_sync_log WHERE DATE(production_date) = ? ORDER BY synced_at DESC LIMIT 1',
+          [formattedDate]
         );
         if (syncRows.length > 0) {
           lastSyncTime = new Date(syncRows[0].synced_at);
-          console.log(`[SYNC] Last sync time for ${targetDate}:`, lastSyncTime);
+          console.log(`[SYNC] Last sync time for ${formattedDate}:`, lastSyncTime);
         } else {
-          console.log(`[SYNC] No previous sync found for ${targetDate}`);
+          console.log(`[SYNC] No previous sync found for ${formattedDate}`);
         }
       }
       
@@ -500,11 +519,11 @@ class DraftWorkPlan {
           const isDefaultJob = defaultCodes.includes(draft.job_code);
           // เช็คว่ามี A, B, C, D ใน workplans จริงของวันนั้นหรือยัง
           const [existingDefault] = await connection.execute(
-            'SELECT COUNT(*) as count FROM work_plans WHERE production_date = ? AND job_code = ?',
+            'SELECT COUNT(*) as count FROM work_plans WHERE DATE(production_date) = DATE(?) AND job_code = ?',
             [draft.production_date, draft.job_code]
           );
           const [existingPlans] = await connection.execute(
-            'SELECT COUNT(*) as count FROM work_plans WHERE production_date = ? AND job_code NOT IN (\'A\', \'B\', \'C\', \'D\')',
+            'SELECT COUNT(*) as count FROM work_plans WHERE DATE(production_date) = DATE(?) AND job_code NOT IN (\'A\', \'B\', \'C\', \'D\')',
             [draft.production_date]
           );
           const isSpecialJob = existingPlans[0].count > 0 && !isDefaultJob;
@@ -534,11 +553,14 @@ class DraftWorkPlan {
             FROM INFORMATION_SCHEMA.COLUMNS 
             WHERE TABLE_SCHEMA = DATABASE() 
             AND TABLE_NAME = 'work_plans' 
-            AND COLUMN_NAME IN ('status_id', 'is_special')
+            AND COLUMN_NAME IN ('status_id', 'is_special', 'machine_id', 'production_room_id')
           `);
           const hasStatusColumn = columns.some(col => col.COLUMN_NAME === 'status_id');
           const hasIsSpecialColumn = columns.some(col => col.COLUMN_NAME === 'is_special');
+          const hasMachineIdColumn = columns.some(col => col.COLUMN_NAME === 'machine_id');
+          const hasProductionRoomIdColumn = columns.some(col => col.COLUMN_NAME === 'production_room_id');
           console.log('🔄 Has status_id column:', hasStatusColumn, 'Has is_special column:', hasIsSpecialColumn);
+          console.log('🔄 Has machine_id column:', hasMachineIdColumn, 'Has production_room_id column:', hasProductionRoomIdColumn);
           // ตรวจสอบว่ามี operators column หรือไม่
           const [operatorsColumns] = await connection.execute(`
             SELECT COLUMN_NAME 
@@ -550,15 +572,83 @@ class DraftWorkPlan {
           const hasOperatorsColumn = operatorsColumns.length > 0;
           console.log('🔄 Has operators column:', hasOperatorsColumn);
           
-          if (hasStatusColumn && hasIsSpecialColumn && hasOperatorsColumn) {
-            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special, notes, operators) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+                    if (hasStatusColumn && hasIsSpecialColumn && hasOperatorsColumn && hasMachineIdColumn && hasProductionRoomIdColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special, notes, operators, machine_id, production_room_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            insertParams = [
+              draft.production_date,
+              jobCode, 
+              jobName, 
+              draft.start_time, 
+              draft.end_time,
+              isSpecialDraft ? 10 : 3, // 10 = งานพิเศษ, 3 = พิมพ์แล้ว (สำหรับงานที่บันทึกเสร็จสิ้นแล้ว)
+              isSpecialDraft ? 1 : 0,   // is_special
+              draft.notes || null,      // notes
+              JSON.stringify(operators), // operators
+              draft.machine_id || null,  // machine_id
+              draft.production_room_id || null // production_room_id
+            ];
+          } else if (hasStatusColumn && hasOperatorsColumn && hasMachineIdColumn && hasProductionRoomIdColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, notes, operators, machine_id, production_room_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
             insertParams = [
               draft.production_date, 
               jobCode, 
               jobName, 
               draft.start_time, 
               draft.end_time,
-              isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialDraft ? 10 : 3, // 10 = งานพิเศษ, 3 = พิมพ์แล้ว (สำหรับงานที่บันทึกเสร็จสิ้นแล้ว)
+              draft.notes || null,     // notes
+              JSON.stringify(operators), // operators
+              draft.machine_id || null,  // machine_id
+              draft.production_room_id || null // production_room_id
+            ];
+          } else if (hasStatusColumn && hasIsSpecialColumn && hasMachineIdColumn && hasProductionRoomIdColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special, notes, machine_id, production_room_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            insertParams = [
+              draft.production_date, 
+              jobCode, 
+              jobName, 
+              draft.start_time, 
+              draft.end_time,
+              isSpecialDraft ? 10 : 3, // 10 = งานพิเศษ, 3 = พิมพ์แล้ว (สำหรับงานที่บันทึกเสร็จสิ้นแล้ว)
+              isSpecialDraft ? 1 : 0,   // is_special
+              draft.notes || null,      // notes
+              draft.machine_id || null,  // machine_id
+              draft.production_room_id || null // production_room_id
+            ];
+          } else if (hasStatusColumn && hasMachineIdColumn && hasProductionRoomIdColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, notes, machine_id, production_room_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            insertParams = [
+              draft.production_date, 
+              jobCode, 
+              jobName, 
+              draft.start_time, 
+              draft.end_time,
+              isSpecialDraft ? 10 : 3, // 10 = งานพิเศษ, 3 = พิมพ์แล้ว (สำหรับงานที่บันทึกเสร็จสิ้นแล้ว)
+              draft.notes || null,     // notes
+              draft.machine_id || null,  // machine_id
+              draft.production_room_id || null // production_room_id
+            ];
+          } else if (hasMachineIdColumn && hasProductionRoomIdColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, notes, machine_id, production_room_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+            insertParams = [
+              draft.production_date, 
+              jobCode, 
+              jobName, 
+              draft.start_time, 
+              draft.end_time,
+              draft.notes || null,     // notes
+              draft.machine_id || null,  // machine_id
+              draft.production_room_id || null // production_room_id
+            ];
+          } else if (hasStatusColumn && hasIsSpecialColumn && hasOperatorsColumn) {
+            insertQuery = 'INSERT INTO work_plans (production_date, job_code, job_name, start_time, end_time, status_id, is_special, notes, operators) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            insertParams = [
+              draft.production_date,
+              jobCode, 
+              jobName, 
+              draft.start_time, 
+              draft.end_time,
+              isSpecialDraft ? 10 : 3, // 10 = งานพิเศษ, 3 = พิมพ์แล้ว (สำหรับงานที่บันทึกเสร็จสิ้นแล้ว)
               isSpecialDraft ? 1 : 0,   // is_special
               draft.notes || null,      // notes
               JSON.stringify(operators) // operators
@@ -571,7 +661,7 @@ class DraftWorkPlan {
               jobName, 
               draft.start_time, 
               draft.end_time,
-              isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialDraft ? 10 : 3, // 10 = งานพิเศษ, 3 = พิมพ์แล้ว (สำหรับงานที่บันทึกเสร็จสิ้นแล้ว)
               draft.notes || null,     // notes
               JSON.stringify(operators) // operators
             ];
@@ -583,7 +673,7 @@ class DraftWorkPlan {
               jobName, 
               draft.start_time, 
               draft.end_time,
-              isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialDraft ? 10 : 3, // 10 = งานพิเศษ, 3 = พิมพ์แล้ว (สำหรับงานที่บันทึกเสร็จสิ้นแล้ว)
               isSpecialDraft ? 1 : 0,   // is_special
               draft.notes || null       // notes
             ];
@@ -595,7 +685,7 @@ class DraftWorkPlan {
               jobName, 
               draft.start_time, 
               draft.end_time,
-              isSpecialDraft ? 10 : 1, // 10 = งานพิเศษ, 1 = รอดำเนินการ
+              isSpecialDraft ? 10 : 3, // 10 = งานพิเศษ, 3 = พิมพ์แล้ว (สำหรับงานที่บันทึกเสร็จสิ้นแล้ว)
               draft.notes || null      // notes
             ];
           } else {
@@ -611,6 +701,7 @@ class DraftWorkPlan {
           }
           console.log('🔄 Insert query:', insertQuery);
           console.log('🔄 Insert params:', insertParams);
+          console.log('🔄 Machine ID from draft:', draft.machine_id, 'Production Room ID from draft:', draft.production_room_id);
           const [result] = await connection.execute(insertQuery, insertParams);
           const workPlanId = result.insertId;
           // เพิ่ม operators
@@ -640,9 +731,10 @@ class DraftWorkPlan {
       
       // 3. บันทึก log การ sync (ย้ายมาหลัง loop)
       if (targetDate) {
+        const formattedDate = formatDateForDatabase(targetDate);
         const [syncLogResult] = await connection.execute(
           'INSERT INTO workplan_sync_log (production_date) VALUES (?)',
-          [targetDate]
+          [formattedDate]
         );
         syncLogId = syncLogResult.insertId;
         console.log(`[SYNC] Inserted sync log with ID: ${syncLogId}`);

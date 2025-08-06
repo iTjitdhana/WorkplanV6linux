@@ -12,6 +12,10 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			sans: ['var(--font-noto-sans-thai)', 'Noto Sans Thai', 'Noto Sans', 'Inter', 'system-ui', 'sans-serif'],
+  			thai: ['var(--font-noto-sans-thai)', 'Noto Sans Thai', 'sans-serif'],
+  		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
