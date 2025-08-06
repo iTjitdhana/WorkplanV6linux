@@ -19,7 +19,7 @@ module.exports = {
         DB_NAME: 'workplan',
         DB_PORT: 3306,
         API_RATE_LIMIT: 100,
-        CORS_ORIGINS: 'http://localhost:3011,http://your-domain.com'
+        CORS_ORIGINS: 'http://192.168.0.94:3011,http://your-domain.com'
       },
       error_file: './logs/err.log',
       out_file: './logs/out.log',
@@ -40,7 +40,7 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3011,
-        NEXT_PUBLIC_API_URL: 'http://localhost:3101',
+        NEXT_PUBLIC_API_URL: 'http://192.168.0.94:3101',
         NEXT_PUBLIC_APP_ENV: 'production',
         NEXT_PUBLIC_APP_VERSION: '1.0.0'
       },

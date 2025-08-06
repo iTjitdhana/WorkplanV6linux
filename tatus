@@ -1,0 +1,5 @@
+[33m73bba20[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Add IP 192.168.0.94 configuration scripts and setup files
+[33m6d4eaeb[m  Fix network access issue - Allow access from other machines
+[33mf6e940b[m Fix production deployment and add all-in-one production script
+[33m3273ecf[m Fix dependency conflicts with --legacy-peer-deps flag
+[33m6f7d58f[m Add production deployment scripts

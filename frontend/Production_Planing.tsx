@@ -57,7 +57,7 @@ export default function MedicalAppointmentDashboard() {
   // Helper function for API URL - ใช้ relative URLs เพื่อเรียก frontend API routes
   const getApiUrl = (endpoint: string) => {
     // ใช้ backend URL โดยตรง
-    return `http://localhost:3101${endpoint}`;
+    return `http://192.168.0.94:3101${endpoint}`;
   };
 
   // เปลี่ยน default selectedDate เป็นวันที่ปัจจุบัน (dynamic)
@@ -1464,7 +1464,7 @@ export default function MedicalAppointmentDashboard() {
     setMessage("");
     
     try {
-          const url = `http://localhost:3101/api/work-plans/${workPlanId}/cancel`;
+          const url = `http://192.168.0.94:3101/api/work-plans/${workPlanId}/cancel`;
     console.log('🔴 [DEBUG] Making PATCH request to:', url);
     
     const res = await fetch(url, {
