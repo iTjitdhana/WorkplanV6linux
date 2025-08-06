@@ -141,9 +141,10 @@ app.use(errorHandler);
 app.use(errorMonitor);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📊 API Documentation: http://localhost:${PORT}/api`);
+  console.log(`🌐 Network access: http://192.168.0.94:${PORT}/api`);
   
   // เริ่มต้น monitoring system
   systemMonitor.start();

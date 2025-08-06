@@ -21,8 +21,14 @@ start "Frontend Server" cmd /k "npm start"
 
 echo.
 echo ✅ Production servers started!
-echo 🌐 Frontend: http://localhost:3011
-echo 🔧 Backend: http://localhost:3101
+echo.
+echo 🌐 Frontend (Local): http://localhost:3011
+echo 🌐 Frontend (Network): http://192.168.0.94:3011
+echo.
+echo 🔧 Backend (Local): http://localhost:3101
+echo 🔧 Backend (Network): http://192.168.0.94:3101
+echo.
+echo ✅ All devices on network can now access: http://192.168.0.94:3011
 echo Wait 30 seconds for servers to fully start
 
 pause
