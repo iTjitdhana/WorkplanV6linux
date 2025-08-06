@@ -13,7 +13,22 @@ if %errorlevel% neq 0 (
 
 echo.
 echo Step 2: Starting Production Servers...
-call start-production.bat
+if exist "start-production.bat" (
+    call start-production.bat
+) else (
+    echo ⚠️ start-production.bat not found, starting servers manually...
+    
+    echo Starting Backend Server...
+    cd backend
+    start "Backend Server" cmd /k "npm start"
+    
+    echo Waiting for Backend to start...
+    timeout /t 5 /nobreak >nul
+    
+    echo Starting Frontend Server (Production Mode)...
+    cd ..\frontend
+    start "Frontend Server" cmd /k "npm start"
+)
 
 echo.
 echo 🎉 Production deployment completed!
