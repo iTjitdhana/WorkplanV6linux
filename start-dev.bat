@@ -1,22 +1,28 @@
 @echo off
-echo Starting Production Planning System on IP 192.168.0.94
-echo Backend will run on port 3101
-echo Frontend will run on port 3011
-echo.
+chcp 65001 >nul
+echo Development Start System
+echo ========================
 
-echo Starting Backend Server...
-start "Backend Server" cmd /k "cd backend && npm run dev"
-
-echo Waiting 5 seconds for backend to start...
-timeout /t 5 /nobreak > nul
-
-echo Starting Frontend Server...
-start "Frontend Server" cmd /k "cd frontend && npm run dev"
+echo Step 1: Stopping existing processes...
+taskkill /f /im node.exe >nul 2>&1
+echo ✅ Stopped existing Node.js processes
 
 echo.
-echo Both servers are starting...
-echo Backend: http://192.168.0.94:3101
-echo Frontend: http://192.168.0.94:3011
+echo Step 2: Starting Backend...
+cd backend
+start "Backend Server" cmd /k "npm start"
+
+echo Waiting for Backend to start...
+timeout /t 5 /nobreak >nul
+
+echo Step 3: Starting Frontend (Development Mode)...
+cd ..\frontend
+start "Frontend Server" cmd /k "npm run dev"
+
 echo.
-echo Press any key to close this window...
-pause > nul 
+echo ✅ Development servers started!
+echo 🌐 Frontend: http://localhost:3011
+echo 🔧 Backend: http://localhost:3101
+echo Wait 30 seconds for servers to fully start
+
+pause 

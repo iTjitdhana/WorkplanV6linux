@@ -1,32 +1,28 @@
 @echo off
-echo ========================================
-echo 🔄 Restarting Production Planning System
-echo ========================================
+chcp 65001 >nul
+echo Restart System
+echo ===============
+
+echo Step 1: Stopping existing processes...
+taskkill /f /im node.exe >nul 2>&1
+echo ✅ Stopped existing Node.js processes
 
 echo.
-echo 🛑 Stopping all Node.js processes...
-taskkill /f /im node.exe 2>nul
-timeout /t 2 /nobreak >nul
-
-echo.
-echo 🚀 Starting Backend...
+echo Step 2: Starting Backend...
 cd backend
-start "Backend Server" cmd /k "npm run dev"
+start "Backend Server" cmd /k "npm start"
 
-echo.
-echo ⏳ Waiting for backend to start...
+echo Waiting for Backend to start...
 timeout /t 5 /nobreak >nul
 
-echo.
-echo 🌐 Starting Frontend...
+echo Step 3: Starting Frontend...
 cd ..\frontend
 start "Frontend Server" cmd /k "npm run dev"
 
 echo.
-echo ✅ System restart completed!
-echo.
-echo 📱 Backend: http://localhost:3101
-echo 🌐 Frontend: http://localhost:3000
-echo.
-echo Press any key to close this window...
-pause >nul 
+echo ✅ System restarted successfully!
+echo 🌐 Frontend: http://localhost:3011
+echo 🔧 Backend: http://localhost:3101
+echo Wait 30 seconds for servers to fully start
+
+pause 
