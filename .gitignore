@@ -80,7 +80,7 @@ Thumbs.db
 
 # PowerShell scripts (optional - remove if you want to include them)
 *.ps1
-*.bat
+# *.bat
 
 # MySQL dumps
 *.sql 
