@@ -136,7 +136,7 @@ export default function MedicalAppointmentDashboard() {
             id: p.id,
             date: p.production_date,
             title: p.job_name,
-            room: draft?.production_room_id || draft?.production_room || 'ไม่ระบุ',
+            room: draft?.production_room_name || draft?.production_room_id || draft?.production_room || 'ไม่ระบุ',
             staff: p.operators || '',
             time: `${p.start_time || ''} - ${p.end_time || ''}`,
             status: status,

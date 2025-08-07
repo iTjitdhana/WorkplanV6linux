@@ -1840,7 +1840,7 @@ export default function MedicalAppointmentDashboard() {
             recordStatus: p.recordStatus === 'แผนจริง' || !p.recordStatus ? 'บันทึกสำเร็จ' : p.recordStatus,
             isPrinted: true, // งานที่ sync แล้วถือว่าพิมพ์แล้ว
             operators: operatorNames, // เพิ่ม operators ที่ parse แล้ว
-            production_room: (draft && (draft.production_room_name || draft.production_room_id || draft.production_room)) || p.production_room_id || p.production_room || 'ไม่ระบุ',
+            production_room: (draft && (draft.production_room_name || draft.production_room_id || draft.production_room)) || p.production_room_name || p.production_room_id || p.production_room || 'ไม่ระบุ',
             machine_id: (draft && draft.machine_id) || p.machine_id || '',
             notes: (draft && draft.notes) || p.notes || '',
           };
