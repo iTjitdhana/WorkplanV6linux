@@ -46,16 +46,20 @@ class WorkPlanController {
   // ดึงรายการงานทั้งหมด
   static async getAllWorkPlans(req, res) {
     try {
-      const query = `
-        SELECT * FROM work_plans 
-        ORDER BY production_date DESC, id DESC
-      `;
+      const { date } = req.query;
+      console.log('Requested date:', date);
+      console.log('Date type:', typeof date);
+      console.log('Query parameters:', req.query);
+      console.log('Full request URL:', req.url);
+      console.log('Request headers:', req.headers);
       
-      const [rows] = await pool.query(query);
+      const workPlans = await WorkPlan.getAll(date);
+      console.log('Found work plans:', workPlans.length);
+      console.log('Work plans data:', workPlans);
       
       res.json({
         success: true,
-        data: rows,
+        data: workPlans,
         message: 'ดึงข้อมูลงานสำเร็จ'
       });
     } catch (error) {
