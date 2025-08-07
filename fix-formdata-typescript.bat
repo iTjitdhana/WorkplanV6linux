@@ -1,15 +1,16 @@
 @echo off
 echo ========================================
-echo    Test Build
+echo    Fix FormData TypeScript Error
 echo ========================================
 echo.
 
-echo Testing frontend build...
+echo Testing build...
 cd frontend
 call npm run build
 if errorlevel 1 (
     echo.
-    echo ERROR: Build failed!
+    echo ERROR: Build still failed!
+    echo Please check the TypeScript errors above.
     echo.
     pause
     exit /b 1
@@ -47,4 +48,4 @@ docker ps
 echo.
 echo Containers should now appear in Docker Desktop!
 echo.
-pause 
+pause

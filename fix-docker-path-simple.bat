@@ -1,29 +1,22 @@
 @echo off
 echo ========================================
-echo    Test Build
-echo ========================================
+echo    Fix Docker Path Error
+========================================
 echo.
 
-echo Testing frontend build...
-cd frontend
-call npm run build
+echo Checking if SQL file exists...
+dir "backend\esp_tracker (6).sql" >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo ERROR: Build failed!
-    echo.
+    echo ERROR: SQL file not found!
+    echo Please check if the file exists.
     pause
     exit /b 1
+) else (
+    echo SQL file found: backend\esp_tracker (6).sql
 )
-cd ..
 
 echo.
-echo ========================================
-echo    Build Successful!
-echo ========================================
-echo.
-echo Now testing Docker build...
-echo.
-
+echo Testing Docker build...
 docker-compose up --build -d
 
 if errorlevel 1 (
@@ -40,11 +33,11 @@ if errorlevel 1 (
 echo.
 echo ========================================
 echo    Docker Build Successful!
-echo ========================================
+========================================
 echo.
 echo Checking container status...
 docker ps
 echo.
 echo Containers should now appear in Docker Desktop!
 echo.
-pause 
+pause

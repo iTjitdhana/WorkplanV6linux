@@ -362,6 +362,9 @@ export default function MedicalAppointmentDashboard() {
 
   const formatDateForGoogleSheet = (date: Date | string) => {
     const dateObj = typeof date === 'string' ? createSafeDate(date) : date;
+    if (!dateObj) {
+      return 'Invalid Date';
+    }
     return dateObj.toLocaleDateString('th-TH', { 
       weekday: 'long', 
       year: 'numeric', 
@@ -372,6 +375,9 @@ export default function MedicalAppointmentDashboard() {
 
   const formatDateForValue = (date: Date | string) => {
     const dateObj = typeof date === 'string' ? createSafeDate(date) : date;
+    if (!dateObj) {
+      return 'Invalid Date';
+    }
     return dateObj.toLocaleDateString('th-TH'); // DD/MM/YYYY
   };
 
@@ -1284,8 +1290,8 @@ export default function MedicalAppointmentDashboard() {
       
       // ใช้ selectedDate แทน today เพื่อให้วันที่ตรงกับข้อมูลงาน
        const selectedDateObj = createSafeDate(selectedDate);
-       const dateString = formatDateForGoogleSheet(selectedDateObj);
-       const dateValue = formatDateForValue(selectedDateObj);
+       const dateString = selectedDateObj ? formatDateForGoogleSheet(selectedDateObj) : 'Invalid Date';
+       const dateValue = selectedDateObj ? formatDateForValue(selectedDateObj) : 'Invalid Date';
       const timeStamp = new Date().toLocaleString('en-GB') + ', ' + new Date().toLocaleTimeString('en-GB');
 
       console.log("🟡 [DEBUG] Date processing:");

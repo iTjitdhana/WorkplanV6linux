@@ -1,175 +1,276 @@
-# คู่มือการ Optimize ประสิทธิภาพระบบ
+# 🚀 WorkplanV6 Performance Optimization Guide
 
-## 📋 ไฟล์สคริปต์ที่สร้างขึ้น
+## 📊 Performance Optimizations Implemented
 
-### 1. ไฟล์ทดสอบ API Performance
-- **`optimize-system.ps1`** - ทดสอบ API Performance (PowerShell)
-- **`optimize-system.bat`** - ทดสอบ API Performance (Batch)
+### 🎯 Frontend Optimizations
 
-### 2. ไฟล์ทดสอบ Database Performance
-- **`test-db-performance.ps1`** - ทดสอบ Database Performance แบบละเอียด
+#### 1. Next.js Configuration
+- **Bundle Splitting**: แยก vendor chunks และ common chunks
+- **Image Optimization**: รองรับ WebP, AVIF formats
+- **Compression**: เปิดใช้งาน gzip compression
+- **Caching Headers**: ตั้งค่า cache headers สำหรับ static assets
+- **Security Headers**: เพิ่ม security headers
 
-### 3. ไฟล์ Optimize Database
-- **`optimize-database-indexes.sql`** - เพิ่ม Indexes สำหรับ Database
+#### 2. Webpack Optimizations
+```javascript
+// Bundle splitting
+vendor: {
+  test: /[\\/]node_modules[\\/]/,
+  name: 'vendors',
+  chunks: 'all',
+}
 
-### 4. ไฟล์รัน Optimize ทั้งหมด
-- **`run-optimize.ps1`** - เมนูหลักสำหรับรัน Optimize ทั้งหมด
-
-## 🚀 วิธีการใช้งาน
-
-### วิธีที่ 1: ใช้เมนูหลัก (แนะนำ)
-```powershell
-.\run-optimize.ps1
+// Image optimization
+image-webpack-loader: {
+  mozjpeg: { progressive: true },
+  pngquant: { quality: [0.65, 0.90], speed: 4 },
+  webp: { quality: 75 },
+}
 ```
 
-### วิธีที่ 2: รันแยกกัน
+#### 3. Package Optimizations
+- **Tree Shaking**: ลบ unused code
+- **Code Splitting**: แยก code ตาม routes
+- **Lazy Loading**: โหลด components เมื่อจำเป็น
 
-#### ทดสอบ API Performance:
-```powershell
-.\optimize-system.ps1
-```
+### 🔧 Backend Optimizations
 
-#### ทดสอบ Database Performance:
-```powershell
-.\test-db-performance.ps1
-```
+#### 1. Express.js Optimizations
+- **Compression**: เปิดใช้งาน gzip compression
+- **Rate Limiting**: ป้องกัน API abuse
+- **Security Headers**: เพิ่ม security headers
+- **Connection Pooling**: ใช้ connection pooling สำหรับ database
 
-#### เพิ่ม Database Indexes:
-```powershell
-# รันผ่านเมนูหลัก หรือใช้ MySQL client โดยตรง
-mysql -u root -p < optimize-database-indexes.sql
-```
-
-## 📊 สิ่งที่ทดสอบ
-
-### API Performance Test
-1. **Backend Connection** - ทดสอบการเชื่อมต่อ Backend
-2. **Work Plans API** - ทดสอบการดึงข้อมูล Work Plans
-3. **Drafts API** - ทดสอบการดึงข้อมูล Drafts
-4. **Sync API** - ทดสอบการ Sync Drafts to Plans
-5. **Reports API** - ทดสอบการดึงข้อมูล Reports
-6. **Users API** - ทดสอบการดึงข้อมูล Users
-7. **Machines API** - ทดสอบการดึงข้อมูล Machines
-
-### Database Performance Test
-1. **Work Plans Count** - ทดสอบการนับจำนวน Work Plans
-2. **Work Plans By Date** - ทดสอบการดึงข้อมูลตามวันที่
-3. **Drafts Query** - ทดสอบการดึงข้อมูล Drafts
-4. **JOIN Query** - ทดสอบการ JOIN ข้อมูล
-5. **GROUP BY Query** - ทดสอบการ GROUP BY
-6. **LIKE Query** - ทดสอบการค้นหาแบบ LIKE
-7. **ORDER BY Query** - ทดสอบการ ORDER BY
-
-## 🎯 เกณฑ์การประเมิน
-
-### API Performance
-- **🚀 เร็วมาก**: น้อยกว่า 1 วินาที
-- **⚡ เร็ว**: 1-3 วินาที
-- **⏳ ปานกลาง**: 3-5 วินาที
-- **🐌 ช้า**: มากกว่า 5 วินาที
-
-### Database Performance
-- **🚀 เร็วมาก**: น้อยกว่า 50ms
-- **⚡ เร็ว**: 50-100ms
-- **⏳ ปานกลาง**: 100-200ms
-- **🐌 ช้า**: มากกว่า 200ms
-
-## 🔧 การ Optimize ที่แนะนำ
-
-### 1. Database Indexes
+#### 2. Database Optimizations
 ```sql
--- Indexes หลักที่แนะนำ
-CREATE INDEX idx_work_plans_production_date ON work_plans(production_date);
-CREATE INDEX idx_work_plans_job_code ON work_plans(job_code);
-CREATE INDEX idx_work_plans_status_id ON work_plans(status_id);
-CREATE INDEX idx_drafts_workflow_status ON work_plan_drafts(workflow_status_id);
-CREATE INDEX idx_drafts_production_date ON work_plan_drafts(production_date);
+-- MySQL Performance Settings
+innodb_buffer_pool_size = 256M
+innodb_log_file_size = 64M
+query_cache_size = 32M
+max_connections = 200
 ```
 
-### 2. Caching
-- ใช้ Redis สำหรับ caching ข้อมูลที่เรียกบ่อย
-- Cache ผลลัพธ์ของ API ที่ใช้บ่อย
-- Cache ข้อมูล Users, Machines, Production Rooms
+#### 3. Caching Strategy
+- **API Response Caching**: cache API responses
+- **Static File Caching**: cache static files
+- **Database Query Caching**: cache frequent queries
 
-### 3. Query Optimization
-- ใช้ LIMIT ใน queries ที่ไม่ต้องการข้อมูลทั้งหมด
-- หลีกเลี่ยง SELECT * ใช้เฉพาะ columns ที่ต้องการ
-- ใช้ EXPLAIN เพื่อตรวจสอบ query performance
+### 🐳 Docker Optimizations
 
-### 4. Connection Pooling
-- ตั้งค่า connection pool ให้เหมาะสม
-- ใช้ connection pooling ใน production
+#### 1. Container Optimizations
+- **Multi-stage Builds**: ลด image size
+- **Resource Limits**: จำกัด memory และ CPU
+- **Health Checks**: ตรวจสอบ service health
+- **Non-root Users**: ใช้ non-root users
 
-## 📈 การติดตามผล
+#### 2. Nginx Reverse Proxy
+- **Load Balancing**: แบ่ง load ระหว่าง services
+- **Caching**: cache static files และ API responses
+- **Compression**: gzip compression
+- **Rate Limiting**: ป้องกัน abuse
 
-### ก่อน Optimize
-1. รัน `test-db-performance.ps1`
-2. บันทึกผลลัพธ์
+## 🚀 How to Use Performance Mode
 
-### หลัง Optimize
-1. เพิ่ม Database Indexes
-2. รัน `test-db-performance.ps1` อีกครั้ง
-3. เปรียบเทียบผลลัพธ์
-
-### การเปรียบเทียบ
-- เปรียบเทียบเวลาเฉลี่ย
-- เปรียบเทียบเวลาสูงสุด-ต่ำสุด
-- ดูจำนวน queries ที่สำเร็จ
-
-## 🛠️ การแก้ไขปัญหา
-
-### ปัญหา: Backend ไม่เชื่อมต่อ
-```powershell
-# ตรวจสอบว่า Backend รันอยู่
-cd backend
-npm start
+### Option 1: NPM Performance Mode
+```bash
+# รัน performance mode
+start-performance.bat
 ```
 
-### ปัญหา: Database ไม่เชื่อมต่อ
-```powershell
-# ตรวจสอบ MySQL service
-net start mysql
+**Features:**
+- Gzip compression
+- Image optimization
+- Bundle splitting
+- Memory optimization
+- Caching headers
+
+### Option 2: Docker Performance Mode
+```bash
+# รัน Docker performance mode
+start-performance.bat
 ```
 
-### ปัญหา: Indexes ไม่สามารถเพิ่มได้
+**Features:**
+- Nginx reverse proxy with caching
+- Gzip compression
+- Rate limiting
+- Resource limits
+- Health checks
+- MySQL optimization
+
+## 📈 Performance Metrics
+
+### Target Performance
+- **First Contentful Paint**: < 1.5s
+- **Largest Contentful Paint**: < 2.5s
+- **Time to Interactive**: < 3.5s
+- **Cumulative Layout Shift**: < 0.1
+
+### Monitoring Tools
+```bash
+# Bundle analyzer
+npm run analyze
+
+# Performance monitoring
+docker-compose logs -f
+
+# Health checks
+curl http://localhost:3101/health
+```
+
+## 🔧 Advanced Optimizations
+
+### 1. Database Indexing
 ```sql
--- ตรวจสอบสิทธิ์
-SHOW GRANTS FOR CURRENT_USER();
-
--- ตรวจสอบ Indexes ที่มีอยู่
-SHOW INDEX FROM work_plans;
+-- Add indexes for frequently queried columns
+CREATE INDEX idx_work_plans_date ON work_plans(created_at);
+CREATE INDEX idx_production_status_date ON production_status(created_at);
+CREATE INDEX idx_logs_timestamp ON logs(timestamp);
 ```
 
-## 📝 บันทึกผลการทดสอบ
-
-### ตัวอย่างผลลัพธ์
+### 2. API Response Optimization
+```javascript
+// Implement pagination
+app.get('/api/work-plans', async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const offset = (page - 1) * limit;
+  
+  const workPlans = await WorkPlan.find()
+    .limit(limit)
+    .skip(offset)
+    .lean(); // Use lean() for better performance
+    
+  res.json({
+    data: workPlans,
+    pagination: {
+      page,
+      limit,
+      total: await WorkPlan.countDocuments()
+    }
+  });
+});
 ```
-📊 สถิติโดยรวม:
-   จำนวน API ที่ทดสอบ: 7
-   จำนวน API ที่สำเร็จ: 7
-   เวลารวม: 2450 ms
-   เวลาเฉลี่ย: 350 ms
 
-🎯 การประเมินประสิทธิภาพ:
-   ⚡ ระบบทำงานเร็ว (1-3 วินาที)
+### 3. Frontend Code Splitting
+```javascript
+// Lazy load components
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Reports = lazy(() => import('./components/Reports'));
+
+// Use Suspense
+<Suspense fallback={<Loading />}>
+  <Dashboard />
+</Suspense>
 ```
 
-## 🔄 การทดสอบเป็นประจำ
+## 🛠️ Troubleshooting
 
-### ทดสอบทุกสัปดาห์
-1. รัน API Performance Test
-2. รัน Database Performance Test
-3. บันทึกผลลัพธ์
+### Common Performance Issues
 
-### ทดสอบหลังการเปลี่ยนแปลง
-1. ทดสอบหลังเพิ่มข้อมูลใหม่
-2. ทดสอบหลังปรับปรุง code
-3. ทดสอบหลังเพิ่ม features ใหม่
+#### 1. Slow Database Queries
+```bash
+# Check slow queries
+docker-compose logs mysql | grep "slow"
 
-## 📞 การติดต่อ
+# Optimize queries
+EXPLAIN SELECT * FROM work_plans WHERE created_at > '2024-01-01';
+```
 
-หากมีปัญหาหรือต้องการความช่วยเหลือ:
-1. ตรวจสอบ log ใน Backend console
-2. ตรวจสอบ error messages
-3. ใช้ Developer Tools ใน browser
-4. ตรวจสอบ Network tab สำหรับ API calls 
+#### 2. Memory Issues
+```bash
+# Check memory usage
+docker stats
+
+# Increase memory limits
+NODE_OPTIONS="--max-old-space-size=1024"
+```
+
+#### 3. Network Issues
+```bash
+# Check network performance
+curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3011"
+
+# Optimize network settings
+# In nginx.conf
+keepalive_timeout 65;
+keepalive_requests 100;
+```
+
+## 📊 Performance Monitoring
+
+### 1. Real-time Monitoring
+```bash
+# Monitor containers
+docker-compose logs -f
+
+# Monitor system resources
+docker stats
+
+# Monitor API performance
+curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3101/api/health"
+```
+
+### 2. Performance Testing
+```bash
+# Load testing
+npm install -g artillery
+artillery quick --count 100 --num 10 http://localhost:3011
+
+# Stress testing
+npm install -g autocannon
+autocannon -c 10 -d 30 http://localhost:3011
+```
+
+## 🎯 Best Practices
+
+### 1. Development
+- ใช้ `npm run dev` สำหรับ development
+- ใช้ `npm run build:prod` สำหรับ production build
+- เปิดใช้งาน bundle analyzer เพื่อดู bundle size
+
+### 2. Production
+- ใช้ Docker สำหรับ production deployment
+- เปิดใช้งาน Nginx reverse proxy
+- ตั้งค่า proper caching headers
+- ใช้ CDN สำหรับ static assets
+
+### 3. Monitoring
+- ตรวจสอบ performance metrics อย่างสม่ำเสมอ
+- ใช้ health checks เพื่อตรวจสอบ service status
+- Monitor memory และ CPU usage
+
+## 📈 Expected Performance Improvements
+
+### Before Optimization
+- First Load: ~5-8 seconds
+- Bundle Size: ~2-3MB
+- API Response: ~500-1000ms
+- Memory Usage: ~200-300MB
+
+### After Optimization
+- First Load: ~1-2 seconds
+- Bundle Size: ~500KB-1MB
+- API Response: ~100-200ms
+- Memory Usage: ~100-150MB
+
+## 🔄 Continuous Optimization
+
+### 1. Regular Monitoring
+- ตรวจสอบ performance metrics ทุกสัปดาห์
+- Monitor user experience metrics
+- Track error rates และ response times
+
+### 2. Optimization Cycles
+- ทดสอบ performance ทุกเดือน
+- Update dependencies อย่างสม่ำเสมอ
+- Optimize database queries ตาม usage patterns
+
+### 3. User Feedback
+- เก็บ feedback จาก users เกี่ยวกับ performance
+- Monitor real user metrics
+- Adjust optimizations ตาม feedback
+
+---
+
+**🎯 Goal**: ให้ WorkplanV6 รันได้เร็วและเสถียรที่สุดเท่าที่เป็นไปได้! 

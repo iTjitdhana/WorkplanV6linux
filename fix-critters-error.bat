@@ -1,15 +1,22 @@
 @echo off
 echo ========================================
-echo    Test Build
-echo ========================================
+echo    Fix Critters Error
+========================================
 echo.
 
-echo Testing frontend build...
+echo Installing missing dependencies...
+cd frontend
+call npm install critters --save-dev
+cd ..
+
+echo.
+echo Testing build...
 cd frontend
 call npm run build
 if errorlevel 1 (
     echo.
-    echo ERROR: Build failed!
+    echo ERROR: Build still failed!
+    echo Please check the errors above.
     echo.
     pause
     exit /b 1
@@ -19,7 +26,7 @@ cd ..
 echo.
 echo ========================================
 echo    Build Successful!
-echo ========================================
+========================================
 echo.
 echo Now testing Docker build...
 echo.
@@ -40,11 +47,11 @@ if errorlevel 1 (
 echo.
 echo ========================================
 echo    Docker Build Successful!
-echo ========================================
+========================================
 echo.
 echo Checking container status...
 docker ps
 echo.
 echo Containers should now appear in Docker Desktop!
 echo.
-pause 
+pause

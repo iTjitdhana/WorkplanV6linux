@@ -138,7 +138,7 @@ export default function ManageNewJobsPage() {
         });
         setIsEditDialogOpen(false);
         setEditingJob(null);
-        setFormData({ new_job_code: '', new_job_name: '' });
+        setFormData({ new_job_code: '', new_job_name: '', total_workers: 0 });
         setProcessSteps([]);
         fetchNewJobs();
       } else {
