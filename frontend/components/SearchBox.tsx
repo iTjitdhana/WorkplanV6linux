@@ -86,7 +86,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
       setIsSearching(true);
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/process-steps/search?query=${encodeURIComponent(searchTerm)}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/new-jobs/search?query=${encodeURIComponent(searchTerm)}`,
         { signal: controller.signal }
       );
       
@@ -153,20 +153,32 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
       return;
     }
 
-    // เรียก API ถ้าไม่พบใน cache
+    // เรียก API ถ้าไม่พบใน cache และมีข้อความอย่างน้อย 2 ตัวอักษร
     if (debouncedValue.length >= 2) {
       throttledSearch(debouncedValue);
+      // แสดง dropdown ทันทีเพื่อให้เห็น "กำลังค้นหา..."
+      setShowDropdown(true);
+    } else {
+      // แสดง dropdown แม้ไม่มีผลลัพธ์ เพื่อให้แสดงปุ่มเพิ่มรายการใหม่
+      setShowDropdown(true);
     }
   }, [debouncedValue, throttledSearch]);
 
   // ตรวจสอบว่าควรแสดงปุ่มเพิ่มรายการใหม่หรือไม่
-  const showAddNew = !isSearching && value.trim().length > 0 && options.length === 0;
+  // แสดงเมื่อมีข้อความ, ไม่กำลังค้นหา, และไม่มี exact match ในผลลัพธ์
+  const showAddNew = value.trim().length > 0 && 
+                    !isSearching && 
+                    !options.some(option => 
+                      option.job_name.toLowerCase() === value.trim().toLowerCase() ||
+                      option.job_code.toLowerCase() === value.trim().toLowerCase()
+                    ) &&
+                    (options.length === 0 || value.trim().length > 2);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setHighlightIndex(prev => {
-        const max = showAddNew ? 0 : options.length - 1;
+        const max = showAddNew ? options.length : options.length - 1;
         return Math.min(prev + 1, max);
       });
     } else if (e.key === "ArrowUp") {
@@ -174,13 +186,13 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
       setHighlightIndex(prev => Math.max(prev - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (highlightIndex >= 0 && options.length > 0) {
+      if (highlightIndex >= 0 && highlightIndex < options.length) {
         selectOption(options[highlightIndex]);
-      } else if (showAddNew && (highlightIndex === 0 || options.length === 0)) {
+      } else if (showAddNew && highlightIndex === options.length) {
         handleAddNew();
       }
     } else if (e.key === "Tab") {
-      if (showAddNew && highlightIndex === 0) {
+      if (showAddNew && highlightIndex === options.length) {
         e.preventDefault();
         handleAddNew();
       }
@@ -228,6 +240,11 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value);
     setHighlightIndex(-1);
+    
+    // แสดง dropdown ทันทีเมื่อมีข้อความ
+    if (e.target.value.trim().length > 0) {
+      setShowDropdown(true);
+    }
   }, [onChange]);
 
   // Cleanup เมื่อ component unmount
@@ -250,7 +267,11 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
           ref={inputRef}
           value={value}
           onChange={handleInputChange}
-          onFocus={() => { if (options.length > 0 || showAddNew) setShowDropdown(true); }}
+          onFocus={() => { 
+          if (value.trim().length > 0) {
+            setShowDropdown(true);
+          }
+        }}
           onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
@@ -264,39 +285,22 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
         <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-60 overflow-y-auto">
           {isSearching ? (
             <div className="p-2 text-gray-500">🔍 กำลังค้นหา...</div>
-          ) : options.length === 0 && showAddNew ? (
-            <div
-              className={`p-2 cursor-pointer text-green-700 hover:bg-green-100 font-semibold ${highlightIndex === 0 ? "bg-green-200" : ""}`}
-              onClick={handleAddNewClick}
-              onMouseDown={handleAddNewClick}
-              onTouchEnd={handleAddNewClick}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleAddNew();
-                }
-              }}
-              tabIndex={0}
-              role="button"
-              aria-label={`เพิ่มรายการใหม่ "${value.trim()}"`}
-            >
-              + เพิ่มรายการใหม่ "{value.trim()}"
-            </div>
-          ) : options.length === 0 ? (
+                     ) : options.length === 0 ? (
             <div className="p-2 text-gray-400">ไม่พบผลลัพธ์</div>
-          ) : (
-            options.map((item, i) => (
-              <div
-                key={item.job_code}
-                onClick={(e) => handleOptionClick(item, e)}
-                onMouseDown={(e) => handleOptionClick(item, e)}
-                onTouchEnd={(e) => handleOptionClick(item, e)}
-                onKeyDown={(e) => handleOptionKeyDown(item, e)}
-                className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-green-100 ${i === highlightIndex ? "bg-green-200" : ""}`}
-                tabIndex={0}
-                role="button"
-                aria-label={`เลือก ${item.job_name}`}
-              >
+                      ) : (
+            <>
+              {options.map((item, i) => (
+                <div
+                  key={item.job_code}
+                  onClick={(e) => handleOptionClick(item, e)}
+                  onMouseDown={(e) => handleOptionClick(item, e)}
+                  onTouchEnd={(e) => handleOptionClick(item, e)}
+                  onKeyDown={(e) => handleOptionKeyDown(item, e)}
+                  className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-green-100 ${i === highlightIndex ? "bg-green-200" : ""}`}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`เลือก ${item.job_name}`}
+                >
                 {showAvatar && (
                   <img
                     src={item.iconUrl || `/placeholder.svg?text=${item.job_name.charAt(0)}`}
@@ -307,10 +311,31 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
                 <div className="flex flex-col">
                   <span className="font-semibold text-sm">{item.job_name}</span>
                   <span className="text-xs text-gray-500">{item.job_code} {item.category ? `• ${item.category}` : ""}</span>
-                </div>
-              </div>
-            ))
-          )}
+                                   </div>
+                 </div>
+               ))}
+               
+               {showAddNew && (
+                 <div
+                   className={`p-2 cursor-pointer text-green-700 hover:bg-green-100 font-semibold ${highlightIndex === options.length ? "bg-green-200" : ""}`}
+                   onClick={handleAddNewClick}
+                   onMouseDown={handleAddNewClick}
+                   onTouchEnd={handleAddNewClick}
+                   onKeyDown={(e) => {
+                     if (e.key === "Enter" || e.key === " ") {
+                       e.preventDefault();
+                       handleAddNew();
+                     }
+                   }}
+                   tabIndex={0}
+                   role="button"
+                   aria-label={`เพิ่มรายการใหม่ "${value.trim()}"`}
+                 >
+                   ➕ เพิ่มรายการใหม่ "{value.trim()}"
+                 </div>
+               )}
+             </>
+           )}
         </div>
       )}
     </div>
