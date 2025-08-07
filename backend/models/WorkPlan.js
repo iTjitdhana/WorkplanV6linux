@@ -393,11 +393,30 @@ class WorkPlan {
 // เพิ่ม model สำหรับ work_plan_drafts
 class DraftWorkPlan {
   static async getAll() {
-    const [rows] = await pool.execute('SELECT *, DATE_FORMAT(production_date, "%Y-%m-%d") as production_date FROM work_plan_drafts ORDER BY production_date DESC, id DESC');
+    const [rows] = await pool.execute(`
+      SELECT 
+        wd.*,
+        DATE_FORMAT(wd.production_date, "%Y-%m-%d") as production_date,
+        pr.room_name as production_room_name,
+        m.machine_name as machine_name
+      FROM work_plan_drafts wd
+      LEFT JOIN production_rooms pr ON wd.production_room_id = pr.id
+      LEFT JOIN machines m ON wd.machine_id = m.id
+      ORDER BY wd.production_date DESC, wd.id DESC
+    `);
     return rows;
   }
   static async getById(id) {
-    const [rows] = await pool.execute('SELECT * FROM work_plan_drafts WHERE id = ?', [id]);
+    const [rows] = await pool.execute(`
+      SELECT 
+        wd.*,
+        pr.room_name as production_room_name,
+        m.machine_name as machine_name
+      FROM work_plan_drafts wd
+      LEFT JOIN production_rooms pr ON wd.production_room_id = pr.id
+      LEFT JOIN machines m ON wd.machine_id = m.id
+      WHERE wd.id = ?
+    `, [id]);
     return rows[0] || null;
   }
   static async create(data) {
