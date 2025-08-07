@@ -1,45 +1,4 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: workplan_mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: iT12345$
-      MYSQL_DATABASE: esp_tracker
-      MYSQL_USER: jitdhana
-      MYSQL_PASSWORD: iT12345$
-      # Performance optimizations for MySQL
-      MYSQL_INNODB_BUFFER_POOL_SIZE: 256M
-      MYSQL_INNODB_LOG_FILE_SIZE: 64M
-      MYSQL_INNODB_FLUSH_LOG_AT_TRX_COMMIT: 2
-      MYSQL_INNODB_FLUSH_METHOD: O_DIRECT
-      MYSQL_QUERY_CACHE_SIZE: 32M
-      MYSQL_QUERY_CACHE_TYPE: 1
-      MYSQL_MAX_CONNECTIONS: 200
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - "./backend/esp_tracker (6).sql:/docker-entrypoint-initdb.d/init.sql"
-      # MySQL configuration for performance
-      - ./mysql-config.cnf:/etc/mysql/conf.d/custom.cnf
-    ports:
-      - "3306:3306"
-    networks:
-      - workplan_network
-    restart: unless-stopped
-    # Health check for MySQL
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-
   backend:
     build: 
       context: ./backend
@@ -48,7 +7,7 @@ services:
     ports:
       - "3101:3101"
     environment:
-      DB_HOST: mysql
+      DB_HOST: 192.168.0.94
       DB_USER: jitdhana
       DB_PASSWORD: iT12345$
       DB_NAME: esp_tracker
@@ -57,8 +16,8 @@ services:
       PORT: 3101
       # Node.js performance optimizations
       NODE_OPTIONS: "--max-old-space-size=512"
-    depends_on:
-      - mysql
+    # depends_on:
+    #   - mysql
     networks:
       - workplan_network
     restart: unless-stopped
@@ -133,9 +92,7 @@ services:
         reservations:
           memory: 64M
 
-volumes:
-  mysql_data:
-    driver: local
+
 
 networks:
   workplan_network:
