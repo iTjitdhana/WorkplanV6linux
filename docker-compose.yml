@@ -7,7 +7,8 @@ services:
       - "3011:3011"
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://backend:3011
+      - NEXT_PUBLIC_API_URL=http://192.168.0.94:3101
+      - BACKEND_URL=http://backend:3011
     depends_on:
       - backend
     restart: unless-stopped
@@ -17,7 +18,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3012:3011"
+      - "3101:3101"
     environment:
       - NODE_ENV=production
       - DB_HOST=192.168.0.94
