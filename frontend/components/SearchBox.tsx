@@ -86,7 +86,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
       setIsSearching(true);
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/new-jobs/search?query=${encodeURIComponent(searchTerm)}`,
+        `/api/process-steps/search?query=${encodeURIComponent(searchTerm)}`,
         { signal: controller.signal }
       );
       
@@ -171,8 +171,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
                     !options.some(option => 
                       option.job_name.toLowerCase() === value.trim().toLowerCase() ||
                       option.job_code.toLowerCase() === value.trim().toLowerCase()
-                    ) &&
-                    (options.length === 0 || value.trim().length > 2);
+                    );
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
@@ -285,57 +284,59 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
         <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-60 overflow-y-auto">
           {isSearching ? (
             <div className="p-2 text-gray-500">🔍 กำลังค้นหา...</div>
-                     ) : options.length === 0 ? (
-            <div className="p-2 text-gray-400">ไม่พบผลลัพธ์</div>
-                      ) : (
+          ) : (
             <>
-              {options.map((item, i) => (
+              {options.length === 0 ? (
+                <div className="p-2 text-gray-400">ไม่พบผลลัพธ์</div>
+              ) : (
+                options.map((item, i) => (
+                  <div
+                    key={item.job_code}
+                    onClick={(e) => handleOptionClick(item, e)}
+                    onMouseDown={(e) => handleOptionClick(item, e)}
+                    onTouchEnd={(e) => handleOptionClick(item, e)}
+                    onKeyDown={(e) => handleOptionKeyDown(item, e)}
+                    className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-green-100 ${i === highlightIndex ? "bg-green-200" : ""}`}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`เลือก ${item.job_name}`}
+                  >
+                  {showAvatar && (
+                    <img
+                      src={item.iconUrl || `/placeholder.svg?text=${item.job_name.charAt(0)}`}
+                      alt="avatar"
+                      className="w-6 h-6 rounded-full object-cover"
+                    />
+                  )}
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-sm">{item.job_name}</span>
+                    <span className="text-xs text-gray-500">{item.job_code} {item.category ? `• ${item.category}` : ""}</span>
+                                     </div>
+                   </div>
+                 ))
+              )}
+              
+              {showAddNew && (
                 <div
-                  key={item.job_code}
-                  onClick={(e) => handleOptionClick(item, e)}
-                  onMouseDown={(e) => handleOptionClick(item, e)}
-                  onTouchEnd={(e) => handleOptionClick(item, e)}
-                  onKeyDown={(e) => handleOptionKeyDown(item, e)}
-                  className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-green-100 ${i === highlightIndex ? "bg-green-200" : ""}`}
+                  className={`p-2 cursor-pointer text-green-700 hover:bg-green-100 font-semibold ${highlightIndex === options.length ? "bg-green-200" : ""}`}
+                  onClick={handleAddNewClick}
+                  onMouseDown={handleAddNewClick}
+                  onTouchEnd={handleAddNewClick}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleAddNew();
+                    }
+                  }}
                   tabIndex={0}
                   role="button"
-                  aria-label={`เลือก ${item.job_name}`}
+                  aria-label={`เพิ่มรายการใหม่ "${value.trim()}"`}
                 >
-                {showAvatar && (
-                  <img
-                    src={item.iconUrl || `/placeholder.svg?text=${item.job_name.charAt(0)}`}
-                    alt="avatar"
-                    className="w-6 h-6 rounded-full object-cover"
-                  />
-                )}
-                <div className="flex flex-col">
-                  <span className="font-semibold text-sm">{item.job_name}</span>
-                  <span className="text-xs text-gray-500">{item.job_code} {item.category ? `• ${item.category}` : ""}</span>
-                                   </div>
-                 </div>
-               ))}
-               
-               {showAddNew && (
-                 <div
-                   className={`p-2 cursor-pointer text-green-700 hover:bg-green-100 font-semibold ${highlightIndex === options.length ? "bg-green-200" : ""}`}
-                   onClick={handleAddNewClick}
-                   onMouseDown={handleAddNewClick}
-                   onTouchEnd={handleAddNewClick}
-                   onKeyDown={(e) => {
-                     if (e.key === "Enter" || e.key === " ") {
-                       e.preventDefault();
-                       handleAddNew();
-                     }
-                   }}
-                   tabIndex={0}
-                   role="button"
-                   aria-label={`เพิ่มรายการใหม่ "${value.trim()}"`}
-                 >
-                   ➕ เพิ่มรายการใหม่ "{value.trim()}"
-                 </div>
-               )}
-             </>
-           )}
+                  ➕ เพิ่มรายการใหม่ "{value.trim()}"
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

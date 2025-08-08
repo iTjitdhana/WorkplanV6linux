@@ -9,6 +9,7 @@ const productionRoomRoutes = require('./productionRoomRoutes');
 const productionStatusRoutes = require('./productionStatusRoutes');
 const newJobsRoutes = require('./newJobsRoutes');
 const googleSheetProxy = require('./googleSheetProxy');
+const productionLogRoutes = require('./productionLogRoutes');
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ router.use('/production-rooms', productionRoomRoutes);
 router.use('/production-statuses', productionStatusRoutes);
 router.use('/new-jobs', newJobsRoutes);
 router.use('/send-to-google-sheet', googleSheetProxy);
+router.use('/production-logs', productionLogRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

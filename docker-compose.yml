@@ -1,102 +1,43 @@
-services:
-  backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: workplan_backend
-    ports:
-      - "3101:3101"
-    environment:
-      DB_HOST: 192.168.0.94
-      DB_USER: jitdhana
-      DB_PASSWORD: iT12345$
-      DB_NAME: esp_tracker
-      DB_PORT: 3306
-      NODE_ENV: production
-      PORT: 3101
-      # Node.js performance optimizations
-      NODE_OPTIONS: "--max-old-space-size=512"
-    # depends_on:
-    #   - mysql
-    networks:
-      - workplan_network
-    restart: unless-stopped
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-    # Health check - temporarily disabled
-    # healthcheck:
-    #   test: ["CMD-SHELL", "curl -f http://localhost:3101/health || exit 1"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 40s
+version: '3.8'
 
+services:
   frontend:
-    build: 
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: workplan_frontend
+    image: itjitdhana/workplnav6.2:latest
     ports:
       - "3011:3011"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3101
-      NODE_ENV: production
-      # Next.js performance optimizations
-      NODE_OPTIONS: "--max-old-space-size=512"
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://backend:3011
     depends_on:
       - backend
-    networks:
-      - workplan_network
     restart: unless-stopped
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-    # Health check - temporarily disabled
-    # healthcheck:
-    #   test: ["CMD-SHELL", "curl -f http://localhost:3011 || exit 1"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 40s
 
-  # Nginx reverse proxy for better performance
-  nginx:
-    image: nginx:alpine
-    container_name: workplan_nginx
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
-      - "80:80"
-      # - "443:443"  # Commented out - no SSL certificates
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      # - ./ssl:/etc/nginx/ssl  # Commented out - no SSL certificates
+      - "3012:3011"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=workplan
     depends_on:
-      - frontend
-      - backend
-    networks:
-      - workplan_network
+      - mysql
     restart: unless-stopped
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-        reservations:
-          memory: 64M
 
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=workplan
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
 
-
-networks:
-  workplan_network:
-    driver: bridge
-    # Network optimization
-    driver_opts:
-      com.docker.network.bridge.name: workplan_br0
+volumes:
+  mysql_data:
