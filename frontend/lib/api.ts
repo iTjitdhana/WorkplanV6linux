@@ -1,7 +1,17 @@
 // API utility functions for better error handling and request management
 
 import { config, getApiUrl, debugLog, debugError } from './config';
-import type { ApiResponse, PaginatedResponse } from '../types/production';
+import type { 
+  ApiResponse, 
+  PaginatedResponse, 
+  User, 
+  Machine, 
+  ProductionRoom, 
+  ProductionItem, 
+  DraftWorkPlan, 
+  JobOption, 
+  ProductionLog 
+} from '../types/production';
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
