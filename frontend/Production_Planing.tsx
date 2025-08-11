@@ -15,7 +15,7 @@ import {
   Plus,
   RefreshCw,
   Search,
-  User,
+  User as UserIcon,
   XCircle,
   BarChart3,
 } from "lucide-react"
@@ -32,6 +32,18 @@ import { Noto_Sans_Thai } from "next/font/google"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SearchBox, SearchOption } from "./components/SearchBox";
 import { createSafeDate, formatDateForDisplay, formatDateForAPI, formatDateThaiShort } from "@/lib/dateUtils";
+import { config, debugLog, debugError } from "@/lib/config";
+import { api, handleApiError, createAbortController } from "@/lib/api";
+import { getOperatorsArray, getOperatorsString } from "@/lib/utils";
+import type { 
+  User, 
+  Machine, 
+  ProductionRoom, 
+  ProductionItem, 
+  ProductionLog, 
+  DraftWorkPlan,
+  JobOption 
+} from "@/types/production";
 import Link from "next/link";
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -54,10 +66,9 @@ const notoSansThai = Noto_Sans_Thai({
 const hasJobNumberPrefix = (name: string) => /^([A-D]|\d+)\s/.test(name);
 
 export default function MedicalAppointmentDashboard() {
-  // Helper function for API URL - ใช้ relative URLs เพื่อเรียก frontend API routes
+  // Helper function for API URL - ใช้ config
   const getApiUrl = (endpoint: string) => {
-    // ใช้ backend URL โดยตรง
-    return `http://192.168.0.94:3101${endpoint}`;
+    return config.api.baseUrl + endpoint;
   };
 
   // เปลี่ยน default selectedDate เป็นวันที่ปัจจุบัน (dynamic)
@@ -84,12 +95,12 @@ export default function MedicalAppointmentDashboard() {
 
   // เพิ่ม state สำหรับ dropdown และ autocomplete
   const [jobQuery, setJobQuery] = useState("");
-  const [jobOptions, setJobOptions] = useState<{job_code: string, job_name: string}[]>([]);
+  const [jobOptions, setJobOptions] = useState<JobOption[]>([]);
   const [showJobDropdown, setShowJobDropdown] = useState(false);
   const [jobCode, setJobCode] = useState("");
-  const [users, setUsers] = useState<{id: number, id_code: string, name: string}[]>([]);
-  const [machines, setMachines] = useState<{id: number, machine_code: string, machine_name: string}[]>([]);
-  const [rooms, setRooms] = useState<{id: number, room_code: string, room_name: string}[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [rooms, setRooms] = useState<ProductionRoom[]>([]);
   const [selectedRoom, setSelectedRoom] = useState("");
   const jobInputRef = useRef<HTMLInputElement>(null);
   const [jobName, setJobName] = useState("");
@@ -101,7 +112,7 @@ export default function MedicalAppointmentDashboard() {
   const [syncModeEnabled, setSyncModeEnabled] = useState(false); // เพิ่ม state สำหรับ sync mode
   
   // เพิ่ม cache สำหรับผลลัพธ์การค้นหา
-  const searchCacheRef = useRef<Map<string, {job_code: string, job_name: string}[]>>(new Map());
+  const searchCacheRef = useRef<Map<string, SearchOption[]>>(new Map());
   const [isSearching, setIsSearching] = useState(false);
 
   const isCreatingRef = useRef(false); // <--- ย้ายมาอยู่นอก useEffect
@@ -159,12 +170,12 @@ export default function MedicalAppointmentDashboard() {
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     const todayString = `${yyyy}-${mm}-${dd}`;
-    console.log('📅 Setting initial selectedDate:', todayString);
+    debugLog('📅 Setting initial selectedDate:', todayString);
     setSelectedDate(todayString);
   }, []);
 
   // state สำหรับข้อมูลแผนผลิตจริง
-  const [productionData, setProductionData] = useState<any[]>([]);
+  const [productionData, setProductionData] = useState<ProductionItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   
   // ดึงข้อมูลแผนผลิตจริงและแบบร่างมารวมกัน
@@ -486,8 +497,8 @@ export default function MedicalAppointmentDashboard() {
         const timeB = b.start_time || "00:00";
         const timeComparison = timeA.localeCompare(timeB);
         if (timeComparison !== 0) return timeComparison;
-        const operatorA = (a.operators || "").split(", ")[0] || "";
-        const operatorB = (b.operators || "").split(", ")[0] || "";
+        const operatorA = (typeof a.operators === 'string' ? a.operators : "").split(", ")[0] || "";
+        const operatorB = (typeof b.operators === 'string' ? b.operators : "").split(", ")[0] || "";
         const indexA = operatorA.indexOf("อ");
         const indexB = operatorB.indexOf("อ");
         if (indexA === 0 && indexB !== 0) return -1;
@@ -513,10 +524,21 @@ export default function MedicalAppointmentDashboard() {
     let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
 
-    // งานปกติ (is_special !== 1, ไม่ใช่ default, isDraft = false)
-    const normalJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special !== 1 && !item.isDraft);
-    // งานพิเศษ (is_special === 1, isDraft = false)
-    const specialJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.is_special === 1 && !item.isDraft);
+    // งานปกติ (is_special !== 1 และ workflow_status_id !== 10, ไม่ใช่ default, isDraft = false)
+    const normalJobs = dayData.filter(item => 
+      !defaultCodes.includes(item.job_code) && 
+      item.is_special !== 1 && 
+      item.workflow_status_id !== 10 && 
+      !item.isDraft
+    );
+    
+    // งานพิเศษ (is_special === 1 หรือ workflow_status_id === 10, isDraft = false)
+    const specialJobs = dayData.filter(item => 
+      !defaultCodes.includes(item.job_code) && 
+      (item.is_special === 1 || item.workflow_status_id === 10) && 
+      !item.isDraft
+    );
+    
     // งาน draft (isDraft = true, ไม่ใช่ default)
     const draftJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.isDraft);
 
@@ -526,19 +548,35 @@ export default function MedicalAppointmentDashboard() {
       const timeB = b.start_time || "00:00";
       const timeComparison = timeA.localeCompare(timeB);
       if (timeComparison !== 0) return timeComparison;
-      const operatorA = (a.operators || "").split(", ")[0] || "";
-      const operatorB = (b.operators || "").split(", ")[0] || "";
+      const operatorA = getOperatorsArray(a.operators)[0] || "";
+      const operatorB = getOperatorsArray(b.operators)[0] || "";
       const indexA = operatorA.indexOf("อ");
       const indexB = operatorB.indexOf("อ");
       if (indexA === 0 && indexB !== 0) return -1;
       if (indexB === 0 && indexA !== 0) return 1;
       return operatorA.localeCompare(operatorB);
     };
+    
     normalJobs.sort(sortFn);
     specialJobs.sort(sortFn);
     draftJobs.sort(sortFn);
 
-    // รวมกลุ่มตามลำดับที่ต้องการ
+    // Debug: แสดงข้อมูลการแยกงาน
+    console.log("🔍 [DEBUG] getSelectedDayProduction แยกงาน:");
+    console.log("🔍 [DEBUG] งานปกติ:", normalJobs.length, "รายการ");
+    console.log("🔍 [DEBUG] งานพิเศษ:", specialJobs.length, "รายการ");
+    console.log("🔍 [DEBUG] งานปกติ:", normalJobs.map(item => ({ 
+      job_name: item.job_name, 
+      is_special: item.is_special, 
+      workflow_status_id: item.workflow_status_id 
+    })));
+    console.log("🔍 [DEBUG] งานพิเศษ:", specialJobs.map(item => ({ 
+      job_name: item.job_name, 
+      is_special: item.is_special, 
+      workflow_status_id: item.workflow_status_id 
+    })));
+
+    // รวมกลุ่มตามลำดับที่ต้องการ: default -> งานปกติ -> งานพิเศษ -> draft
     return [...defaultDrafts, ...normalJobs, ...specialJobs, ...draftJobs];
   };
 
@@ -561,7 +599,8 @@ export default function MedicalAppointmentDashboard() {
   // เพิ่มฟังก์ชันส่งข้อมูลไป Google Sheet
   const sendToGoogleSheet = async (data: any) => {
     console.log("🟡 [DEBUG] call sendToGoogleSheet", data);
-    const url = getApiUrl('/api/send-to-google-sheet');
+    // เรียกไปที่ frontend API route แทน backend
+    const url = '/api/send-to-google-sheet';
     console.log("🟡 [DEBUG] Google Sheet URL:", url);
     try {
       const res = await fetch(url, {
@@ -597,8 +636,8 @@ export default function MedicalAppointmentDashboard() {
       if (timeComparison !== 0) return timeComparison
       
       // หากเวลาเริ่มเหมือนกัน เรียงตามผู้ปฏิบัติงานคนที่ 1 ที่มีตัวอักษร "อ"
-      const operatorA = (a.operators || "").split(", ")[0] || ""
-      const operatorB = (b.operators || "").split(", ")[0] || ""
+      const operatorA = getOperatorsArray(a.operators)[0] || ""
+      const operatorB = getOperatorsArray(b.operators)[0] || ""
       
       // หาตำแหน่งของ "อ" ในชื่อ (indexOf จะ return -1 ถ้าไม่เจอ)
       const indexA = operatorA.indexOf("อ")
@@ -1224,38 +1263,86 @@ export default function MedicalAppointmentDashboard() {
       // 1. เตรียมข้อมูล summaryRows สำหรับ 1.ใบสรุปงาน v.4 (ไม่เอา A, B, C, D)
       const defaultCodes = ['A', 'B', 'C', 'D'];
           // ฟังก์ชันแปลงรหัส/ID ห้องเป็นชื่อห้อง
-    const getRoomNameByCodeOrId = (codeOrId: string) => {
+    const getRoomNameByCodeOrId = (codeOrId: string | undefined) => {
       if (!codeOrId) return "";
       // ใช้ข้อมูลจาก Frontend
       const room = rooms.find(r => r.room_code === codeOrId || r.id?.toString() === codeOrId?.toString());
       return room?.room_name || codeOrId;
     };
     // ฟังก์ชันแปลง ID เครื่องเป็นชื่อเครื่อง
-    const getMachineNameById = (machineId: string) => {
+    const getMachineNameById = (machineId: string | undefined) => {
       if (!machineId) return "";
       // ใช้ข้อมูลจาก Frontend
       const machine = machines.find(m => m.id?.toString() === machineId?.toString());
       return machine?.machine_name || machineId;
     };
-      // เรียงงานตาม logic หน้าเว็บ
-      const filtered = productionData
-        .filter(item => item.production_date === selectedDate && !(item.isDraft && defaultCodes.includes(item.job_code)))
-        .sort((a, b) => {
-          const timeA = a.start_time || "00:00";
-          const timeB = b.start_time || "00:00";
-          const timeComparison = timeA.localeCompare(timeB);
-          if (timeComparison !== 0) return timeComparison;
-          const operatorA = (a.operators || "").split(", ")[0] || "";
-          const operatorB = (b.operators || "").split(", ")[0] || "";
-          const indexA = operatorA.indexOf("อ");
-          const indexB = operatorB.indexOf("อ");
-          if (indexA === 0 && indexB !== 0) return -1;
-          if (indexB === 0 && indexA !== 0) return 1;
-          return operatorA.localeCompare(operatorB);
-        });
-      const summaryRows = filtered.map((item, idx) => {
-        let ops = (item.operators || "").split(", ").map((s: string) => s.trim());
-        while (ops.length < 4) ops.push("");
+      // แยกงานปกติและงานพิเศษ (ใช้ is_special = 1 หรือ workflow_status_id = 10)
+      const normalJobs = productionData.filter(item => 
+        item.production_date === selectedDate && 
+        !(item.isDraft && defaultCodes.includes(item.job_code)) &&
+        item.is_special !== 1 && 
+        item.workflow_status_id !== 10 // ไม่ใช่งานพิเศษ
+      );
+      
+      const specialJobs = productionData.filter(item => 
+        item.production_date === selectedDate && 
+        !(item.isDraft && defaultCodes.includes(item.job_code)) &&
+        (item.is_special === 1 || item.workflow_status_id === 10) // งานพิเศษ
+      );
+      
+      // เรียงงานปกติตาม logic หน้าเว็บ
+      const sortedNormalJobs = normalJobs.sort((a, b) => {
+        const timeA = a.start_time || "00:00";
+        const timeB = b.start_time || "00:00";
+        const timeComparison = timeA.localeCompare(timeB);
+        if (timeComparison !== 0) return timeComparison;
+        const operatorA = getOperatorsArray(a.operators)[0] || "";
+        const operatorB = getOperatorsArray(b.operators)[0] || "";
+        const indexA = operatorA.indexOf("อ");
+        const indexB = operatorB.indexOf("อ");
+        if (indexA === 0 && indexB !== 0) return -1;
+        if (indexB === 0 && indexA !== 0) return 1;
+        return operatorA.localeCompare(operatorB);
+      });
+      
+      // เรียงงานพิเศษตามเวลา
+      const sortedSpecialJobs = specialJobs.sort((a, b) => {
+        const timeA = a.start_time || "00:00";
+        const timeB = b.start_time || "00:00";
+        return timeA.localeCompare(timeB);
+      });
+      
+      // Debug: แสดงข้อมูลการแยกงาน
+      console.log("🔍 [DEBUG] แยกงานพิเศษ:");
+      console.log("🔍 [DEBUG] งานปกติ:", normalJobs.length, "รายการ");
+      console.log("🔍 [DEBUG] งานพิเศษ:", specialJobs.length, "รายการ");
+      console.log("🔍 [DEBUG] งานปกติ:", normalJobs.map(item => ({ 
+        job_name: item.job_name, 
+        is_special: item.is_special, 
+        workflow_status_id: item.workflow_status_id 
+      })));
+      console.log("🔍 [DEBUG] งานพิเศษ:", specialJobs.map(item => ({ 
+        job_name: item.job_name, 
+        is_special: item.is_special, 
+        workflow_status_id: item.workflow_status_id 
+      })));
+      
+      // รวมงานปกติ + งานพิเศษ (งานพิเศษอยู่ด้านล่างสุด)
+      const filtered = [...sortedNormalJobs, ...sortedSpecialJobs];
+      
+      // Debug: แสดงข้อมูลที่ส่งไป Google Sheet
+      console.log("🔍 [DEBUG] ข้อมูลที่ส่งไป Google Sheet:");
+      console.log("🔍 [DEBUG] จำนวนงานทั้งหมด:", filtered.length);
+      console.log("🔍 [DEBUG] ลำดับงาน:", filtered.map((item, idx) => ({
+        ลำดับ: idx + 1,
+        job_name: item.job_name,
+        is_special: item.is_special,
+        workflow_status_id: item.workflow_status_id,
+        start_time: item.start_time
+      })));
+              const summaryRows = filtered.map((item, idx) => {
+          let ops = getOperatorsArray(item.operators);
+          while (ops.length < 4) ops.push("");
         return [
           idx + 1, // ลำดับ (A)
           item.job_code || "", // รหัสวัตถุดิบ (B)
@@ -1266,8 +1353,8 @@ export default function MedicalAppointmentDashboard() {
           ops[3], // ผู้ปฏิบัติงาน 4 (G)
           item.start_time || "", // เริ่มต้น (H)
           item.end_time || "", // สิ้นสุด (I)
-          getMachineNameById(item.machine_id), // เครื่องที่ (J)
-          getRoomNameByCodeOrId(item.production_room) // ห้องผลิต (K)
+          getMachineNameById(item.machine_id || ""), // เครื่องที่ (J)
+          getRoomNameByCodeOrId(item.production_room || "") // ห้องผลิต (K)
         ];
       });
       // 2. ส่ง batch ไป 1.ใบสรุปงาน v.4
@@ -1337,7 +1424,7 @@ export default function MedicalAppointmentDashboard() {
       } else {
         // ถ้ามีข้อมูลงาน A B C D ในฐานข้อมูล ให้ใช้ข้อมูลจริง
         defaultJobsData.forEach((item) => {
-          const operators = (item.operators || "").split(", ").map((s: string) => s.trim()).filter(Boolean);
+          const operators = (typeof item.operators === 'string' ? item.operators : "").split(", ").map((s: string) => s.trim()).filter(Boolean);
           
           if (operators.length === 0) {
             // ถ้าไม่มีผู้ปฏิบัติงาน ส่ง 1 แถว (8 คอลัมน์)
@@ -1371,7 +1458,7 @@ export default function MedicalAppointmentDashboard() {
 
       // เพิ่มข้อมูลงานอื่นๆ
       filtered.forEach((item) => {
-        const operators = (item.operators || "").split(", ").map((s: string) => s.trim()).filter(Boolean);
+        const operators = (typeof item.operators === 'string' ? item.operators : "").split(", ").map((s: string) => s.trim()).filter(Boolean);
         
         if (operators.length === 0) {
           // ถ้าไม่มีผู้ปฏิบัติงาน ส่ง 1 แถว (8 คอลัมน์)
@@ -1843,6 +1930,9 @@ export default function MedicalAppointmentDashboard() {
             production_room: (draft && (draft.production_room_name || draft.production_room_id || draft.production_room)) || p.production_room_name || p.production_room_id || p.production_room || 'ไม่ระบุ',
             machine_id: (draft && draft.machine_id) || p.machine_id || '',
             notes: (draft && draft.notes) || p.notes || '',
+            // เพิ่มข้อมูลสำหรับการแยกงานพิเศษ
+            is_special: p.status_id === 10 ? 1 : 0, // งานพิเศษถ้า status_id = 10
+            workflow_status_id: p.status_id || 1, // ใช้ status_id เป็น workflow_status_id
           };
         })
       ];
@@ -2008,8 +2098,8 @@ export default function MedicalAppointmentDashboard() {
       const timeComparison = timeA.localeCompare(timeB);
       if (timeComparison !== 0) return timeComparison;
       // เรียงผู้ปฏิบัติงานที่ขึ้นต้นด้วย 'อ' ขึ้นก่อน
-      const opA = (a.operators || "").split(", ")[0] || "";
-      const opB = (b.operators || "").split(", ")[0] || "";
+      const opA = (typeof a.operators === 'string' ? a.operators : "").split(", ")[0] || "";
+      const opB = (typeof b.operators === 'string' ? b.operators : "").split(", ")[0] || "";
       const indexA = opA.indexOf("อ");
       const indexB = opB.indexOf("อ");
       if (indexA === 0 && indexB !== 0) return -1;
@@ -2042,8 +2132,8 @@ export default function MedicalAppointmentDashboard() {
       const timeB = b.start_time || "00:00";
       const timeComparison = timeA.localeCompare(timeB);
       if (timeComparison !== 0) return timeComparison;
-      const opA = (a.operators || "").split(", ")[0] || "";
-      const opB = (b.operators || "").split(", ")[0] || "";
+      const opA = getOperatorsArray(a.operators)[0] || "";
+      const opB = getOperatorsArray(b.operators)[0] || "";
       const indexA = opA.indexOf("อ");
       const indexB = opB.indexOf("อ");
       if (indexA === 0 && indexB !== 0) return -1;
@@ -2064,12 +2154,12 @@ export default function MedicalAppointmentDashboard() {
     normalDrafts.sort(sortDraftsByCreatedAt);
     specialDrafts.sort(sortDraftsByCreatedAt);
     
-    // ส่งคืนตามลำดับ: default -> งานปกติเสร็จแล้ว -> งานพิเศษเสร็จแล้ว -> งานปกติแบบร่าง -> งานพิเศษแบบร่าง
+    // ส่งคืนตามลำดับ: default -> งานปกติเสร็จแล้ว -> งานปกติแบบร่าง -> งานพิเศษเสร็จแล้ว -> งานพิเศษแบบร่าง (งานพิเศษอยู่ล่างสุดเสมอ)
     return [
       ...defaultDrafts,
       ...normalCompleted,
-      ...specialCompleted,
       ...normalDrafts,
+      ...specialCompleted,
       ...specialDrafts
     ];
   };
@@ -2090,8 +2180,8 @@ export default function MedicalAppointmentDashboard() {
       const timeB = b.start_time || "00:00";
       const timeComparison = timeA.localeCompare(timeB);
       if (timeComparison !== 0) return timeComparison;
-      const opA = (a.operators || "").split(", ")[0] || "";
-      const opB = (b.operators || "").split(", ")[0] || "";
+      const opA = getOperatorsArray(a.operators)[0] || "";
+      const opB = getOperatorsArray(b.operators)[0] || "";
       const indexA = opA.indexOf("อ");
       const indexB = opB.indexOf("อ");
       if (indexA === 0 && indexB !== 0) return -1;
@@ -2415,7 +2505,7 @@ export default function MedicalAppointmentDashboard() {
               <CardHeader className="pb-3 sm:pb-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center space-x-2 text-sm sm:text-base md:text-lg">
-                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                    <UserIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                     <span className="leading-7 text-2xl">เพิ่มงานที่ต้องการผลิต</span>
                   </CardTitle>
                   <Button
@@ -2459,6 +2549,10 @@ export default function MedicalAppointmentDashboard() {
                           setJobQuery(item.job_name);
                         }}
                         cacheRef={searchCacheRef}
+                        onError={(error) => {
+                          console.error('SearchBox error:', error);
+                          setMessage(`ข้อผิดพลาดในการค้นหา: ${error}`);
+                        }}
                       />
                       <Search className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
                     </div>

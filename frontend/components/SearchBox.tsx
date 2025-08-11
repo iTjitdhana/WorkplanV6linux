@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search } from "lucide-react";
+import { Search, AlertCircle } from "lucide-react";
 
 export type SearchOption = {
   job_code: string;
@@ -18,6 +18,7 @@ interface SearchBoxProps {
   cacheRef: React.MutableRefObject<Map<string, SearchOption[]>>;
   placeholder?: string;
   showAvatar?: boolean;
+  onError?: (error: string) => void; // เพิ่ม error callback
 }
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -58,12 +59,14 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
   onSelect,
   cacheRef,
   placeholder = "ค้นหา...",
-  showAvatar = false
+  showAvatar = false,
+  onError
 }) => {
   const [options, setOptions] = useState<SearchOption[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [error, setError] = useState<string | null>(null); // เพิ่ม error state
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const justSelectedRef = useRef(false);
@@ -84,13 +87,17 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
       const controller = new AbortController();
       abortRef.current = controller;
       setIsSearching(true);
+      setError(null); // เคลียร์ error เมื่อเริ่มค้นหาใหม่
 
       const response = await fetch(
         `/api/process-steps/search?query=${encodeURIComponent(searchTerm)}`,
         { signal: controller.signal }
       );
       
-      if (!response.ok) throw new Error('Search failed');
+      if (!response.ok) {
+        const errorMessage = `การค้นหาล้มเหลว (${response.status})`;
+        throw new Error(errorMessage);
+      }
       
       const data = await response.json();
       const results = data.data || [];
@@ -104,11 +111,18 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
     } catch (err: any) {
       if (err.name !== "AbortError") {
         console.error("Search error:", err);
+        const errorMessage = err.message || "เกิดข้อผิดพลาดในการค้นหา";
+        setError(errorMessage);
+        
+        // เรียก error callback ถ้ามี
+        if (onError) {
+          onError(errorMessage);
+        }
       }
     } finally {
       setIsSearching(false);
     }
-  }, [debouncedValue, cacheRef]);
+  }, [debouncedValue, cacheRef, onError]);
 
   // ใช้ throttle สำหรับการค้นหา
   const throttledSearch = useThrottle(performSearch, 100);
@@ -122,6 +136,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
     if (!debouncedValue.trim()) {
       setOptions([]);
       setShowDropdown(false);
+      setError(null); // เคลียร์ error เมื่อไม่มีข้อความ
       return;
     }
 
@@ -132,6 +147,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
     if (cachedResults && cachedResults.length > 0) {
       setOptions(cachedResults.slice(0, 20));
       setShowDropdown(true);
+      setError(null); // เคลียร์ error เมื่อพบผลลัพธ์ใน cache
       return;
     }
 
@@ -150,6 +166,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
     if (localResults.length > 0) {
       setOptions(localResults.slice(0, 20));
       setShowDropdown(true);
+      setError(null); // เคลียร์ error เมื่อพบผลลัพธ์ใน cache
       return;
     }
 
@@ -168,6 +185,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
   // แสดงเมื่อมีข้อความ, ไม่กำลังค้นหา, และไม่มี exact match ในผลลัพธ์
   const showAddNew = value.trim().length > 0 && 
                     !isSearching && 
+                    !error && // ไม่แสดงปุ่มเพิ่มใหม่เมื่อมี error
                     !options.some(option => 
                       option.job_name.toLowerCase() === value.trim().toLowerCase() ||
                       option.job_code.toLowerCase() === value.trim().toLowerCase()
@@ -198,6 +216,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
     } else if (e.key === "Escape") {
       e.preventDefault();
       setShowDropdown(false);
+      setError(null); // เคลียร์ error เมื่อกด Escape
     }
   }, [highlightIndex, options.length, showAddNew]);
 
@@ -207,6 +226,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
     setShowDropdown(false);
     setOptions([]);
     setHighlightIndex(-1);
+    setError(null); // เคลียร์ error เมื่อเลือกตัวเลือก
   }, [onSelect]);
 
   const handleAddNew = useCallback(() => {
@@ -239,12 +259,21 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value);
     setHighlightIndex(-1);
+    setError(null); // เคลียร์ error เมื่อผู้ใช้พิมพ์ใหม่
     
     // แสดง dropdown ทันทีเมื่อมีข้อความ
     if (e.target.value.trim().length > 0) {
       setShowDropdown(true);
     }
   }, [onChange]);
+
+  // ฟังก์ชันสำหรับ retry การค้นหา
+  const handleRetry = useCallback(() => {
+    setError(null);
+    if (debouncedValue.trim().length >= 2) {
+      performSearch(debouncedValue);
+    }
+  }, [debouncedValue, performSearch]);
 
   // Cleanup เมื่อ component unmount
   useEffect(() => {
@@ -267,23 +296,38 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
           value={value}
           onChange={handleInputChange}
           onFocus={() => { 
-          if (value.trim().length > 0) {
-            setShowDropdown(true);
-          }
-        }}
+            if (value.trim().length > 0) {
+              setShowDropdown(true);
+            }
+          }}
           onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full pl-8 pr-3 py-2 border rounded shadow-sm focus:ring-2 focus:ring-green-500"
+          className={`w-full pl-8 pr-3 py-2 border rounded shadow-sm focus:ring-2 focus:ring-green-500 ${
+            error ? 'border-red-500 focus:ring-red-500' : ''
+          }`}
           autoComplete="off"
           spellCheck="false"
         />
+        {error && (
+          <AlertCircle className="absolute right-2 w-4 h-4 text-red-500" />
+        )}
       </div>
 
       {showDropdown && (
         <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-60 overflow-y-auto">
           {isSearching ? (
             <div className="p-2 text-gray-500">🔍 กำลังค้นหา...</div>
+          ) : error ? (
+            <div className="p-2">
+              <div className="text-red-600 text-sm mb-2">❌ {error}</div>
+              <button
+                onClick={handleRetry}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                ลองใหม่
+              </button>
+            </div>
           ) : (
             <>
               {options.length === 0 ? (
@@ -301,19 +345,19 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
                     role="button"
                     aria-label={`เลือก ${item.job_name}`}
                   >
-                  {showAvatar && (
-                    <img
-                      src={item.iconUrl || `/placeholder.svg?text=${item.job_name.charAt(0)}`}
-                      alt="avatar"
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                  )}
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-sm">{item.job_name}</span>
-                    <span className="text-xs text-gray-500">{item.job_code} {item.category ? `• ${item.category}` : ""}</span>
-                                     </div>
-                   </div>
-                 ))
+                    {showAvatar && (
+                      <img
+                        src={item.iconUrl || `/placeholder.svg?text=${item.job_name.charAt(0)}`}
+                        alt="avatar"
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    )}
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-sm">{item.job_name}</span>
+                      <span className="text-xs text-gray-500">{item.job_code} {item.category ? `• ${item.category}` : ""}</span>
+                    </div>
+                  </div>
+                ))
               )}
               
               {showAddNew && (

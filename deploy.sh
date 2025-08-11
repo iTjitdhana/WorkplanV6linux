@@ -1,9 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 # 🚀 WorkplansV4 Auto Deployment Script
 # สำหรับการ deploy ระบบไปยัง production server
-
-set -e  # หยุดการทำงานทันทีหากมี error
 
 # Colors for output
 RED='\033[0;31m'
@@ -99,9 +98,9 @@ setup_mysql() {
     }
     
     # Import database schema if exists
-    if [ -f "backend/esp_tracker (6).sql" ]; then
+    if [ -f "database/sql/esp_tracker (6).sql" ]; then
         print_status "Importing database schema..."
-        mysql -u root -p${MYSQL_ROOT_PASSWORD} esp_tracker < "backend/esp_tracker (6).sql"
+        mysql -u root -p${MYSQL_ROOT_PASSWORD} esp_tracker < "database/sql/esp_tracker (6).sql"
         print_status "Database schema imported"
     else
         print_warning "Database schema file not found. You may need to import it manually."

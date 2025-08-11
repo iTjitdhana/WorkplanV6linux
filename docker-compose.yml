@@ -2,16 +2,20 @@ version: '3.8'
 
 services:
   frontend:
-    image: itjitdhana/workplnav6.2:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "3011:3011"
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=http://192.168.0.94:3101
-      - BACKEND_URL=http://backend:3011
+      - BACKEND_URL=http://backend:3101
     depends_on:
       - backend
     restart: unless-stopped
+    networks:
+      - workplan-network
 
   backend:
     build:
@@ -27,3 +31,9 @@ services:
       - DB_NAME=esp_tracker
       - DB_PORT=3306
     restart: unless-stopped
+    networks:
+      - workplan-network
+
+networks:
+  workplan-network:
+    driver: bridge

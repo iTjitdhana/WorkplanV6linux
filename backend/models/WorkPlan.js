@@ -46,7 +46,12 @@ class WorkPlan {
       }
       
       query += ` GROUP BY wp.id, wp.production_date, wp.job_code, wp.job_name, wp.start_time, wp.end_time, wp.notes, wp.operators, wp.status_id, ps.name, ps.color, ff.is_finished, ff.updated_at, pr.room_name, m.machine_name
-                 ORDER BY wp.start_time ASC, 
+                 ORDER BY 
+                 CASE 
+                   WHEN COALESCE(wp.status_id, 1) = 10 THEN 2  -- งานพิเศษ (status_id = 10) อยู่ล่างสุด
+                   ELSE 1  -- งานปกติอยู่บนสุด
+                 END ASC,
+                 wp.start_time ASC, 
                  CASE 
                    WHEN GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) LIKE 'อ%' THEN 0 
                    ELSE 1 
@@ -99,7 +104,12 @@ class WorkPlan {
       }
       
       fallbackQuery += ` GROUP BY wp.id, wp.production_date, wp.job_code, wp.job_name, wp.start_time, wp.end_time, wp.notes, wp.operators, ff.is_finished, ff.updated_at, pr.room_name, m.machine_name
-                         ORDER BY wp.start_time ASC, 
+                         ORDER BY 
+                         CASE 
+                           WHEN COALESCE(wp.status_id, 1) = 10 THEN 2  -- งานพิเศษ (status_id = 10) อยู่ล่างสุด
+                           ELSE 1  -- งานปกติอยู่บนสุด
+                         END ASC,
+                         wp.start_time ASC, 
                          CASE 
                            WHEN GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) LIKE 'อ%' THEN 0 
                            ELSE 1 

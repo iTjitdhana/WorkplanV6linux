@@ -68,7 +68,7 @@ app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/monitoring', require('./routes/monitoringRoutes'));
 app.use('/api/process-steps', require('./routes/processStepRoutes'));
-app.use('/api/google-sheet-proxy', require('./routes/googleSheetProxy'));
+app.use('/api/send-to-google-sheet', require('./routes/googleSheetProxy'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
