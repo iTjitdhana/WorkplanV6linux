@@ -5,6 +5,9 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const path = require('path');
 
+// Load environment variables
+require('dotenv').config({ path: './production.env' });
+
 const app = express();
 const PORT = process.env.PORT || 3101;
 
@@ -15,20 +18,32 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// Rate limiting for API protection
+// Rate limiting for API protection (very relaxed for development)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 1 * 60 * 1000, // 1 minute (reduced from 15 minutes)
+  max: 10000, // limit each IP to 10000 requests per minute (increased from 1000)
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful requests
+  skipFailedRequests: false, // Count failed requests
+  keyGenerator: (req) => {
+    // Use a more specific key to avoid conflicts
+    return req.ip + ':' + req.path;
+  }
 });
-app.use('/api/', limiter);
+
+// Rate limiting disabled for development
+// app.use('/api/work-plans', limiter); // Disabled
+// app.use('/api/users', limiter); // Disabled
+// app.use('/api/machines', limiter); // Disabled
+// app.use('/api/production-rooms', limiter); // Disabled
+// Don't apply rate limiting to logs and other read-only endpoints
 
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['http://192.168.0.94:3011', 'http://localhost:3011']
+    ? ['http://192.168.0.222:3011', 'http://localhost:3011', 'http://127.0.0.1:3011']
     : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -96,6 +111,7 @@ process.on('SIGTERM', () => {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌍 External access: http://192.168.0.222:${PORT}/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 

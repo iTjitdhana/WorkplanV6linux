@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Production optimizations
-  // output: 'standalone', // Disabled for now to fix start issues
+  output: 'standalone',
   poweredByHeader: false,
   compress: true,
   generateEtags: false,

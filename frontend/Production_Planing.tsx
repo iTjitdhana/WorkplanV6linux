@@ -18,6 +18,7 @@ import {
   User as UserIcon,
   XCircle,
   BarChart3,
+  ChevronDown as ChevronDownIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,6 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Noto_Sans_Thai } from "next/font/google"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SearchBox, SearchOption } from "./components/SearchBox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { createSafeDate, formatDateForDisplay, formatDateForAPI, formatDateThaiShort } from "@/lib/dateUtils";
 import { config, debugLog, debugError } from "@/lib/config";
 import { api, handleApiError, createAbortController } from "@/lib/api";
@@ -84,6 +86,7 @@ export default function MedicalAppointmentDashboard() {
   const [viewMode, setViewMode] = useState<"daily" | "weekly">("daily")
   const [isFormCollapsed, setIsFormCollapsed] = useState(false)
   const [selectedWeekDay, setSelectedWeekDay] = useState<string | null>(null)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   // เพิ่ม state สำหรับฟอร์ม
   const [operators, setOperators] = useState(["", "", "", ""]); // 4 ตำแหน่ง
@@ -2476,11 +2479,54 @@ export default function MedicalAppointmentDashboard() {
               </h1>
             </div>
             <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
-              <Link href="/dashboard">
-                <span className="hidden md:block text-sm text-green-100 hover:text-white cursor-pointer transition-colors duration-200">
-                  ระบบจัดการข้อมูล
-                </span>
-              </Link>
+              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="hidden md:flex items-center space-x-1 text-sm text-green-100 hover:text-white hover:bg-white/10 transition-colors duration-200 p-2"
+                  >
+                    <span>ระบบจัดการข้อมูล</span>
+                    <ChevronDownIcon className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
+                      <span>หน้าหลัก</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/logs" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
+                      <span>ระบบจัดการ Logs</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/tracker" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
+                      <span>ติดตามการผลิต</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/reports" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
+                      <span>รายงาน</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/users" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
+                      <span>จัดการผู้ใช้</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
+                      <span>ตั้งค่าระบบ</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/monitoring" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
+                      <span>ติดตามสถานะ</span>
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <div className="flex items-center space-x-1 sm:space-x-2">
                 <span className="hidden sm:block text-xs sm:text-sm text-white">ผู้ใช้: Admin</span>

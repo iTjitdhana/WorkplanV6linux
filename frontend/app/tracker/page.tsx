@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { Noto_Sans_Thai } from "next/font/google";
+import { translations, Language } from "@/lib/translations";
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ["thai", "latin"],
@@ -17,6 +18,7 @@ function formatUsedTime(sec: number) {
 
 export default function TrackerPage() {
   const [date, setDate] = useState(() => {
+    // ใช้วันที่ปัจจุบัน
     const today = new Date();
     return today.toISOString().slice(0, 10);
   });
@@ -30,13 +32,32 @@ export default function TrackerPage() {
   const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
   const [usedSec, setUsedSec] = useState<number | null>(null);
   const [statusType, setStatusType] = useState<"success"|"fail"|"info">("info");
+  const [language, setLanguage] = useState<Language>('thai');
+  const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+
 
   // Load workplans by date
   useEffect(() => {
     setIsLoading(true);
     fetch(`/api/work-plans?date=${date}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        // ตรวจสอบว่า response มี success field และเป็น false หรือไม่
+        if (data.success === false) {
+          throw new Error(data.message || 'Backend returned error');
+        }
+        return data;
+      })
       .then(data => {
         console.log('[DEBUG] Loaded workplans (raw from API):', data);
         console.log('[DEBUG] Workplans data (raw from API):', data.data);
@@ -74,33 +95,354 @@ export default function TrackerPage() {
           console.log('[DEBUG] Keeping workplan:', wp.job_name, 'with date:', wpDate);
           return true;
         });
-        console.log('[DEBUG] Filtered workplans (after frontend filter):', filteredWorkplans);
-        setWorkplans(filteredWorkplans);
-      })
-      .finally(() => setIsLoading(false));
-    setSelectedWorkplan(null);
-    setProcessSteps([]);
-    setProcessLogs([]);
-    setSelectedProcessIndex(0);
-    setUsedSec(null);
+                 console.log('[DEBUG] Filtered workplans (after frontend filter):', filteredWorkplans);
+         setWorkplans(filteredWorkplans);
+         // อัปเดตเวลาล่าสุดเมื่อโหลดข้อมูลครั้งแรก
+         setLastUpdateTime(new Date().toLocaleTimeString('th-TH'));
+       })
+                       .catch((error: any) => {
+          console.error('[DEBUG] Error loading workplans:', error);
+          setWorkplans([]);
+          
+          // จัดการ HTTP 429 error โดยเฉพาะ
+          if (error.message && error.message.includes('429')) {
+            console.log('[DEBUG] Rate limit exceeded on initial load');
+            // เพิ่มเวลารอสำหรับการ refresh ครั้งถัดไป
+            (window as any).lastRefreshTime = Date.now() + 60000; // รอ 1 นาที
+            
+            if (!isAutoRefreshing) {
+              setMessage('เซิร์ฟเวอร์กำลังรับคำขอมากเกินไป กรุณารอสักครู่แล้วลองใหม่');
+              setStatusType('fail');
+              setTimeout(() => setMessage(''), 5000);
+            }
+            return;
+          }
+          
+          // แสดงข้อความ error เฉพาะเมื่อเป็น initial load (ไม่ใช่ auto-refresh)
+          // ไม่แสดง error message สำหรับ auto-refresh เพื่อไม่รบกวนผู้ใช้
+          if (!isAutoRefreshing) {
+            let errorMessage = 'เกิดข้อผิดพลาดในการโหลดข้อมูลงานผลิต';
+            if (error.message && error.message.includes('Too many requests')) {
+              errorMessage = 'เซิร์ฟเวอร์กำลังรับคำขอมากเกินไป กรุณาลองใหม่อีกครั้ง';
+            } else if (error.message && error.message.includes('Backend error')) {
+              errorMessage = 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์: ' + error.message;
+            } else if (error.message && error.message.includes('Failed to fetch')) {
+              errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้';
+            }
+            
+            setMessage(errorMessage);
+            setStatusType('fail');
+            
+            // ลบข้อความหลังจาก 5 วินาที
+            setTimeout(() => {
+              setMessage('');
+            }, 5000);
+          }
+        })
+       .finally(() => setIsLoading(false));
+     setSelectedWorkplan(null);
+     setProcessSteps([]);
+     setProcessLogs([]);
+     setSelectedProcessIndex(0);
+     setUsedSec(null);
+   }, [date]);
+
+     // Manual refresh functionality
+   const refreshWorkplans = async () => {
+     console.log('[DEBUG] refreshWorkplans called, isLoading:', isLoading, 'isAutoRefreshing:', isAutoRefreshing);
+     if (isLoading) return; // Don't refresh if already loading
+     
+     // เพิ่มการป้องกัน Rate Limiting - ตรวจสอบว่าการ refresh ครั้งล่าสุดห่างกันอย่างน้อย 30 วินาที
+     const now = Date.now();
+     const lastRefreshTime = (window as any).lastRefreshTime || 0;
+     const timeSinceLastRefresh = now - lastRefreshTime;
+     
+     if (timeSinceLastRefresh < 30000) { // 30 วินาที
+       console.log('[DEBUG] Skipping refresh - too soon since last refresh:', timeSinceLastRefresh, 'ms');
+       return;
+     }
+     
+     (window as any).lastRefreshTime = now;
+    
+    try {
+      const response = await fetch(`/api/work-plans?date=${date}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // ตรวจสอบว่า response มี success field และเป็น false หรือไม่
+      if (data.success === false) {
+        throw new Error(data.message || 'Backend returned error');
+      }
+      
+      const filteredWorkplans = (data.data || []).filter((wp: any) => {
+        if (wp.status_name === 'งานผลิตถูกยกเลิก') {
+          return false;
+        }
+        const wpDate = wp.production_date;
+        let wpDateFormatted = wpDate;
+        if (wpDate && typeof wpDate === 'string') {
+          if (wpDate.includes('T')) {
+            wpDateFormatted = wpDate.split('T')[0];
+          }
+        }
+        return wpDateFormatted === date;
+      });
+      
+      setWorkplans(filteredWorkplans);
+      
+      // เก็บ selectedWorkplan ไว้หลัง refresh เสมอ
+      if (selectedWorkplan) {
+        const updatedSelectedWorkplan = filteredWorkplans.find((wp: any) => wp.id === selectedWorkplan.id);
+        if (updatedSelectedWorkplan) {
+          console.log('[DEBUG] Found updated workplan, keeping selection:', updatedSelectedWorkplan.job_name);
+          setSelectedWorkplan(updatedSelectedWorkplan);
+        } else {
+          // ถ้าไม่เจอ workplan เดิม (อาจถูกลบหรือยกเลิก) ให้รีเซ็ต
+          console.log('[DEBUG] Workplan not found after refresh, resetting selection');
+          setSelectedWorkplan(null);
+          setProcessSteps([]);
+          setProcessLogs([]);
+          setSelectedProcessIndex(0);
+          setUsedSec(null);
+        }
+      }
+      
+      // อัปเดตเวลาล่าสุด
+      setLastUpdateTime(new Date().toLocaleTimeString('th-TH'));
+      console.log('[DEBUG] Refresh completed successfully');
+         } catch (error: any) {
+       console.error('Refresh failed:', error);
+       
+       // จัดการ HTTP 429 error โดยเฉพาะ
+       if (error.message && error.message.includes('429')) {
+         console.log('[DEBUG] Rate limit exceeded, increasing refresh interval');
+         // เพิ่มเวลารอสำหรับการ refresh ครั้งถัดไป
+         (window as any).lastRefreshTime = Date.now() + 60000; // รอ 1 นาที
+         
+         if (!isAutoRefreshing) {
+           setMessage('เซิร์ฟเวอร์กำลังรับคำขอมากเกินไป กรุณารอสักครู่แล้วลองใหม่');
+           setStatusType('fail');
+           setTimeout(() => setMessage(''), 5000);
+         }
+         return;
+       }
+       
+       // ไม่ต้องแสดง error message สำหรับ auto-refresh
+       if (!isAutoRefreshing) {
+         // แสดงข้อความ error ที่ชัดเจนขึ้น
+         let errorMessage = 'เกิดข้อผิดพลาดในการอัปเดตข้อมูล';
+         if (error.message && error.message.includes('Too many requests')) {
+           errorMessage = 'เซิร์ฟเวอร์กำลังรับคำขอมากเกินไป กรุณาลองใหม่อีกครั้ง';
+         } else if (error.message && error.message.includes('Backend error')) {
+           errorMessage = 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์: ' + error.message;
+         } else if (error.message && error.message.includes('Failed to fetch')) {
+           errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้';
+         }
+         
+         setMessage(errorMessage);
+         setStatusType('fail');
+         
+         // ลบข้อความหลังจาก 5 วินาที
+         setTimeout(() => {
+           setMessage('');
+         }, 5000);
+       }
+     }
+  };
+
+  // Load auto refresh setting function
+  const loadAutoRefreshSetting = async () => {
+    try {
+      const response = await fetch('/api/settings/auto-refresh');
+      const data = await response.json();
+      if (data.success) {
+        const newValue = data.autoRefreshEnabled;
+        console.log('[DEBUG] Auto refresh setting loaded:', newValue, 'current:', autoRefreshEnabled);
+        if (newValue !== autoRefreshEnabled) {
+          console.log('[DEBUG] Auto refresh setting changed from', autoRefreshEnabled, 'to', newValue);
+          setAutoRefreshEnabled(newValue);
+        }
+      }
+          } catch (error) {
+        console.error('Error loading auto refresh setting:', error);
+        setAutoRefreshEnabled(false); // default to false on error
+      }
+  };
+
+  // Load auto refresh setting on mount
+  useEffect(() => {
+    loadAutoRefreshSetting();
+  }, []);
+
+  // Reload auto refresh setting when page becomes visible (for real-time updates)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[DEBUG] Page became visible, reloading auto refresh setting');
+        loadAutoRefreshSetting();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Check auto refresh setting every 5 seconds for real-time updates (เฉพาะเมื่อ Auto Refresh เปิด)
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (autoRefreshEnabled) {
+      console.log('[DEBUG] Starting auto refresh setting check interval');
+      interval = setInterval(() => {
+        loadAutoRefreshSetting();
+      }, 5000); // Check every 5 seconds
+    } else {
+      console.log('[DEBUG] Auto refresh disabled, not starting setting check interval');
+    }
+
+    return () => {
+      if (interval) {
+        console.log('[DEBUG] Clearing auto refresh setting check interval');
+        clearInterval(interval);
+      }
+    };
+  }, [autoRefreshEnabled]);
+
+  // Force reload auto refresh setting when component mounts or date changes
+  useEffect(() => {
+    console.log('[DEBUG] Component mounted or date changed, reloading auto refresh setting');
+    loadAutoRefreshSetting();
   }, [date]);
+
+  // Reload auto refresh setting when window gains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('[DEBUG] Window gained focus, reloading auto refresh setting');
+      loadAutoRefreshSetting();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  // Auto-refresh workplans (เฉพาะเมื่อเปิดใช้งาน)
+  useEffect(() => {
+    // Auto-refresh workplans every 120 seconds for real-time updates (เฉพาะเมื่อเปิดใช้งาน)
+    let autoRefreshInterval: NodeJS.Timeout | null = null;
+    if (autoRefreshEnabled) {
+      console.log('[DEBUG] Auto refresh is ENABLED, starting interval');
+      autoRefreshInterval = setInterval(async () => {
+        if (!isLoading) {
+          console.log('[DEBUG] Auto-refreshing workplans...');
+          setIsAutoRefreshing(true);
+          await refreshWorkplans();
+          setIsAutoRefreshing(false);
+        }
+      }, 120000); // 120 seconds (2 นาที)
+    } else {
+      console.log('[DEBUG] Auto refresh is DISABLED, not starting interval');
+    }
+
+    return () => {
+      if (autoRefreshInterval) {
+        console.log('[DEBUG] Clearing auto refresh interval');
+        clearInterval(autoRefreshInterval);
+      }
+    };
+  }, [date, isLoading, autoRefreshEnabled]);
 
   // Load process steps & logs when select workplan
   useEffect(() => {
     if (!selectedWorkplan) return;
     setIsLoading(true);
-    Promise.all([
-      fetch(`/api/process-steps?job_code=${selectedWorkplan.job_code}`).then(res => res.json()),
-      fetch(`/api/logs/work-plan/${selectedWorkplan.id}`).then(res => res.json())
-    ]).then(([steps, logs]) => {
-      console.log('[DEBUG] Loaded process steps:', steps);
-      console.log('[DEBUG] Loaded process logs:', logs);
-      setProcessSteps(steps.data || []);
-      setProcessLogs(logs.data || []);
-      setSelectedProcessIndex(0);
-      setUsedSec(null);
-    }).finally(() => setIsLoading(false));
+    
+    const loadProcessData = async () => {
+      try {
+        const [stepsRes, logsRes] = await Promise.all([
+          fetch(`/api/process-steps?job_code=${selectedWorkplan.job_code}`),
+          fetch(`/api/logs/work-plan/${selectedWorkplan.id}`)
+        ]);
+
+        if (!stepsRes.ok) {
+          throw new Error(`Process steps API error: ${stepsRes.status}`);
+        }
+        if (!logsRes.ok) {
+          throw new Error(`Logs API error: ${logsRes.status}`);
+        }
+
+        const [steps, logs] = await Promise.all([
+          stepsRes.json(),
+          logsRes.json()
+        ]);
+
+        console.log('[DEBUG] Loaded process steps:', steps);
+        console.log('[DEBUG] Loaded process logs:', logs);
+        
+        setProcessSteps(steps.data || []);
+        setProcessLogs(logs.data || []);
+        setSelectedProcessIndex(0);
+        setUsedSec(null);
+      } catch (error) {
+        console.error('[DEBUG] Error loading process data:', error);
+        setProcessSteps([]);
+        setProcessLogs([]);
+        setSelectedProcessIndex(0);
+        setUsedSec(null);
+        
+        // Show error message
+        setMessage('เกิดข้อผิดพลาดในการโหลดข้อมูลกระบวนการ');
+        setStatusType('fail');
+        setTimeout(() => setMessage(''), 5000);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProcessData();
   }, [selectedWorkplan]);
+
+  // Auto-refresh logs every 10 seconds for real-time updates
+  useEffect(() => {
+    if (!selectedWorkplan) return;
+
+         const refreshLogs = async () => {
+       try {
+         const logsResponse = await fetch(`/api/logs/work-plan/${selectedWorkplan.id}`);
+         
+         // ตรวจสอบ HTTP status
+         if (!logsResponse.ok) {
+           console.error('[DEBUG] Logs refresh failed with status:', logsResponse.status);
+           return; // ไม่แสดง error message สำหรับ auto-refresh
+         }
+         
+         const logsData = await logsResponse.json();
+         console.log('[DEBUG] Auto-refreshing logs...');
+         setProcessLogs(logsData.data || []);
+       } catch (error) {
+         console.error('Error auto-refreshing logs:', error);
+         // ไม่แสดง error message สำหรับ auto-refresh
+       }
+     };
+
+         // Refresh logs every 30 seconds (ลดความถี่ลง)
+     const logsInterval = setInterval(refreshLogs, 30000);
+
+    return () => {
+      if (logsInterval) {
+        clearInterval(logsInterval);
+      }
+    };
+  }, [selectedWorkplan]);
+
+
 
   // Update timer when processLogs or selectedProcessIndex change
   useEffect(() => {
@@ -190,8 +532,13 @@ export default function TrackerPage() {
         throw new Error(result.message || "API error");
       }
       
-      setMessage("จบงานผลิตแล้ว");
-      setStatusType("success");
+             setMessage("จบงานผลิตแล้ว");
+       setStatusType("success");
+       
+       // ลบข้อความหลังจาก 2 วินาที
+       setTimeout(() => {
+         setMessage('');
+       }, 2000);
       
       // Reload workplans เพื่ออัปเดตสถานะ
       console.log("[DEBUG] Reloading workplans...");
@@ -218,11 +565,19 @@ export default function TrackerPage() {
         errorMessage += ": " + e.message;
       }
       
-      setMessage(errorMessage);
-      setStatusType("fail");
+             setMessage(errorMessage);
+       setStatusType("fail");
+       
+       // ลบข้อความหลังจาก 3 วินาที
+       setTimeout(() => {
+         setMessage('');
+       }, 3000);
     }
     setIsLoading(false);
   };
+
+  // Get current language translations
+  const t = translations[language];
 
   // Handle start/stop
   const handleLog = async (isStart: boolean) => {
@@ -269,8 +624,13 @@ export default function TrackerPage() {
         throw new Error(result.message || "API error");
       }
       
-      setMessage(isStart ? "เริ่มขั้นตอนแล้ว" : "หยุดขั้นตอนแล้ว");
-      setStatusType("success");
+             setMessage(isStart ? "เริ่มขั้นตอนแล้ว" : "หยุดขั้นตอนแล้ว");
+       setStatusType("success");
+       
+       // ลบข้อความหลังจาก 2 วินาที
+       setTimeout(() => {
+         setMessage('');
+       }, 2000);
       
       // reload logs
       console.log("[DEBUG] Reloading logs...");
@@ -280,8 +640,13 @@ export default function TrackerPage() {
       
     } catch (e: any) {
       console.error("[DEBUG] Error in handleLog:", e);
-      setMessage("เกิดข้อผิดพลาดในการบันทึก: " + (e?.message || ""));
-      setStatusType("fail");
+             setMessage("เกิดข้อผิดพลาดในการบันทึก: " + (e?.message || ""));
+       setStatusType("fail");
+       
+       // ลบข้อความหลังจาก 3 วินาที
+       setTimeout(() => {
+         setMessage('');
+       }, 3000);
     }
     setIsLoading(false);
   };
@@ -300,193 +665,376 @@ export default function TrackerPage() {
   return (
     <div className={`min-h-screen bg-gray-50 py-4 px-2 sm:px-4 text-base sm:text-lg ${notoSansThai.className}`}>
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-row justify-between items-center mb-4">
-          <h1 className="text-3xl font-bold text-black">ระบบจับเวลาการผลิต</h1>
-          <div className="flex flex-row items-center gap-2">
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="border rounded px-2 py-1" />
-            <button className="border rounded px-3 py-1 text-gray-700 bg-white shadow-sm flex items-center gap-1">
-              <span className="hidden sm:inline">เมนู</span>
-              <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-            </button>
-          </div>
-        </div>
-        <div className="text-gray-500 mb-4 text-lg">Food Production Timer</div>
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* กล่องซ้าย: จับเวลา */}
-          <div className="w-full lg:w-7/12">
-            <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-4">
-              {/* Header */}
-              <div className="text-center text-lg font-semibold mb-2">
-                {selectedWorkplan ? selectedWorkplan.job_name : "แผนงานผลิต"}
-              </div>
-              {/* เลขขั้นตอน + ปุ่มลูกศร + ชื่อขั้นตอน */}
-              <div className="flex flex-col items-center mb-2">
-                <div className="text-2xl font-bold mb-2 text-center min-h-[2.5rem] flex items-center justify-center">{processSteps[selectedProcessIndex]?.process_description || "-"}</div>
-                <div className="flex flex-row items-center justify-center gap-6 w-full">
-                  <button
-                    className="bg-gray-300 rounded-full w-12 h-12 flex items-center justify-center text-2xl"
-                    onClick={() => setSelectedProcessIndex(i => Math.max(0, i - 1))}
-                    disabled={selectedProcessIndex === 0}
-                  >&lt;</button>
-                  <div className="flex flex-col items-center min-w-[120px]">
-                    <div className="number-display text-6xl font-mono bg-black text-white rounded-lg px-10 py-4 mb-2">
-                      {processSteps[selectedProcessIndex]?.process_number?.toString().padStart(2, "0") || "--"}
-                    </div>
-                    <div className="text-base font-bold mb-1">ขั้นตอนที่</div>
-                  </div>
-                  <button
-                    className="bg-gray-300 rounded-full w-12 h-12 flex items-center justify-center text-2xl"
-                    onClick={() => setSelectedProcessIndex(i => Math.min(processSteps.length - 1, i + 1))}
-                    disabled={selectedProcessIndex === processSteps.length - 1}
-                  >&gt;</button>
-                </div>
-              </div>
-              {/* กล่องเวลา */}
-              <div className="flex flex-col sm:flex-row gap-2 justify-center mb-4">
-                <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                  <div className="text-xs text-gray-500">เวลาเริ่ม</div>
-                  <div className="font-bold text-lg">
-                    {(() => {
-                      const log = processLogs.find((l: any) => l.process_number === processSteps[selectedProcessIndex]?.process_number) || {};
-                      return log.start_time ? new Date(log.start_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–";
-                    })()}
-                  </div>
-                </div>
-                <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-                  <div className="text-xs text-gray-500">เวลาสิ้นสุด</div>
-                  <div className="font-bold text-lg text-red-600">
-                    {(() => {
-                      const log = processLogs.find((l: any) => l.process_number === processSteps[selectedProcessIndex]?.process_number) || {};
-                      return log.stop_time ? new Date(log.stop_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–";
-                    })()}
-                  </div>
-                </div>
-                <div className="flex-1 bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                  <div className="text-xs text-gray-500">เวลาที่ใช้</div>
-                  <div className="font-bold text-lg">{(() => {
-                    const log = processLogs.find((l: any) => l.process_number === processSteps[selectedProcessIndex]?.process_number) || {};
-                    // ใช้ usedSec ถ้ามี (timer กำลังทำงาน) หรือใช้ log.used_time จาก database
-                    if (usedSec !== null) {
-                      return formatUsedTime(usedSec);
-                    } else if (log.used_time != null) {
-                      return formatUsedTime(log.used_time);
-                    } else {
-                      return "–";
-                    }
-                  })()}</div>
-                </div>
-              </div>
-              {/* ปุ่ม */}
-              <div className="flex flex-col sm:flex-row gap-3 justify-center mb-2">
-                <button
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg text-lg disabled:opacity-50"
-                  onClick={() => handleLog(true)}
-                  disabled={isLoading || !selectedWorkplan}
-                >เริ่มขั้นตอน</button>
-                <button
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg text-lg disabled:opacity-50"
-                  onClick={() => handleLog(false)}
-                  disabled={isLoading || !selectedWorkplan}
-                >หยุดขั้นตอน</button>
-                <button
-                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg text-lg disabled:opacity-50"
-                  onClick={() => handleFinishProduction()}
-                  disabled={isLoading || !selectedWorkplan}
-                >จบงานผลิตแล้ว</button>
-              </div>
+                 <div className="flex flex-row justify-between items-center mb-4">
+                      <h1 className="text-3xl font-bold text-black">{t.title}</h1>
+                      <div className="flex flex-row items-center gap-2">
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="border rounded px-2 py-1" />
+                            <button 
+                 onClick={() => setLanguage(language === 'thai' ? 'myanmar' : 'thai')}
+                 className="border rounded px-3 py-1 text-gray-700 bg-white shadow-sm hover:bg-gray-50 transition-colors"
+               >
+                 {language === 'thai' ? t.myanmar : t.thai}
+               </button>
+              
+
+              
+              <button className="border rounded px-3 py-1 text-gray-700 bg-white shadow-sm flex items-center gap-1">
+                <span className="hidden sm:inline">เมนู</span>
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+              </button>
             </div>
-          </div>
-          {/* กล่องขวา: งานที่ผลิต (dropdown) ด้านบน, รายการขั้นตอนด้านล่าง */}
-          <div className="w-full lg:w-5/12 flex flex-col gap-4">
-            {/* กล่องงานที่ผลิต */}
-            <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
-              <div className="flex flex-row items-center gap-3 mb-2">
-                <div className="font-semibold whitespace-nowrap">งานที่ผลิต</div>
-                <select
-                  className="border rounded px-2 py-1 min-w-[180px]"
-                  value={selectedWorkplan?.id || ""}
-                  onChange={e => {
-                    const wp = workplans.find(w => w.id == e.target.value);
-                    setSelectedWorkplan(wp || null);
-                  }}
-                >
-                  <option value="">กรุณาเลือก</option>
-                  {workplans.map(wp => {
-                    console.log('[DEBUG] Workplan option:', { id: wp.id, job_name: wp.job_name, job_code: wp.job_code, production_date: wp.production_date });
-                    const displayDate = wp.production_date ? new Date(wp.production_date).toLocaleDateString('th-TH') : 'ไม่ระบุวันที่';
-                    return (
-                      <option key={wp.id} value={wp.id}>
-                        {wp.job_name || wp.job_code || 'ไม่ระบุชื่อ'} ({displayDate})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              {selectedWorkplan && (selectedWorkplan.operators || selectedWorkplan.operators_from_join) && (
-                <div className="mt-2 text-gray-700 text-base">
-                  <span className="font-semibold">ผู้ปฏิบัติงาน:</span> {(() => {
-                    try {
-                      // ใช้ operators_from_join ก่อน (ข้อมูลจาก JOIN)
-                      if (selectedWorkplan.operators_from_join) {
-                        return selectedWorkplan.operators_from_join;
-                      }
-                      // ถ้าไม่มี ให้ใช้ operators จาก field เดิม
-                      if (typeof selectedWorkplan.operators === 'string') {
-                        return selectedWorkplan.operators;
-                      } else if (Array.isArray(selectedWorkplan.operators)) {
-                        return selectedWorkplan.operators.map((op: any) => 
-                          typeof op === 'string' ? op : op.name || op.id_code || 'Unknown'
-                        ).join(", ");
-                      } else {
-                        return 'ไม่ระบุ';
-                      }
-                    } catch (e) {
-                      return 'ไม่ระบุ';
-                    }
-                  })()}
-                </div>
-              )}
-            </div>
-            {/* กล่องรายการขั้นตอนการผลิต */}
-            <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg font-semibold"><i className="bi bi-clock mr-2" />รายการขั้นตอนการผลิต</span>
-              </div>
-              <div ref={scrollRef} className="process-scroll max-h-[400px] overflow-y-auto divide-y divide-gray-100">
-                {processSteps.length === 0 && <div className="text-center text-gray-400 py-4">ไม่มีขั้นตอนการผลิต</div>}
-                {processSteps.map((step, idx) => {
-                  const log = processLogs.find((l: any) => l.process_number === step.process_number) || {};
-                  return (
-                    <div
-                      key={step.process_number}
-                      className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 py-4 px-3 cursor-pointer ${idx === selectedProcessIndex ? "bg-green-50 process-item-active" : "hover:bg-gray-50"}`}
-                      onClick={() => setSelectedProcessIndex(idx)}
-                    >
-                      <div className="font-bold text-xl w-10 text-center">{step.process_number}.</div>
-                      <div className="flex-1 font-semibold text-gray-900 text-lg">{step.process_description}</div>
-                      <div className="flex flex-col text-base text-right min-w-[110px] gap-0.5">
-                        <span>เริ่ม: <span className="text-green-700 font-bold">{log.start_time ? new Date(log.start_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–"}</span></span>
-                        <span>สิ้นสุด: <span className="text-red-600 font-bold">{log.stop_time ? new Date(log.stop_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–"}</span></span>
-                        <span>ใช้เวลา: <span className="text-blue-700 font-bold">{(() => {
-                          // ถ้าเป็นขั้นตอนที่กำลังทำงาน ให้ใช้ usedSec
-                          if (idx === selectedProcessIndex && usedSec !== null) {
-                            return formatUsedTime(usedSec);
-                          } else if (log.used_time != null) {
-                            return formatUsedTime(log.used_time);
-                          } else {
-                            return "–";
+                   </div>
+          
+
+
+
+                                   <div className="text-gray-500 mb-4 text-lg">{t.subtitle}</div>
+                          <div className="flex flex-col lg:flex-row gap-6 items-start">
+           {/* กล่องเลือกงานผลิต - แยกออกมาบนมือถือ */}
+           <div className="w-full lg:w-2/5 order-1 lg:order-2 lg:hidden">
+             <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-4">
+               <div className="flex flex-row items-center gap-3 mb-2">
+                 <div className="font-semibold whitespace-nowrap">{t.workPlan}</div>
+                 <select
+                   className="border rounded px-2 py-1 min-w-[180px]"
+                   value={selectedWorkplan?.id || ""}
+                   onChange={e => {
+                     const wp = workplans.find(w => w.id == e.target.value);
+                     setSelectedWorkplan(wp || null);
+                   }}
+                 >
+                   <option value="">{t.pleaseSelect}</option>
+                   {workplans.map(wp => {
+                     console.log('[DEBUG] Workplan option:', { id: wp.id, job_name: wp.job_name, job_code: wp.job_code, production_date: wp.production_date });
+                     return (
+                       <option key={wp.id} value={wp.id}>
+                         {wp.job_name || wp.job_code || 'ไม่ระบุชื่อ'}
+                       </option>
+                     );
+                   })}
+                 </select>
+               </div>
+               {selectedWorkplan && (
+                 <>
+                   {(selectedWorkplan.operators || selectedWorkplan.operators_from_join) && (
+                     <div className="mt-2 text-gray-700 text-xl">
+                       <span className="font-semibold">{t.operator}</span> <span className="font-bold">{(() => {
+                        try {
+                          // ใช้ operators_from_join ก่อน (ข้อมูลจาก JOIN)
+                          if (selectedWorkplan.operators_from_join) {
+                            return selectedWorkplan.operators_from_join;
                           }
-                        })()}</span></span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="text-right mt-2 text-sm text-gray-600">เวลารวมของงาน: <span className="font-bold">{totalJobTime}</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+                          // ถ้าไม่มี ให้ใช้ operators จาก field เดิม
+                          if (typeof selectedWorkplan.operators === 'string') {
+                            return selectedWorkplan.operators;
+                          } else if (Array.isArray(selectedWorkplan.operators)) {
+                            return selectedWorkplan.operators.map((op: any) => 
+                              typeof op === 'string' ? op : op.name || op.id_code || 'Unknown'
+                            ).join(", ");
+                          } else {
+                            return 'ไม่ระบุ';
+                          }
+                                                 } catch (e) {
+                          return 'ไม่ระบุ';
+                        }
+                      })()}</span>
+                     </div>
+                   )}
+                   {selectedWorkplan.notes && (
+                     <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                       <div className="text-red-700 text-base font-bold">
+                         <span className="font-semibold">{t.notes}</span> {selectedWorkplan.notes}
+                       </div>
+                     </div>
+                   )}
+                 </>
+               )}
+             </div>
+           </div>
+
+           {/* กล่องจับเวลา */}
+           <div className="w-full lg:w-3/5 order-2 lg:order-1">
+             <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-4">
+               {/* Header */}
+               <div className="text-center text-lg font-semibold mb-2">
+                 {selectedWorkplan ? selectedWorkplan.job_name : t.productionPlan}
+               </div>
+               {/* เลขขั้นตอน + ปุ่มลูกศร + ชื่อขั้นตอน */}
+               <div className="flex flex-col items-center mb-2">
+                 <div className="text-2xl font-bold mb-2 text-center min-h-[2.5rem] flex items-center justify-center">{processSteps[selectedProcessIndex]?.process_description || "-"}</div>
+                 <div className="flex flex-row items-center justify-center gap-6 w-full">
+                   <button
+                     className="bg-gray-300 rounded-full w-12 h-12 flex items-center justify-center text-2xl"
+                     onClick={() => setSelectedProcessIndex(i => Math.max(0, i - 1))}
+                     disabled={selectedProcessIndex === 0}
+                   >&lt;</button>
+                   <div className="flex flex-col items-center min-w-[120px]">
+                     <div className="number-display text-6xl font-mono bg-black text-white rounded-lg px-10 py-4 mb-2">
+                       {processSteps[selectedProcessIndex]?.process_number?.toString().padStart(2, "0") || "--"}
+                     </div>
+                     <div className="text-base font-bold mb-1">{t.stepNumber}</div>
+                   </div>
+                   <button
+                     className="bg-gray-300 rounded-full w-12 h-12 flex items-center justify-center text-2xl"
+                     onClick={() => setSelectedProcessIndex(i => Math.min(processSteps.length - 1, i + 1))}
+                     disabled={selectedProcessIndex === processSteps.length - 1}
+                   >&gt;</button>
+                 </div>
+               </div>
+               {/* กล่องเวลา */}
+               <div className="flex flex-col sm:flex-row gap-2 justify-center mb-4">
+                 <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                   <div className="text-xs text-gray-500">{t.startTime}</div>
+                   <div className="font-bold text-lg">
+                     {(() => {
+                       const log = processLogs.find((l: any) => l.process_number === processSteps[selectedProcessIndex]?.process_number) || {};
+                       return log.start_time ? new Date(log.start_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–";
+                     })()}
+                   </div>
+                 </div>
+                 <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                   <div className="text-xs text-gray-500">{t.endTime}</div>
+                   <div className="font-bold text-lg text-red-600">
+                     {(() => {
+                       const log = processLogs.find((l: any) => l.process_number === processSteps[selectedProcessIndex]?.process_number) || {};
+                       return log.stop_time ? new Date(log.stop_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–";
+                     })()}
+                   </div>
+                 </div>
+                 <div className="flex-1 bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                   <div className="text-xs text-gray-500">{t.usedTime}</div>
+                   <div className="font-bold text-lg">{(() => {
+                     const log = processLogs.find((l: any) => l.process_number === processSteps[selectedProcessIndex]?.process_number) || {};
+                     // ใช้ usedSec ถ้ามี (timer กำลังทำงาน) หรือใช้ log.used_time จาก database
+                     if (usedSec !== null) {
+                       return formatUsedTime(usedSec);
+                     } else if (log.used_time != null) {
+                       return formatUsedTime(log.used_time);
+                     } else {
+                       return "–";
+                     }
+                   })()}</div>
+                 </div>
+               </div>
+               {/* ปุ่ม */}
+               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-2">
+                 <button
+                   className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-4 sm:py-3 px-4 rounded-lg text-xl sm:text-lg disabled:opacity-50 shadow-lg hover:shadow-xl transition-all duration-200 min-h-[60px] sm:min-h-[48px]"
+                   onClick={() => handleLog(true)}
+                   disabled={isLoading || !selectedWorkplan}
+                 >{t.startStep}</button>
+                 <button
+                   className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-4 sm:py-3 px-4 rounded-lg text-xl sm:text-lg disabled:opacity-50 shadow-lg hover:shadow-xl transition-all duration-200 min-h-[60px] sm:min-h-[48px]"
+                   onClick={() => handleLog(false)}
+                   disabled={isLoading || !selectedWorkplan}
+                 >{t.stopStep}</button>
+                 <button
+                   className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-4 sm:py-3 px-4 rounded-lg text-xl sm:text-lg disabled:opacity-50 shadow-lg hover:shadow-xl transition-all duration-200 min-h-[60px] sm:min-h-[48px]"
+                   onClick={() => handleFinishProduction()}
+                   disabled={isLoading || !selectedWorkplan}
+                 >{t.finishProduction}</button>
+               </div>
+             </div>
+           </div>
+
+           {/* กล่องรายการขั้นตอนการผลิต - แยกออกมาบนมือถือ */}
+           <div className="w-full lg:w-2/5 order-3 lg:order-3 lg:hidden">
+             <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
+               <div className="flex items-center gap-2 mb-2">
+                 <span className="text-lg font-semibold"><i className="bi bi-clock mr-2" />รายการขั้นตอนการผลิต</span>
+               </div>
+               <div ref={scrollRef} className="process-scroll max-h-[400px] overflow-y-auto divide-y divide-gray-100">
+                 {processSteps.length === 0 && <div className="text-center text-gray-400 py-4">ไม่มีขั้นตอนการผลิต</div>}
+                 {processSteps.map((step, idx) => {
+                   const log = processLogs.find((l: any) => l.process_number === step.process_number) || {};
+                   return (
+                     <div
+                       key={step.process_number}
+                       className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 py-4 px-3 cursor-pointer ${idx === selectedProcessIndex ? "bg-green-50 process-item-active" : "hover:bg-gray-50"}`}
+                       onClick={() => setSelectedProcessIndex(idx)}
+                     >
+                       <div className="font-bold text-xl w-10 text-center">{step.process_number}.</div>
+                       <div className="flex-1 font-semibold text-gray-900 text-lg">{step.process_description}</div>
+                       <div className="flex flex-col text-base text-right min-w-[110px] gap-0.5">
+                         <span>เริ่ม: <span className="text-green-700 font-bold">{log.start_time ? new Date(log.start_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–"}</span></span>
+                         <span>สิ้นสุด: <span className="text-red-600 font-bold">{log.stop_time ? new Date(log.stop_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–"}</span></span>
+                         <span>ใช้เวลา: <span className="text-blue-700 font-bold">{(() => {
+                           // ถ้าเป็นขั้นตอนที่กำลังทำงาน ให้ใช้ usedSec
+                           if (idx === selectedProcessIndex && usedSec !== null) {
+                             return formatUsedTime(usedSec);
+                           } else if (log.used_time != null) {
+                             return formatUsedTime(log.used_time);
+                           } else {
+                             return "–";
+                           }
+                         })()}</span></span>
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+               <div className="text-right mt-2 text-sm text-gray-600">เวลารวมของงาน: <span className="font-bold">{totalJobTime}</span></div>
+             </div>
+           </div>
+
+           {/* กล่องขวา: กล่องเลือกงานผลิต + กล่องรายการขั้นตอน - เฉพาะบนหน้าจอใหญ่ */}
+           <div className="hidden lg:flex w-full lg:w-2/5 order-1 lg:order-2 flex-col gap-4">
+             {/* กล่องเลือกงานผลิต */}
+             <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
+               <div className="flex flex-row items-center gap-3 mb-2">
+                 <div className="font-semibold whitespace-nowrap">{t.workPlan}</div>
+                 <select
+                   className="border rounded px-2 py-1 min-w-[180px]"
+                   value={selectedWorkplan?.id || ""}
+                   onChange={e => {
+                     const wp = workplans.find(w => w.id == e.target.value);
+                     setSelectedWorkplan(wp || null);
+                   }}
+                 >
+                   <option value="">{t.pleaseSelect}</option>
+                   {workplans.map(wp => {
+                     console.log('[DEBUG] Workplan option:', { id: wp.id, job_name: wp.job_name, job_code: wp.job_code, production_date: wp.production_date });
+                     return (
+                       <option key={wp.id} value={wp.id}>
+                         {wp.job_name || wp.job_code || 'ไม่ระบุชื่อ'}
+                       </option>
+                     );
+                   })}
+                 </select>
+               </div>
+               {selectedWorkplan && (
+                 <>
+                   {(selectedWorkplan.operators || selectedWorkplan.operators_from_join) && (
+                     <div className="mt-2 text-gray-700 text-xl">
+                       <span className="font-semibold">{t.operator}</span> <span className="font-bold">{(() => {
+                        try {
+                          // ใช้ operators_from_join ก่อน (ข้อมูลจาก JOIN)
+                          if (selectedWorkplan.operators_from_join) {
+                            return selectedWorkplan.operators_from_join;
+                          }
+                          // ถ้าไม่มี ให้ใช้ operators จาก field เดิม
+                          if (typeof selectedWorkplan.operators === 'string') {
+                            return selectedWorkplan.operators;
+                          } else if (Array.isArray(selectedWorkplan.operators)) {
+                            return selectedWorkplan.operators.map((op: any) => 
+                              typeof op === 'string' ? op : op.name || op.id_code || 'Unknown'
+                            ).join(", ");
+                          } else {
+                            return 'ไม่ระบุ';
+                          }
+                                                 } catch (e) {
+                          return 'ไม่ระบุ';
+                        }
+                      })()}</span>
+                     </div>
+                   )}
+                   {selectedWorkplan.notes && (
+                     <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                       <div className="text-red-700 text-base font-bold">
+                         <span className="font-semibold">{t.notes}</span> {selectedWorkplan.notes}
+                       </div>
+                     </div>
+                   )}
+                 </>
+               )}
+             </div>
+
+             {/* กล่องรายการขั้นตอนการผลิต */}
+             <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 flex-1">
+               <div className="flex items-center gap-2 mb-2">
+                 <span className="text-lg font-semibold"><i className="bi bi-clock mr-2" />รายการขั้นตอนการผลิต</span>
+               </div>
+               <div ref={scrollRef} className="process-scroll max-h-[400px] overflow-y-auto divide-y divide-gray-100">
+                 {processSteps.length === 0 && <div className="text-center text-gray-400 py-4">ไม่มีขั้นตอนการผลิต</div>}
+                 {processSteps.map((step, idx) => {
+                   const log = processLogs.find((l: any) => l.process_number === step.process_number) || {};
+                   return (
+                     <div
+                       key={step.process_number}
+                       className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 py-4 px-3 cursor-pointer ${idx === selectedProcessIndex ? "bg-green-50 process-item-active" : "hover:bg-gray-50"}`}
+                       onClick={() => setSelectedProcessIndex(idx)}
+                     >
+                       <div className="font-bold text-xl w-10 text-center">{step.process_number}.</div>
+                       <div className="flex-1 font-semibold text-gray-900 text-lg">{step.process_description}</div>
+                       <div className="flex flex-col text-base text-right min-w-[110px] gap-0.5">
+                         <span>เริ่ม: <span className="text-green-700 font-bold">{log.start_time ? new Date(log.start_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–"}</span></span>
+                         <span>สิ้นสุด: <span className="text-red-600 font-bold">{log.stop_time ? new Date(log.stop_time).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "–"}</span></span>
+                         <span>ใช้เวลา: <span className="text-blue-700 font-bold">{(() => {
+                           // ถ้าเป็นขั้นตอนที่กำลังทำงาน ให้ใช้ usedSec
+                           if (idx === selectedProcessIndex && usedSec !== null) {
+                             return formatUsedTime(usedSec);
+                           } else if (log.used_time != null) {
+                             return formatUsedTime(log.used_time);
+                           } else {
+                             return "–";
+                           }
+                         })()}</span></span>
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+               <div className="text-right mt-2 text-sm text-gray-600">เวลารวมของงาน: <span className="font-bold">{totalJobTime}</span></div>
+             </div>
+           </div>
+                   </div>
+          
+                     {/* ข้อความแจ้งเตือน */}
+           {message && (
+             <div className={`flex items-center justify-center mb-2 p-2 rounded-lg ${
+               statusType === 'success' ? 'bg-green-100 text-green-800' :
+               statusType === 'fail' ? 'bg-red-100 text-red-800' :
+               'bg-blue-100 text-blue-800'
+             }`}>
+               <div className="flex items-center gap-2">
+                 <span className="text-sm font-medium">{message}</span>
+                 {statusType === 'fail' && (
+                   <button
+                     onClick={() => {
+                       setMessage('');
+                       // ลองโหลดข้อมูลใหม่
+                       const today = new Date();
+                       const currentDate = today.toISOString().slice(0, 10);
+                       setDate(currentDate);
+                     }}
+                     className="text-xs bg-white px-2 py-1 rounded border hover:bg-gray-50"
+                   >
+                     ลองใหม่
+                   </button>
+                 )}
+               </div>
+             </div>
+           )}
+          
+                     {/* จุดสถานะ Auto-refresh ที่มุมล่างขวา */}
+           <div className="fixed bottom-4 right-4 z-50">
+             <div className="flex flex-col items-end gap-2">
+               {/* สถานะการโหลดข้อมูล */}
+               <div className="bg-white rounded-lg shadow-lg px-3 py-2 text-xs">
+                 <div className="flex items-center gap-2">
+                   <div className={`w-2 h-2 rounded-full ${
+                     isAutoRefreshing ? 'bg-orange-500 animate-pulse' : 
+                     autoRefreshEnabled ? 'bg-green-500' : 'bg-gray-400'
+                   }`}></div>
+                   <span className="text-gray-600">
+                     {isAutoRefreshing ? 'กำลังอัปเดต...' : 
+                      autoRefreshEnabled ? 'Auto Refresh เปิด' : 'Auto Refresh ปิด'}
+                   </span>
+                 </div>
+                 {lastUpdateTime && (
+                   <div className="text-gray-500 mt-1">
+                     อัปเดตล่าสุด: {lastUpdateTime}
+                   </div>
+                 )}
+                 {!autoRefreshEnabled && (
+                   <div className="text-orange-600 mt-1 font-medium">
+                     เปิด Auto Refresh ในตั้งค่าเพื่ออัปเดตอัตโนมัติ
+                   </div>
+                 )}
+               </div>
+             </div>
+           </div>
+       </div>
+     </div>
+   );
+ }

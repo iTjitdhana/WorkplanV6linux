@@ -1,15 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Production optimizations
+  // Basic production settings
   // output: 'standalone', // Disabled for now to fix start issues
   poweredByHeader: false,
   compress: true,
-  generateEtags: false,
-  
-  // Performance optimizations
-  experimental: {
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
-  },
   
   // Image optimization
   images: {
@@ -43,16 +37,6 @@ const nextConfig = {
   // Environment variables
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
-  },
-  
-  // API routes optimization
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: '/api/:path*',
-      },
-    ]
   },
 }
 

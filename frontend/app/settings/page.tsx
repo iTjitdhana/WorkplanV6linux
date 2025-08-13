@@ -9,16 +9,17 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { 
   Settings, 
-  RefreshCw, 
   ToggleLeft, 
   Info,
   AlertCircle,
   CheckCircle,
-  Clock
+  Clock,
+  Timer
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const [syncModeEnabled, setSyncModeEnabled] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -72,23 +73,40 @@ export default function SettingsPage() {
       const data = await response.json();
       if (data.success && data.data) {
         setSyncModeEnabled(data.data.syncModeEnabled || false);
+        if (Object.prototype.hasOwnProperty.call(data.data, 'autoRefreshEnabled')) {
+          setAutoRefreshEnabled(data.data.autoRefreshEnabled === true);
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
   };
 
+  // โหลดค่า Auto Refresh เฉพาะ เพื่อความทนทานเมื่อ backend ส่งค่า settings รวมไม่ครบ
+  const loadAutoRefreshSetting = async () => {
+    try {
+      const response = await fetch('/api/settings/auto-refresh');
+      const data = await response.json();
+      if (data.success && typeof data.autoRefreshEnabled === 'boolean') {
+        setAutoRefreshEnabled(data.autoRefreshEnabled === true);
+      }
+    } catch (error) {
+      console.error('Error loading auto refresh:', error);
+    }
+  };
+
   // โหลดการตั้งค่าเมื่อเปิดหน้า
   useEffect(() => {
     loadSettings();
+    loadAutoRefreshSetting();
   }, []);
 
   // บันทึกการตั้งค่าเมื่อมีการเปลี่ยนแปลง
   useEffect(() => {
-    if (syncModeEnabled !== undefined) {
+    if (syncModeEnabled !== undefined && autoRefreshEnabled !== undefined) {
       saveSettings();
     }
-  }, [syncModeEnabled]);
+  }, [syncModeEnabled, autoRefreshEnabled]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -101,7 +119,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <RefreshCw className="w-5 h-5 text-green-600" />
+            <Settings className="w-5 h-5 text-green-600" />
             <span>การตั้งค่าฟังก์ชัน Sync</span>
           </CardTitle>
         </CardHeader>
@@ -197,6 +215,87 @@ export default function SettingsPage() {
             </div>
             <Badge variant={syncModeEnabled ? "default" : "secondary"}>
               {syncModeEnabled ? 'โหมดงานพิเศษ' : 'โหมดปกติ'}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* การตั้งค่า Auto Refresh */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Timer className="w-5 h-5 text-blue-600" />
+            <span>การตั้งค่า Auto Refresh</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* ปุ่มเปิด/ปิด Auto Refresh */}
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center space-x-3">
+              <Timer className="w-5 h-5 text-blue-600" />
+              <div>
+                <Label className="text-base font-semibold">Auto Refresh หน้า Tracker</Label>
+                <p className="text-sm text-gray-600">
+                  อัปเดตข้อมูลอัตโนมัติทุก 2 นาทีในหน้า Tracker
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={autoRefreshEnabled}
+              onCheckedChange={setAutoRefreshEnabled}
+              className="data-[state=checked]:bg-blue-600"
+            />
+          </div>
+
+          {/* คำอธิบาย */}
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div className="space-y-2">
+                <h3 className="font-semibold text-gray-900">เมื่อเปิดใช้งาน:</h3>
+                <ul className="space-y-1 text-sm text-gray-600">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span>ข้อมูลจะอัปเดตอัตโนมัติทุก 2 นาที</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span>แสดงสถานะการอัปเดตที่มุมล่างขวา</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5" />
+              <div className="space-y-2">
+                <h3 className="font-semibold text-gray-900">เมื่อปิดใช้งาน:</h3>
+                <ul className="space-y-1 text-sm text-gray-600">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span>ลดการใช้งานเซิร์ฟเวอร์</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span>ข้อมูลจะไม่อัปเดตอัตโนมัติ</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* สถานะปัจจุบัน */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${autoRefreshEnabled ? 'bg-blue-500' : 'bg-gray-400'}`} />
+              <span className="font-medium">
+                สถานะ Auto Refresh: {autoRefreshEnabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+              </span>
+            </div>
+            <Badge variant={autoRefreshEnabled ? 'default' : 'secondary'}>
+              {autoRefreshEnabled ? 'อัปเดตอัตโนมัติ' : 'อัปเดตด้วยตนเอง'}
             </Badge>
           </div>
         </CardContent>

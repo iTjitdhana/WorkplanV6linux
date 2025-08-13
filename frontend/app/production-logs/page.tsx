@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface WorkPlan {
   id: number;
@@ -46,6 +47,12 @@ export default function ProductionLogsPage() {
   const [filterJob, setFilterJob] = useState('');
   const { toast } = useToast();
   const cacheRef = useRef(new Map<string, any[]>());
+
+  // Local fields for cost view (in-page only)
+  const [unitCostMap, setUnitCostMap] = useState<Record<number, number>>({});
+  const [timeUsedMinutesMap, setTimeUsedMinutesMap] = useState<Record<number, number>>({});
+  const [operatorsCountMap, setOperatorsCountMap] = useState<Record<number, number>>({});
+  const LABOR_RATE_PER_HOUR = 480; // บาท/ชั่วโมง
 
   // Load work plans for selected date
   const loadWorkPlans = async (date: string) => {
@@ -400,6 +407,129 @@ export default function ProductionLogsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Cost Table View */}
+      {selectedDate && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">ตารางต้นทุนการผลิต (มุมมองตาราง)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead rowSpan={2} className="min-w-[220px] bg-gray-50">รายการสินค้า</TableHead>
+                    <TableHead rowSpan={2} className="min-w-[120px] bg-gray-50">รหัสงาน</TableHead>
+                    <TableHead colSpan={2} className="text-center bg-rose-50 text-rose-800">ต้นทุนวัตถุดิบตั้งต้น (บาท)</TableHead>
+                    <TableHead colSpan={2} className="text-center bg-emerald-50 text-emerald-800">ต้นทุนที่ผลิตได้ (บาท)</TableHead>
+                    <TableHead colSpan={4} className="text-center bg-amber-50 text-amber-800">ผลการผลิต</TableHead>
+                    <TableHead colSpan={2} className="text-center bg-sky-50 text-sky-800">ต้นทุนแรงงาน</TableHead>
+                    <TableHead colSpan={2} className="text-center bg-indigo-50 text-indigo-800">ค่าใช้จ่ายเพิ่ม</TableHead>
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="bg-rose-50">จำนวนรวม</TableHead>
+                    <TableHead className="bg-rose-50">หน่วย</TableHead>
+                    <TableHead className="bg-emerald-50">มูลค่าต่อหน่วย</TableHead>
+                    <TableHead className="bg-emerald-50">หน่วย</TableHead>
+                    <TableHead className="bg-amber-50">จำนวนผลิตได้</TableHead>
+                    <TableHead className="bg-amber-50">%</TableHead>
+                    <TableHead className="bg-amber-50">เวลาที่ใช้ (นาที)</TableHead>
+                    <TableHead className="bg-amber-50">จำนวนผู้ปฏิบัติงาน</TableHead>
+                    <TableHead className="bg-sky-50">ค่าจ้าง/ชั่วโมง</TableHead>
+                    <TableHead className="bg-sky-50">ต้นทุนรวมค่าแรง</TableHead>
+                    <TableHead className="bg-indigo-50">ค่าสูญหาย 10%</TableHead>
+                    <TableHead className="bg-indigo-50">ค่าน้ำ/ไฟ/แก๊ส 1%</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredWorkPlans.map((workPlan, idx) => {
+                    const log = logs.find(l => l.work_plan_id === workPlan.id);
+                    const inputQty = Number(log?.input_material_quantity || 0);
+                    const outputQty = Number(log?.output_quantity || 0);
+                    const unitCost = unitCostMap[workPlan.id] || 0;
+                    const minutes = timeUsedMinutesMap[workPlan.id] || 0;
+                    const operators = operatorsCountMap[workPlan.id] || 0;
+                    const yieldPercent = inputQty > 0 ? (outputQty / inputQty) * 100 : 0;
+                    const laborTotal = (minutes / 60) * operators * LABOR_RATE_PER_HOUR;
+                    const loss10 = outputQty * unitCost * 0.10;
+                    const util1 = outputQty * unitCost * 0.01;
+                    return (
+                      <TableRow key={workPlan.id}>
+                        <TableCell className="font-medium">{workPlan.job_name}</TableCell>
+                        <TableCell className="text-xs text-gray-600">{workPlan.job_code}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={inputQty || ''}
+                            onChange={(e) => updateLogEntry(workPlan.id, 'input_material_quantity', parseFloat(e.target.value) || null)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={log?.input_material_unit || ''}
+                            onChange={(e) => updateLogEntry(workPlan.id, 'input_material_unit', e.target.value)}
+                            placeholder="หน่วย"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={unitCostMap[workPlan.id] ?? ''}
+                            onChange={(e) => setUnitCostMap(prev => ({ ...prev, [workPlan.id]: parseFloat(e.target.value) || 0 }))}
+                            placeholder="0.00"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={log?.output_unit || ''}
+                            onChange={(e) => updateLogEntry(workPlan.id, 'output_unit', e.target.value)}
+                            placeholder="หน่วย"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={outputQty || ''}
+                            onChange={(e) => updateLogEntry(workPlan.id, 'output_quantity', parseFloat(e.target.value) || null)}
+                          />
+                        </TableCell>
+                        <TableCell>{yieldPercent.toFixed(2)}%</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step={1}
+                            value={timeUsedMinutesMap[workPlan.id] ?? ''}
+                            onChange={(e) => setTimeUsedMinutesMap(prev => ({ ...prev, [workPlan.id]: parseInt(e.target.value || '0', 10) }))}
+                            placeholder="0"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step={1}
+                            value={operatorsCountMap[workPlan.id] ?? ''}
+                            onChange={(e) => setOperatorsCountMap(prev => ({ ...prev, [workPlan.id]: parseInt(e.target.value || '0', 10) }))}
+                            placeholder="0"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">{LABOR_RATE_PER_HOUR.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{laborTotal.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{loss10.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{util1.toFixed(2)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="text-xs text-gray-500 mt-2">หมายเหตุ: มุมมองนี้เป็นการคำนวณชั่วคราวสำหรับการวิเคราะห์ต้นทุน (ไม่ได้บันทึกลงฐานข้อมูล)</div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Instructions */}

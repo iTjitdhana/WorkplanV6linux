@@ -4,10 +4,15 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, FileText, Settings, BarChart3, Users, Home, Activity } from 'lucide-react';
+import { Calendar, Clock, FileText, Settings, BarChart3, Users, Home, Activity, Timer } from 'lucide-react';
 
 export default function Navigation() {
   const pathname = usePathname();
+
+  // Hide navigation on production planning page (root path)
+  if (pathname === '/') {
+    return null;
+  }
 
   const navItems = [
     {
@@ -49,6 +54,11 @@ export default function Navigation() {
       title: 'ติดตามสถานะ',
       href: '/monitoring',
       icon: Activity
+    },
+    {
+      title: 'เวลาการผลิต',
+      href: '/production-times',
+      icon: Timer
     }
   ];
 

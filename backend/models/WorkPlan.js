@@ -35,8 +35,8 @@ class WorkPlan {
       
       const params = [];
       if (date) {
-        // แก้ไขการเปรียบเทียบวันที่ให้ถูกต้อง โดยใช้ CONVERT_TZ เพื่อแปลง timezone
-        query += ' WHERE DATE(CONVERT_TZ(wp.production_date, "UTC", "Asia/Bangkok")) = ?';
+        // แก้ไขการเปรียบเทียบวันที่ให้ถูกต้อง โดยใช้ DATE() function
+        query += ' WHERE DATE(wp.production_date) = ?';
         params.push(date);
         console.log('🔍 Query date:', date);
         console.log('🔍 SQL Query:', query);

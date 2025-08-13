@@ -16,8 +16,17 @@ export async function GET(request: NextRequest) {
     }
 
     const response = await fetch(`${API_BASE_URL}/api/machines?${params}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Backend API error:', response.status, errorText);
+      return NextResponse.json(
+        { success: false, message: `Backend API error: ${response.status} ${errorText}` },
+        { status: response.status }
+      );
+    }
+    
     const data = await response.json();
-
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error fetching machines:', error);
@@ -39,6 +48,15 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify(body),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Backend API error:', response.status, errorText);
+      return NextResponse.json(
+        { success: false, message: `Backend API error: ${response.status} ${errorText}` },
+        { status: response.status }
+      );
+    }
 
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });

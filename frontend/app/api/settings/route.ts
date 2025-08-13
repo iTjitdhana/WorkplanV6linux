@@ -13,7 +13,29 @@ export async function GET(request: NextRequest) {
     }
 
     const response = await fetch(`${API_BASE_URL}/api/settings?${params}`);
-    const data = await response.json();
+    
+    // ตรวจสอบ HTTP status ก่อน
+    if (!response.ok) {
+      console.error('Backend API error:', response.status, response.statusText);
+      return NextResponse.json(
+        { success: false, message: 'Backend API error' },
+        { status: response.status }
+      );
+    }
+
+    const text = await response.text();
+    let data;
+    
+    try {
+      data = text ? JSON.parse(text) : { success: false };
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Response text:', text);
+      return NextResponse.json(
+        { success: false, message: 'Invalid JSON response from server' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(data);
   } catch (error) {
@@ -37,7 +59,29 @@ export async function PUT(request: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    // ตรวจสอบ HTTP status ก่อน
+    if (!response.ok) {
+      console.error('Backend API error:', response.status, response.statusText);
+      return NextResponse.json(
+        { success: false, message: 'Backend API error' },
+        { status: response.status }
+      );
+    }
+
+    const text = await response.text();
+    let data;
+    
+    try {
+      data = text ? JSON.parse(text) : { success: false };
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Response text:', text);
+      return NextResponse.json(
+        { success: false, message: 'Invalid JSON response from server' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error('Error updating settings:', error);

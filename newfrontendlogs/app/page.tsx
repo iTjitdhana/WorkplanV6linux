@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ProductionLogs from "@/components/production-logs"
 import Analytics from "@/components/analytics"
 import DailySummary from "@/components/daily-summary"
+import Costs from "@/components/costs"
 
 export default function ProductionDashboard() {
   const [activeTab, setActiveTab] = useState("logs")
@@ -88,10 +89,11 @@ export default function ProductionDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="logs">Production Logs</TabsTrigger>
             <TabsTrigger value="analytics">วิเคราะห์รายงาน</TabsTrigger>
             <TabsTrigger value="summary">สรุปรายวัน</TabsTrigger>
+            <TabsTrigger value="costs">ต้นทุนการผลิต</TabsTrigger>
           </TabsList>
 
           <TabsContent value="logs">
@@ -104,6 +106,10 @@ export default function ProductionDashboard() {
 
           <TabsContent value="summary">
             <DailySummary />
+          </TabsContent>
+
+          <TabsContent value="costs">
+            <Costs />
           </TabsContent>
         </Tabs>
       </div>
