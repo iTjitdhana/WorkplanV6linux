@@ -330,6 +330,15 @@ class Log {
     try {
       console.log('[DEBUG] Log.getDailySummary called with date:', productionDate);
       
+      // Test database connection
+      try {
+        const [testResult] = await pool.execute('SELECT 1 as test');
+        console.log('[DEBUG] Database connection test:', testResult[0].test === 1 ? 'PASSED' : 'FAILED');
+      } catch (dbError) {
+        console.error('[DEBUG] Database connection failed:', dbError.message);
+        throw new Error(`Database connection failed: ${dbError.message}`);
+      }
+      
       // ดึงข้อมูล work plans จาก database
       const workPlansQuery = `
         SELECT 
@@ -343,13 +352,32 @@ class Log {
           status_id,
           TIMESTAMPDIFF(MINUTE, start_time, end_time) as planned_duration_minutes
         FROM work_plans 
-        WHERE DATE(production_date) = ?
+        WHERE DATE(production_date) = ? OR DATE(production_date) = DATE(?)
         ORDER BY start_time, operators
       `;
       
       console.log('[DEBUG] Executing workPlansQuery with date:', productionDate);
-      const [workPlans] = await pool.execute(workPlansQuery, [productionDate]);
+      const [workPlans] = await pool.execute(workPlansQuery, [productionDate, productionDate]);
       console.log('[DEBUG] Found workPlans:', workPlans.length);
+      console.log('[DEBUG] WorkPlans sample:', workPlans.slice(0, 2));
+      
+      // Check if there are any work plans in the database
+      if (workPlans.length === 0) {
+        console.log('[DEBUG] No work plans found for date:', productionDate);
+        
+        // Check what dates are available in the database
+        try {
+          const [availableDates] = await pool.execute(`
+            SELECT DISTINCT DATE(production_date) as date_only 
+            FROM work_plans 
+            ORDER BY date_only DESC 
+            LIMIT 10
+          `);
+          console.log('[DEBUG] Available dates in database:', availableDates.map(d => d.date_only));
+        } catch (dateError) {
+          console.error('[DEBUG] Error checking available dates:', dateError.message);
+        }
+      }
       
       // ดึงข้อมูล logs สำหรับแต่ละ work plan
       const dailySummary = [];

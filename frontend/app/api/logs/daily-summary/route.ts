@@ -7,11 +7,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const productionDate = searchParams.get('productionDate');
 
+    console.log('[DEBUG] Frontend daily-summary called with productionDate:', productionDate);
+
     if (!productionDate) {
       return NextResponse.json({ error: 'Production Date is required' }, { status: 400 });
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/logs/daily-summary?productionDate=${productionDate}`, {
+    const url = `${BACKEND_URL}/api/logs/daily-summary?productionDate=${productionDate}`;
+    console.log('[DEBUG] Calling Backend URL:', url);
+
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
