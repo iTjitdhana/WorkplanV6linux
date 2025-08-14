@@ -11,6 +11,13 @@ require('dotenv').config({ path: './production.env' });
 const app = express();
 const PORT = process.env.PORT || 3101;
 
+// Debug logging
+console.log('🚀 Starting Backend Server...');
+console.log('📊 Environment:', process.env.NODE_ENV || 'development');
+console.log('🔌 Port:', PORT);
+console.log('🌐 CORS Origin:', process.env.CORS_ORIGIN || 'http://192.168.0.94:3012');
+console.log('🗄️ Database Host:', process.env.DB_HOST || 'localhost');
+
 // Performance optimizations
 app.use(compression()); // Enable gzip compression
 app.use(helmet({
@@ -43,12 +50,18 @@ const limiter = rateLimit({
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['http://192.168.0.222:3012', 'http://localhost:3012', 'http://127.0.0.1:3012']
+    ? [process.env.CORS_ORIGIN || 'http://192.168.0.94:3012', 'http://localhost:3012', 'http://127.0.0.1:3012']
     : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path} - ${req.ip} - ${new Date().toISOString()}`);
+  next();
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -111,8 +124,10 @@ process.on('SIGTERM', () => {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 External access: http://192.168.0.222:${PORT}/health`);
+  console.log(`🌍 External access: http://192.168.0.94:${PORT}/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 API Base URL: http://192.168.0.94:${PORT}/api`);
+  console.log(`✅ Server is ready to accept connections!`);
 });
 
 // Keep-alive timeout
