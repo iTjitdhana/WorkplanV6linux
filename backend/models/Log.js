@@ -325,6 +325,167 @@ class Log {
     }
   }
 
+  // Get daily summary
+  static async getDailySummary(productionDate) {
+    try {
+      // ดึงข้อมูล work plans จาก database
+      const workPlansQuery = `
+        SELECT 
+          id,
+          job_code,
+          job_name,
+          production_date,
+          start_time,
+          end_time,
+          operators,
+          status_id,
+          TIMESTAMPDIFF(MINUTE, start_time, end_time) as planned_duration_minutes
+        FROM work_plans 
+        WHERE DATE(production_date) = ?
+        ORDER BY start_time, operators
+      `;
+      
+      const [workPlans] = await pool.execute(workPlansQuery, [productionDate]);
+      
+      // ดึงข้อมูล logs สำหรับแต่ละ work plan
+      const dailySummary = [];
+
+      for (const workPlan of workPlans) {
+        // ดึงข้อมูล logs สำหรับ work plan นี้
+        const logsQuery = `
+          SELECT 
+            id,
+            work_plan_id,
+            process_number,
+            status,
+            timestamp
+          FROM logs 
+          WHERE work_plan_id = ?
+          ORDER BY timestamp
+        `;
+        
+        const [logs] = await pool.execute(logsQuery, [workPlan.id]);
+        
+        let actualStartTime = null;
+        let actualEndTime = null;
+        let totalActualDuration = 0;
+        let completedProcesses = 0;
+        let totalProcesses = 0;
+
+        if (logs.length > 0) {
+          // จัดกลุ่ม logs ตาม process_number
+          const processGroups = {};
+          logs.forEach(log => {
+            const key = `${log.work_plan_id}-${log.process_number}`;
+            if (!processGroups[key]) {
+              processGroups[key] = [];
+            }
+            processGroups[key].push(log);
+          });
+
+          totalProcesses = Object.keys(processGroups).length;
+
+          // คำนวณเวลาสำหรับแต่ละ process
+          Object.keys(processGroups).forEach(key => {
+            const groupLogs = processGroups[key];
+            groupLogs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            
+            let startTime = null;
+            let endTime = null;
+            
+            // หา start และ stop time
+            groupLogs.forEach(log => {
+              const status = (log.status || '').toString().toLowerCase();
+              if (status === 'start' && !startTime) {
+                startTime = new Date(log.timestamp);
+              } else if (status === 'stop' && startTime) {
+                endTime = new Date(log.timestamp);
+              }
+            });
+
+            if (startTime && endTime) {
+              const durationMs = endTime.getTime() - startTime.getTime();
+              const durationMinutes = Math.round(durationMs / (1000 * 60));
+              totalActualDuration += durationMinutes;
+              completedProcesses++;
+
+              if (!actualStartTime || startTime < actualStartTime) {
+                actualStartTime = startTime;
+              }
+              if (!actualEndTime || endTime > actualEndTime) {
+                actualEndTime = endTime;
+              }
+            }
+          });
+        }
+
+        // กำหนดสถานะ
+        let status = 'not-started';
+        if (workPlan.status_id === 1) {
+          status = 'completed';
+        } else if (workPlan.status_id === 2) {
+          status = 'in-progress';
+        }
+
+        // คำนวณความแตกต่างของเวลา
+        const plannedDuration = workPlan.planned_duration_minutes || 0;
+        const timeVariance = totalActualDuration - plannedDuration;
+
+        dailySummary.push({
+          workPlanId: workPlan.id,
+          jobCode: workPlan.job_code,
+          jobName: workPlan.job_name,
+          productionDate: workPlan.production_date,
+          plannedStartTime: workPlan.start_time,
+          plannedEndTime: workPlan.end_time,
+          plannedDurationMinutes: plannedDuration,
+          actualStartTime: actualStartTime ? actualStartTime.toISOString() : null,
+          actualEndTime: actualEndTime ? actualEndTime.toISOString() : null,
+          actualDurationMinutes: totalActualDuration,
+          timeVarianceMinutes: timeVariance,
+          status: status,
+          completedProcesses: completedProcesses,
+          totalProcesses: totalProcesses,
+          logs: logs,
+          operators: workPlan.operators || '-'
+        });
+      }
+
+      // คำนวณสถิติรวม
+      const totalJobs = dailySummary.length;
+      const completedJobs = dailySummary.filter(job => job.status === 'completed').length;
+      const inProgressJobs = dailySummary.filter(job => job.status === 'in-progress').length;
+      const notStartedJobs = dailySummary.filter(job => job.status === 'not-started').length;
+
+      const totalPlannedTime = dailySummary.reduce((sum, job) => sum + job.plannedDurationMinutes, 0);
+      const totalActualTime = dailySummary.filter(job => job.status === 'completed')
+        .reduce((sum, job) => sum + job.actualDurationMinutes, 0);
+
+      const onTimeJobs = dailySummary.filter(job => 
+        job.status === 'completed' && job.timeVarianceMinutes <= 0
+      ).length;
+      const delayedJobs = dailySummary.filter(job => 
+        job.status === 'completed' && job.timeVarianceMinutes > 0
+      ).length;
+
+      return {
+        productionDate,
+        totalJobs,
+        completedJobs,
+        inProgressJobs,
+        notStartedJobs,
+        totalPlannedTime,
+        totalActualTime,
+        onTimeJobs,
+        delayedJobs,
+        completionRate: totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0,
+        jobs: dailySummary
+      };
+    } catch (error) {
+      throw new Error(`Error fetching daily summary: ${error.message}`);
+    }
+  }
+
   // Get work plan status based on logs
   static async getWorkPlanStatus(workPlanId) {
     try {

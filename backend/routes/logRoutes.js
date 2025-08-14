@@ -29,6 +29,7 @@ router.get('/work-plan/:workPlanId', LogController.getByWorkPlanId);
 router.get('/work-plan/:workPlanId/status', LogController.getProcessStatus);
 router.get('/work-plans/status', LogController.getWorkPlansStatus);
 router.get('/summary/:date', LogController.getProductionSummary);
+router.get('/daily-summary', LogController.getDailySummary);
 
 router.post('/', logValidation, LogController.create);
 router.post('/start', LogController.startProcess);

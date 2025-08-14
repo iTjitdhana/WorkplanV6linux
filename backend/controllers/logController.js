@@ -249,6 +249,33 @@ class LogController {
     }
   }
 
+  // Get daily summary
+  static async getDailySummary(req, res) {
+    try {
+      const { productionDate } = req.query;
+      
+      if (!productionDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'Production Date is required'
+        });
+      }
+      
+      const summary = await Log.getDailySummary(productionDate);
+      
+      res.json({
+        success: true,
+        data: summary
+      });
+    } catch (error) {
+      console.error('Error in getDailySummary:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
   // Get work plans status based on logs
   static async getWorkPlansStatus(req, res) {
     try {
