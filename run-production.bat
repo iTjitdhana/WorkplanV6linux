@@ -21,8 +21,8 @@ echo.
 echo ========================================
 echo Production servers started!
 echo ========================================
-echo Backend: http://192.168.0.94:3101
-echo Frontend: http://192.168.0.94:3011
+echo Backend: http://192.168.0.94:3102
+echo Frontend: http://192.168.0.94:3012
 echo ========================================
 echo.
 echo Note: Make sure you have built the frontend first!

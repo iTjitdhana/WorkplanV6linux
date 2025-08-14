@@ -180,3 +180,4 @@ console.log('[DEBUG] refreshWorkplans called, isLoading:', isLoading, 'isAutoRef
 5. **ปรับปรุงประสบการณ์ผู้ใช้**
 
 ระบบตอนนี้มีความยืดหยุ่นมากขึ้นและผู้ใช้สามารถเลือกได้ว่าจะให้ข้อมูลอัปเดตอัตโนมัติหรือไม่
+

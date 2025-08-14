@@ -63,8 +63,8 @@ echo ========================================
 echo Setup completed!
 echo ========================================
 echo.
-echo Frontend: http://192.168.0.94:3011
-echo Backend API: http://192.168.0.94:3101
+echo Frontend: http://192.168.0.94:3012
+echo Backend API: http://192.168.0.94:3102
 echo Database: 192.168.0.94:3306
 echo.
 echo To view logs: docker-compose logs -f

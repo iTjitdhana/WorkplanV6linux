@@ -90,7 +90,7 @@ echo   - docker pull %username%/%image_name%-frontend:%version%
 echo   - docker pull %username%/%image_name%-backend:%version%
 echo.
 echo 📝 คำสั่งสำหรับ run:
-echo   - docker run -p 3011:3011 %username%/%image_name%-frontend:%version%
-echo   - docker run -p 3101:3101 %username%/%image_name%-backend:%version%
+echo   - docker run -p 3012:3012 %username%/%image_name%-frontend:%version%
+echo   - docker run -p 3102:3102 %username%/%image_name%-backend:%version%
 echo.
 pause

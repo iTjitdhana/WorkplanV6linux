@@ -91,7 +91,7 @@ echo   - docker pull ghcr.io/%username%/workplanv6-frontend:%version%
 echo   - docker pull ghcr.io/%username%/workplanv6-backend:%version%
 echo.
 echo 📝 คำสั่งสำหรับ run:
-echo   - docker run -p 3011:3011 ghcr.io/%username%/workplanv6-frontend:%version%
-echo   - docker run -p 3101:3101 ghcr.io/%username%/workplanv6-backend:%version%
+echo   - docker run -p 3012:3012 ghcr.io/%username%/workplanv6-frontend:%version%
+echo   - docker run -p 3102:3102 ghcr.io/%username%/workplanv6-backend:%version%
 echo.
 pause

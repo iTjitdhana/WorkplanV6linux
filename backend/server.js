@@ -43,7 +43,7 @@ const limiter = rateLimit({
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['http://192.168.0.222:3011', 'http://localhost:3011', 'http://127.0.0.1:3011']
+    ? ['http://192.168.0.222:3012', 'http://localhost:3012', 'http://127.0.0.1:3012']
     : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

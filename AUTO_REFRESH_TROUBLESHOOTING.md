@@ -154,3 +154,4 @@ if (autoRefreshEnabled) {
 2. **Local Storage**: Cache การตั้งค่าใน Local Storage
 3. **Service Worker**: ใช้ Service Worker สำหรับ background sync
 4. **Push Notifications**: แจ้งเตือนเมื่อมีการเปลี่ยนแปลงการตั้งค่า
+

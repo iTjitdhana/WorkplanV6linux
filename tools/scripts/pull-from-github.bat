@@ -49,7 +49,7 @@ echo 🚀 เริ่มต้น run containers...
 echo 📦 Running backend...
 docker run -d ^
   --name workplanv6-backend ^
-  -p 3101:3101 ^
+  -p 3102:3102 ^
   -e NODE_ENV=production ^
   -e DB_HOST=192.168.0.94 ^
   -e DB_USER=jitdhana ^
@@ -68,10 +68,10 @@ if %errorlevel% neq 0 (
 echo 📦 Running frontend...
 docker run -d ^
   --name workplanv6-frontend ^
-  -p 3011:3011 ^
+  -p 3012:3012 ^
   -e NODE_ENV=production ^
-  -e NEXT_PUBLIC_API_URL=http://192.168.0.94:3101 ^
-  -e BACKEND_URL=http://backend:3101 ^
+  -e NEXT_PUBLIC_API_URL=http://192.168.0.94:3102 ^
+  -e BACKEND_URL=http://backend:3102 ^
   --restart unless-stopped ^
   ghcr.io/%username%/workplanv6-frontend:%version%
 
@@ -88,8 +88,8 @@ echo 📋 Containers ที่รันอยู่:
 docker ps --filter "name=workplanv6" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo.
 echo 🌐 URLs:
-echo   - Frontend: http://localhost:3011
-echo   - Backend API: http://localhost:3101
+echo   - Frontend: http://localhost:3012
+echo   - Backend API: http://localhost:3102
 echo.
 echo 📝 คำสั่งสำหรับจัดการ containers:
 echo   - ดู logs: docker logs workplanv6-frontend

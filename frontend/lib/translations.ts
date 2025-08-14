@@ -88,3 +88,4 @@ export const translations = {
 
 export type Language = 'thai' | 'myanmar';
 
+
