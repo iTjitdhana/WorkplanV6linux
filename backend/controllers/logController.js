@@ -252,16 +252,20 @@ class LogController {
   // Get daily summary
   static async getDailySummary(req, res) {
     try {
+      console.log('[DEBUG] getDailySummary called with query:', req.query);
       const { productionDate } = req.query;
       
       if (!productionDate) {
+        console.log('[DEBUG] No productionDate provided');
         return res.status(400).json({
           success: false,
           message: 'Production Date is required'
         });
       }
       
+      console.log('[DEBUG] Calling Log.getDailySummary with date:', productionDate);
       const summary = await Log.getDailySummary(productionDate);
+      console.log('[DEBUG] Summary result:', summary);
       
       res.json({
         success: true,

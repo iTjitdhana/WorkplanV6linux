@@ -328,6 +328,8 @@ class Log {
   // Get daily summary
   static async getDailySummary(productionDate) {
     try {
+      console.log('[DEBUG] Log.getDailySummary called with date:', productionDate);
+      
       // ดึงข้อมูล work plans จาก database
       const workPlansQuery = `
         SELECT 
@@ -345,7 +347,9 @@ class Log {
         ORDER BY start_time, operators
       `;
       
+      console.log('[DEBUG] Executing workPlansQuery with date:', productionDate);
       const [workPlans] = await pool.execute(workPlansQuery, [productionDate]);
+      console.log('[DEBUG] Found workPlans:', workPlans.length);
       
       // ดึงข้อมูล logs สำหรับแต่ละ work plan
       const dailySummary = [];
