@@ -1,150 +1,251 @@
-# WorkplanV6 - Production Planning System
+# TrackerV2 - Production Tracking System
 
-ระบบวางแผนการผลิตที่พัฒนาด้วย Node.js Backend และ Next.js Frontend
+ระบบติดตามการผลิตแบบ Real-time สำหรับโรงงานอุตสาหกรรม
 
-## 📁 โครงสร้างโปรเจค
+## 🚀 Features
 
-```
-WorkplanV6/
-├── backend/                 # Node.js Backend API
-├── frontend/               # Next.js Frontend Application
-├── tools/                  # เครื่องมือและสคริปต์ต่างๆ
-│   ├── scripts/           # ไฟล์ .bat และ .sh
-│   ├── docker/            # ไฟล์ Docker และ docker-compose
-│   ├── deployment/        # สคริปต์การ deploy
-│   ├── testing/           # ไฟล์ทดสอบ
-│   └── utilities/         # ไฟล์ config และ utilities
-├── docs/                  # เอกสารและคู่มือ
-│   ├── guides/           # คู่มือการใช้งาน
-│   ├── fixes/            # เอกสารการแก้ไขปัญหา
-│   ├── updates/          # เอกสารการอัปเดต
-│   ├── deployment/       # คู่มือการ deploy
-│   └── system/           # เอกสารระบบ
-├── scripts/              # สคริปต์เดิม (legacy)
-├── database/             # ไฟล์ฐานข้อมูล
-├── infra/                # Infrastructure files
-├── assets/               # ไฟล์ static assets
-├── ssl/                  # ไฟล์ SSL certificates
-└── newfrontendlogs/      # Frontend logs system
-```
+- **Real-time Production Tracking** - ติดตามการผลิตแบบ Real-time
+- **Work Plan Management** - จัดการแผนงานการผลิต
+- **Machine Status Monitoring** - ตรวจสอบสถานะเครื่องจักร
+- **Production Logs** - บันทึกข้อมูลการผลิต
+- **Reports & Analytics** - รายงานและวิเคราะห์ข้อมูล
+- **User Management** - จัดการผู้ใช้งาน
+- **Auto-refresh System** - ระบบอัปเดตอัตโนมัติ
 
-## 🚀 การเริ่มต้นใช้งาน
+## 🛠️ Technology Stack
 
-### 1. ติดตั้ง Dependencies
+### Backend
+- **Node.js** - Runtime environment
+- **Express.js** - Web framework
+- **MySQL** - Database
+- **JWT** - Authentication
+- **CORS** - Cross-origin resource sharing
+
+### Frontend
+- **Next.js 15** - React framework
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling
+- **Radix UI** - UI components
+- **React Hook Form** - Form handling
+- **Zod** - Schema validation
+
+## 📋 System Requirements
+
+- Node.js 18+
+- MySQL 8.0+
+- Docker (optional)
+
+## 🔧 Installation
+
+### 1. Clone Repository
 ```bash
-# Backend
+git clone https://github.com/iTjitdhana/TrackerV2.git
+cd TrackerV2
+```
+
+### 2. Backend Setup
+```bash
 cd backend
 npm install
+cp env.example .env
+# Edit .env with your database configuration
+npm run start
+```
 
-# Frontend
+### 3. Frontend Setup
+```bash
 cd frontend
 npm install
-```
-
-### 2. ตั้งค่าสภาพแวดล้อม
-```bash
-# Backend
-cp backend/env.example backend/.env
-# ระบบจะใช้ 192.168.0.94 เป็นค่าเริ่มต้น
-
-# Frontend
-cp frontend/env.example frontend/.env.local
-# ระบบจะใช้ 192.168.0.94 เป็นค่าเริ่มต้น
-```
-
-### 3. เริ่มต้นระบบ
-```bash
-# วิธีที่ 1: ใช้สคริปต์อัตโนมัติ (แนะนำ)
-./tools/scripts/setup-192-168-0-94.bat
-
-# วิธีที่ 2: ใช้ Docker
-docker-compose up -d
-
-# วิธีที่ 3: เริ่มต้นแยกกัน
-# Backend
-cd backend
-npm start
-
-# Frontend
-cd frontend
+cp env.example .env.local
+# Edit .env.local with your API configuration
 npm run dev
 ```
 
-### 4. เข้าถึงระบบ
-- **Frontend**: http://192.168.0.94:3011
-- **Backend API**: http://192.168.0.94:3101
-- **Database**: 192.168.0.94:3306
+## 🌐 Port Configuration
 
-## 🛠️ เครื่องมือและสคริปต์
+- **Backend API**: `http://192.168.0.94:3102`
+- **Frontend**: `http://192.168.0.94:3012`
+- **Database**: `192.168.0.94:3306`
 
-### Tools Directory
-- **scripts/**: ไฟล์ .bat และ .sh สำหรับการจัดการระบบ
-- **docker/**: ไฟล์ Docker และ docker-compose
-- **deployment/**: สคริปต์การ deploy และ ecosystem config
-- **testing/**: ไฟล์ทดสอบ API และระบบ
-- **utilities/**: ไฟล์ config และ utilities ต่างๆ
+## 🗄️ Database Configuration
 
-### การใช้งานสคริปต์
-```bash
-# เริ่มต้นระบบ
-./tools/scripts/quick-start.bat
-
-# Deploy ระบบ
-./tools/scripts/deploy-production.bat
-
-# ทดสอบระบบ
-./tools/scripts/test-system.bat
+```env
+DB_HOST=192.168.0.94
+DB_USER=jitdhana
+DB_PASSWORD=iT12345$
+DB_NAME=esp_tracker
+DB_PORT=3306
 ```
 
-## 📚 เอกสาร
+## 🐳 Docker Deployment
 
-### Docs Directory
-- **guides/**: คู่มือการใช้งานและ setup
-- **fixes/**: เอกสารการแก้ไขปัญหา
-- **updates/**: เอกสารการอัปเดตระบบ
-- **deployment/**: คู่มือการ deploy
-- **system/**: เอกสารระบบและ architecture
-
-## 🔧 การพัฒนา
-
-### Backend (Node.js + Express)
-- API Routes ใน `backend/routes/`
-- Controllers ใน `backend/controllers/`
-- Models ใน `backend/models/`
-- Middleware ใน `backend/middleware/`
-
-### Frontend (Next.js)
-- Pages ใน `frontend/app/`
-- Components ใน `frontend/components/`
-- API Routes ใน `frontend/app/api/`
-- Styles ใน `frontend/styles/`
-
-## 📦 Docker
-
-ระบบรองรับการ deploy ด้วย Docker:
+### Using Docker Compose
 ```bash
-# Build และ run
 docker-compose up -d
-
-# ดู logs
-docker-compose logs -f
-
-# Stop ระบบ
-docker-compose down
 ```
 
-## 🤝 การมีส่วนร่วม
+### Manual Docker Commands
+```bash
+# Build images
+docker build -t trackerv2-backend ./backend
+docker build -t trackerv2-frontend .
 
-1. Fork โปรเจค
-2. สร้าง feature branch
-3. Commit การเปลี่ยนแปลง
-4. Push ไปยัง branch
-5. สร้าง Pull Request
+# Run containers
+docker run -d -p 3102:3102 --name trackerv2-backend trackerv2-backend
+docker run -d -p 3012:3012 --name trackerv2-frontend trackerv2-frontend
+```
+
+## 📁 Project Structure
+
+```
+TrackerV2/
+├── backend/                 # Backend API server
+│   ├── controllers/        # Route controllers
+│   ├── models/            # Database models
+│   ├── routes/            # API routes
+│   ├── middleware/        # Custom middleware
+│   └── server.js          # Main server file
+├── frontend/              # Next.js frontend
+│   ├── app/              # App router pages
+│   ├── components/       # React components
+│   ├── lib/             # Utility functions
+│   └── types/           # TypeScript types
+├── tools/               # Development tools
+├── docs/               # Documentation
+└── docker-compose.yml  # Docker configuration
+```
+
+## 🔑 Environment Variables
+
+### Backend (.env)
+```env
+NODE_ENV=production
+PORT=3102
+DB_HOST=192.168.0.94
+DB_USER=jitdhana
+DB_PASSWORD=iT12345$
+DB_NAME=esp_tracker
+DB_PORT=3306
+JWT_SECRET=your-jwt-secret
+CORS_ORIGIN=http://192.168.0.94:3012
+```
+
+### Frontend (.env.local)
+```env
+NEXT_PUBLIC_API_URL=http://192.168.0.94:3102
+NEXT_PUBLIC_BACKEND_URL=http://192.168.0.94:3102
+```
+
+## 🚀 Quick Start Scripts
+
+### Windows (.bat files)
+- `fix-all-issues.bat` - Fix all common issues
+- `run-production.bat` - Start production servers
+- `build-simple.bat` - Build frontend for production
+- `restart-backend.bat` - Restart backend server
+
+### Linux/Mac (.sh files)
+- `start-production.sh` - Start production servers
+- `setup-production.sh` - Setup production environment
+
+## 📊 API Endpoints
+
+### Production Management
+- `GET /api/work-plans` - Get work plans
+- `POST /api/work-plans` - Create work plan
+- `PUT /api/work-plans/:id` - Update work plan
+- `DELETE /api/work-plans/:id` - Delete work plan
+
+### Production Logs
+- `GET /api/production-logs` - Get production logs
+- `POST /api/production-logs` - Create production log
+- `PUT /api/production-logs/:id` - Update production log
+
+### Machine Management
+- `GET /api/machines` - Get machines
+- `POST /api/machines` - Create machine
+- `PUT /api/machines/:id` - Update machine
+
+### Reports
+- `GET /api/reports` - Generate reports
+- `GET /api/reports/production-analysis` - Production analysis
+- `POST /api/reports/export` - Export reports
+
+## 🔒 Security Features
+
+- JWT Authentication
+- CORS Protection
+- Rate Limiting
+- Input Validation
+- SQL Injection Prevention
+- XSS Protection
+
+## 📈 Performance Optimizations
+
+- Database Connection Pooling
+- API Response Caching
+- Frontend Code Splitting
+- Image Optimization
+- Gzip Compression
+- CDN Integration
+
+## 🐛 Troubleshooting
+
+### Common Issues
+1. **Port Already in Use**
+   - Check if ports 3102 and 3012 are available
+   - Kill existing processes: `taskkill /f /im node.exe`
+
+2. **Database Connection Failed**
+   - Verify database credentials in `.env`
+   - Check network connectivity to database server
+
+3. **Frontend Build Failed**
+   - Clear Next.js cache: `rm -rf .next`
+   - Reinstall dependencies: `npm install`
+
+### Debug Mode
+```bash
+# Backend debug
+NODE_ENV=development npm run dev
+
+# Frontend debug
+npm run dev
+```
+
+## 📝 Changelog
+
+### v2.0.0 (Latest)
+- Updated ports: Backend 3102, Frontend 3012
+- Enhanced production tracking features
+- Improved real-time updates
+- Better error handling
+- Performance optimizations
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
 ## 📄 License
 
-โปรเจคนี้อยู่ภายใต้ MIT License - ดูไฟล์ [LICENSE](LICENSE) สำหรับรายละเอียด
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 📞 ติดต่อ
+## 📞 Support
 
-หากมีคำถามหรือปัญหา กรุณาสร้าง Issue ใน GitHub repository
+For support and questions:
+- Email: support@trackerv2.com
+- GitHub Issues: [Create Issue](https://github.com/iTjitdhana/TrackerV2/issues)
+
+## 🔗 Links
+
+- **Live Demo**: http://192.168.0.94:3012
+- **API Documentation**: http://192.168.0.94:3102/health
+- **GitHub Repository**: https://github.com/iTjitdhana/TrackerV2
+
+---
+
+**TrackerV2** - Empowering Production Excellence 🏭
