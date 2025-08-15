@@ -9,8 +9,8 @@ import { Calendar, Clock, FileText, Settings, BarChart3, Users, Home, Activity, 
 export default function Navigation() {
   const pathname = usePathname();
 
-  // Hide navigation on production planning page (root path)
-  if (pathname === '/') {
+  // Hide navigation on production planning page (root path) and tracker page
+  if (pathname === '/' || pathname === '/tracker') {
     return null;
   }
 

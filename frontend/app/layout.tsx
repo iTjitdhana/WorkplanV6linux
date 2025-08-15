@@ -24,7 +24,6 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body className={`${notoSansThai.variable} font-sans antialiased`}>
-        <Navigation />
         {children}
       </body>
     </html>

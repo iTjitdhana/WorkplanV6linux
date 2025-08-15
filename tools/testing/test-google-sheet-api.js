@@ -1,5 +1,5 @@
 // Test script for Google Sheet API
-const fetch = require('node-fetch');
+// Use built-in fetch for Node.js 18+
 
 async function testGoogleSheetAPI() {
   console.log('🧪 Testing Google Sheet API...');

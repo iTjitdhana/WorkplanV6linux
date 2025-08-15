@@ -449,7 +449,7 @@ export default function MedicalAppointmentDashboard() {
   // Staff image mapping
   const staffImages: { [key: string]: string } = {
     // ชื่อไทย
-    จรัญ: "/images/staff/จรัญ.jpg",
+    จรัญ: "/images/staff/จรัญ.jpeg",
     แมน: "/images/staff/แมน.jpg",
     แจ็ค: "/images/staff/แจ็ค.jpg",
     ป้าน้อย: "/images/staff/ป้าน้อย.jpg",
@@ -474,7 +474,7 @@ export default function MedicalAppointmentDashboard() {
     ae: "/images/staff/เอ.jpg",
     rd: "/images/staff/RD.jpg",
     Ola: "/images/staff/โอเล่.jpg",
-    JJ: "/images/staff/จรัญ.jpg",
+    JJ: "/images/staff/จรัญ.jpeg",
     Jak: "/images/staff/แจ็ค.jpg",
   }
 
@@ -2045,6 +2045,22 @@ export default function MedicalAppointmentDashboard() {
       
       let status, displayHours, displayText;
       
+      // ฟังก์ชันแปลงเวลาจากทศนิยมเป็นรูปแบบที่อ่านง่าย
+      const formatRemainingTime = (hours: number) => {
+        if (hours === 0) return '0 ชั่วโมง';
+        
+        const wholeHours = Math.floor(hours);
+        const minutes = Math.round((hours - wholeHours) * 60);
+        
+        if (wholeHours === 0) {
+          return `ว่าง ${minutes} นาที`;
+        } else if (minutes === 0) {
+          return `ว่าง ${wholeHours} ชั่วโมง`;
+        } else {
+          return `ว่าง ${wholeHours} ชั่วโมง ${minutes} นาที`;
+        }
+      };
+      
       if (hours >= maxQuota) {
         // เกิน 8.5 ชั่วโมง ให้แสดงว่าเต็มเวลา
         status = 'full';
@@ -2054,12 +2070,12 @@ export default function MedicalAppointmentDashboard() {
         // เหลือ 0-2 ชั่วโมง
         status = 'limited';
         displayHours = hours;
-        displayText = `เหลือ ${remaining.toFixed(1)} ชม.`;
+        displayText = formatRemainingTime(remaining);
       } else {
         // เหลือมากกว่า 2 ชั่วโมง
         status = 'available';
         displayHours = hours;
-        displayText = `เหลือ ${remaining.toFixed(1)} ชม.`;
+        displayText = formatRemainingTime(remaining);
       }
       
       return {
@@ -2071,7 +2087,7 @@ export default function MedicalAppointmentDashboard() {
         displayHours: displayHours,
         displayText: displayText
       };
-    }).sort((a, b) => b.hours - a.hours); // เรียงตามเวลาจากมากไปน้อย
+    }).sort((a, b) => b.remaining - a.remaining); // เรียงตามเวลาว่างจากมากไปน้อย (ว่างมากขึ้นก่อน)
 
     return {
       totalWorkers,
@@ -2600,7 +2616,6 @@ export default function MedicalAppointmentDashboard() {
                           setMessage(`ข้อผิดพลาดในการค้นหา: ${error}`);
                         }}
                       />
-                      <Search className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
                     </div>
                   </div>
 
@@ -2664,35 +2679,39 @@ export default function MedicalAppointmentDashboard() {
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">เวลาเริ่ม</Label>
                       <div className="relative">
-                        <Select value={startTime || "__none__"} onValueChange={val => setStartTime(val === "__none__" ? "" : val)}>
-                          <SelectTrigger className="text-sm">
-                            <SelectValue placeholder="เลือกเวลาเริ่ม..." />
-                          </SelectTrigger>
-                          <SelectContent className={notoSansThai.className}>
-                            <SelectItem value="__none__" className={notoSansThai.className}>เลือกเวลาเริ่ม...</SelectItem>
-                            {timeOptions.map(t => (
-                              <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                        <div className="relative">
+                          <Select value={startTime || "__none__"} onValueChange={val => setStartTime(val === "__none__" ? "" : val)}>
+                            <SelectTrigger className="text-sm pl-8">
+                              <SelectValue placeholder="เลือกเวลาเริ่ม..." />
+                            </SelectTrigger>
+                            <SelectContent className={notoSansThai.className}>
+                              <SelectItem value="__none__" className={notoSansThai.className}>เลือกเวลาเริ่ม...</SelectItem>
+                              {timeOptions.map(t => (
+                                <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">เวลาสิ้นสุด</Label>
                       <div className="relative">
-                        <Select value={endTime || "__none__"} onValueChange={val => setEndTime(val === "__none__" ? "" : val)}>
-                          <SelectTrigger className="text-sm">
-                            <SelectValue placeholder="เลือกเวลาสิ้นสุด..." />
-                          </SelectTrigger>
-                          <SelectContent className={notoSansThai.className}>
-                            <SelectItem value="__none__" className={notoSansThai.className}>เลือกเวลาสิ้นสุด...</SelectItem>
-                            {timeOptions.map(t => (
-                              <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                        <div className="relative">
+                          <Select value={endTime || "__none__"} onValueChange={val => setEndTime(val === "__none__" ? "" : val)}>
+                            <SelectTrigger className="text-sm pl-8">
+                              <SelectValue placeholder="เลือกเวลาสิ้นสุด..." />
+                            </SelectTrigger>
+                            <SelectContent className={notoSansThai.className}>
+                              <SelectItem value="__none__" className={notoSansThai.className}>เลือกเวลาสิ้นสุด...</SelectItem>
+                              {timeOptions.map(t => (
+                                <SelectItem key={t} value={t} className={notoSansThai.className}>{t}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2859,7 +2878,13 @@ export default function MedicalAppointmentDashboard() {
                             </div>
                             {showWorkerDetails && (
                               <div className="space-y-2">
-                                {summary.workerDetails.map((worker, index) => (
+                                {/* แสดงคนที่ว่างงานก่อน */}
+                                {summary.workerDetails.filter(worker => worker.status === 'available').length > 0 && (
+                                  <div className="text-xs font-semibold text-green-700 mb-2">🟢 คนที่ว่างงาน</div>
+                                )}
+                                {summary.workerDetails
+                                  .filter(worker => worker.status === 'available')
+                                  .map((worker, index) => (
                                 <div key={index} className={`p-3 rounded border text-xs ${
                                   worker.status === 'full' 
                                     ? 'bg-red-50 border-red-200'
@@ -2888,20 +2913,93 @@ export default function MedicalAppointmentDashboard() {
                                           ? 'text-yellow-600'
                                           : 'text-green-600'
                                     }`}>
-                                      {worker.displayHours.toFixed(1)} / {worker.quota} ชม.
+                                      {worker.displayText}
                                     </span>
                                   </div>
-                                  <div className={`text-xs mt-2 ml-11 ${
-                                    worker.status === 'full' 
-                                      ? 'text-red-600'
-                                      : worker.status === 'limited'
-                                        ? 'text-yellow-600'
-                                        : 'text-green-600'
-                                  }`}>
-                                    {worker.displayText}
-                                  </div>
                                 </div>
-                              ))}
+                                ))}
+                                
+                                {/* แสดงคนที่เหลือเวลาน้อย */}
+                                {summary.workerDetails.filter(worker => worker.status === 'limited').length > 0 && (
+                                  <div className="text-xs font-semibold text-yellow-700 mb-2 mt-4">🟡 คนที่เหลือเวลาน้อย</div>
+                                )}
+                                {summary.workerDetails
+                                  .filter(worker => worker.status === 'limited')
+                                  .map((worker, index) => (
+                                  <div key={`limited-${index}`} className={`p-3 rounded border text-xs ${
+                                    worker.status === 'full' 
+                                      ? 'bg-red-50 border-red-200'
+                                      : worker.status === 'limited'
+                                        ? 'bg-yellow-50 border-yellow-200'
+                                        : 'bg-green-50 border-green-200'
+                                  }`}>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center space-x-3">
+                                        <Avatar className="w-8 h-8">
+                                          <AvatarImage
+                                            src={staffImages[worker.name] || "/placeholder-user.jpg"}
+                                            alt={worker.name}
+                                            className="object-cover object-center"
+                                          />
+                                          <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                            {worker.name.substring(0, 2)}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <span className="font-medium text-sm">{worker.name}</span>
+                                      </div>
+                                      <span className={`font-bold text-sm ${
+                                        worker.status === 'full' 
+                                          ? 'text-red-600'
+                                          : worker.status === 'limited'
+                                            ? 'text-yellow-600'
+                                            : 'text-green-600'
+                                      }`}>
+                                        {worker.displayText}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                                
+                                {/* แสดงคนที่เต็มเวลา */}
+                                {summary.workerDetails.filter(worker => worker.status === 'full').length > 0 && (
+                                  <div className="text-xs font-semibold text-red-700 mb-2 mt-4">🔴 คนที่เต็มเวลา</div>
+                                )}
+                                {summary.workerDetails
+                                  .filter(worker => worker.status === 'full')
+                                  .map((worker, index) => (
+                                  <div key={`full-${index}`} className={`p-3 rounded border text-xs ${
+                                    worker.status === 'full' 
+                                      ? 'bg-red-50 border-red-200'
+                                      : worker.status === 'limited'
+                                        ? 'bg-yellow-50 border-yellow-200'
+                                        : 'bg-green-50 border-green-200'
+                                  }`}>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center space-x-3">
+                                        <Avatar className="w-8 h-8">
+                                          <AvatarImage
+                                            src={staffImages[worker.name] || "/placeholder-user.jpg"}
+                                            alt={worker.name}
+                                            className="object-cover object-center"
+                                          />
+                                          <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                            {worker.name.substring(0, 2)}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <span className="font-medium text-sm">{worker.name}</span>
+                                      </div>
+                                      <span className={`font-bold text-sm ${
+                                        worker.status === 'full' 
+                                          ? 'text-red-600'
+                                          : worker.status === 'limited'
+                                            ? 'text-yellow-600'
+                                            : 'text-green-600'
+                                      }`}>
+                                        {worker.displayText}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
@@ -3372,7 +3470,7 @@ export default function MedicalAppointmentDashboard() {
                                               className={`${isFormCollapsed ? "w-12 h-12 sm:w-14 sm:h-14" : "w-10 h-10 sm:w-12 sm:h-12"} border-2 border-white shadow-sm`}
                                             >
                                               <AvatarImage
-                                                src="/images/staff/จรัญ.jpg"
+                                                src="/images/staff/จรัญ.jpeg"
                                                 alt="จรัญ"
                                                 className="object-cover object-center avatar-image"
                                                 style={{ imageRendering: "crisp-edges" }}
