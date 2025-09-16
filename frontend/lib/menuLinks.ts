@@ -70,13 +70,13 @@ async function loadDataFromApi(): Promise<void> {
       }
       if (hasRole && cachedAllowedKeys) {
         try {
-          const encoded = encodeURIComponent(JSON.stringify(Array.from(cachedAllowedKeys)));
+          const encoded = encodeURIComponent(JSON.stringify(Array.from(cachedAllowedKeys || new Set<string>())));
           document.cookie = `rbac.allowedKeys=${encoded}; Path=/; Max-Age=600; SameSite=Lax`;
         } catch {}
-        try { localStorage.setItem('rbac.allowedKeys', JSON.stringify({ keys: Array.from(cachedAllowedKeys), ts: Date.now() })); } catch {}
+        try { localStorage.setItem('rbac.allowedKeys', JSON.stringify({ keys: Array.from(cachedAllowedKeys || new Set<string>()), ts: Date.now() })); } catch {}
       }
       // expose for debugging
-      (window as any).__allowedMenuKeys = Array.from(cachedAllowedKeys);
+      (window as any).__allowedMenuKeys = Array.from(cachedAllowedKeys || new Set<string>());
     } catch (e) {
       // Fallback silently
       cachedAllowedKeys = cachedAllowedKeys || new Set<string>();
