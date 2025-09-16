@@ -125,6 +125,24 @@ process.on('SIGTERM', () => {
   });
 });
 
+// Initialize database connection status
+app.locals.dbConnected = false;
+
+// Test database connection and set status
+const testConnectionAndSetStatus = async () => {
+  try {
+    const { testConnection } = require('./config/database');
+    await testConnection();
+    app.locals.dbConnected = true;
+    console.log('✅ Database connection status set to true');
+  } catch (error) {
+    app.locals.dbConnected = false;
+    console.log('❌ Database connection status set to false');
+    console.error('⚠️ Database connection test failed, but server continues running');
+    console.error('   This may cause API endpoints to fail');
+  }
+};
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
@@ -133,12 +151,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 API Base URL: http://192.168.0.94:${PORT}/api`);
   console.log(`✅ Server is ready to accept connections!`);
   
-  // Test database connection after server starts
-  const { testConnection } = require('./config/database');
-  testConnection().catch(error => {
-    console.error('⚠️ Database connection test failed, but server continues running');
-    console.error('   This may cause API endpoints to fail');
-  });
+  // Test database connection and set status
+  testConnectionAndSetStatus();
 });
 
 // Keep-alive timeout

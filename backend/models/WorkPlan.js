@@ -5,6 +5,9 @@ class WorkPlan {
   // Get all work plans with operators
   static async getAll(date = null) {
     try {
+      console.log('🔍 WorkPlan.getAll called with date:', date);
+      console.log('🔍 Date type:', typeof date);
+      
       let query = `
         SELECT 
           wp.id,
@@ -35,10 +38,25 @@ class WorkPlan {
       
       const params = [];
       if (date) {
-        // แก้ไขการเปรียบเทียบวันที่ให้ถูกต้อง โดยใช้ DATE() function
-        query += ' WHERE DATE(wp.production_date) = ?';
-        params.push(date);
-        console.log('🔍 Query date:', date);
+        // ตรวจสอบรูปแบบวันที่และแปลงให้ถูกต้อง
+        let formattedDate = date;
+        if (typeof date === 'string') {
+          // ถ้าเป็น ISO string ให้ตัดเอาเฉพาะส่วนวันที่
+          if (date.includes('T')) {
+            formattedDate = date.split('T')[0];
+          }
+          // ตรวจสอบรูปแบบ YYYY-MM-DD
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(formattedDate)) {
+            console.error('❌ Invalid date format:', date);
+            throw new Error('Invalid date format. Expected YYYY-MM-DD');
+          }
+        }
+        
+        // ใช้การเปรียบเทียบวันที่ที่ยืดหยุ่นมากขึ้น
+        query += ` WHERE DATE(wp.production_date) = ? OR wp.production_date = ?`;
+        params.push(formattedDate, formattedDate);
+        
+        console.log('🔍 Formatted date:', formattedDate);
         console.log('🔍 SQL Query:', query);
         console.log('🔍 Params:', params);
       } else {
@@ -59,15 +77,28 @@ class WorkPlan {
                  GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) ASC`;
       
       const [rows] = await pool.execute(query, params);
-      console.log('📊 Raw database results:', rows.length, 'rows');
-      console.log('📊 Sample data:', rows.slice(0, 3));
+      console.log('✅ Found work plans:', rows.length);
+      
       if (rows.length > 0) {
-        console.log('📊 Production dates in results:', rows.map(r => r.production_date));
-        console.log('📊 First 3 rows with production_date:', rows.slice(0, 3).map(r => ({ id: r.id, job_name: r.job_name, production_date: r.production_date })));
+        console.log('📊 Sample work plan:', rows[0]);
+        console.log('📊 All production dates found:', rows.map(r => r.production_date));
+      } else {
+        console.log('⚠️ No work plans found for date:', date);
       }
+      
       return rows;
     } catch (error) {
-      console.error('Error in main query:', error);
+      console.error('❌ Error in WorkPlan.getAll:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        errno: error.errno,
+        sqlState: error.sqlState
+      });
+      
+      // ส่งกลับ empty array แทนการ throw error เพื่อให้ frontend ยังทำงานได้
+      console.log('🔄 Returning empty array due to error');
+      return [];
       // Fallback query if status_id column doesn't exist
       console.log('⚠️ Status column not found, using fallback query');
       let fallbackQuery = `

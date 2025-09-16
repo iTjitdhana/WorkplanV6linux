@@ -47,26 +47,75 @@ class WorkPlanController {
   static async getAllWorkPlans(req, res) {
     try {
       const { date } = req.query;
-      console.log('Requested date:', date);
-      console.log('Date type:', typeof date);
-      console.log('Query parameters:', req.query);
-      console.log('Full request URL:', req.url);
-      console.log('Request headers:', req.headers);
+      console.log('🔍 getAllWorkPlans called');
+      console.log('📅 Requested date:', date);
+      console.log('📅 Date type:', typeof date);
+      console.log('🔗 Query parameters:', req.query);
+      console.log('🌐 Full request URL:', req.url);
+      console.log('📋 Request headers:', req.headers);
       
+      // ตรวจสอบการเชื่อมต่อฐานข้อมูลก่อน
+      if (!req.app.locals.dbConnected) {
+        console.error('❌ Database not connected');
+        return res.status(503).json({
+          success: false,
+          message: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้',
+          error: 'Database connection not available'
+        });
+      }
+      
+      // ตรวจสอบรูปแบบวันที่
+      if (date && typeof date === 'string') {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(date)) {
+          console.error('❌ Invalid date format:', date);
+          return res.status(400).json({
+            success: false,
+            message: 'รูปแบบวันที่ไม่ถูกต้อง ต้องเป็น YYYY-MM-DD',
+            error: 'Invalid date format'
+          });
+        }
+      }
+      
+      console.log('🔄 Calling WorkPlan.getAll...');
       const workPlans = await WorkPlan.getAll(date);
-      console.log('Found work plans:', workPlans.length);
-      console.log('Work plans data:', workPlans);
+      console.log('✅ Found work plans:', workPlans.length);
+      
+      if (workPlans.length > 0) {
+        console.log('📊 Sample work plan:', workPlans[0]);
+        console.log('📊 All production dates:', workPlans.map(wp => wp.production_date));
+      } else {
+        console.log('⚠️ No work plans found for date:', date);
+      }
       
       res.json({
         success: true,
-        data: workPlans,
-        message: 'ดึงข้อมูลงานสำเร็จ'
+        data: workPlans || [],
+        message: workPlans.length > 0 ? 'ดึงข้อมูลงานสำเร็จ' : 'ไม่พบข้อมูลงานในวันที่เลือก',
+        count: workPlans.length,
+        requestedDate: date
       });
     } catch (error) {
-      console.error('Error fetching work plans:', error);
-      res.status(500).json({
+      console.error('❌ Error fetching work plans:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        errno: error.errno,
+        sqlState: error.sqlState,
+        stack: error.stack
+      });
+      
+      // ส่ง error response ที่ชัดเจน
+      const statusCode = error.code === 'ECONNREFUSED' ? 503 : 500;
+      const errorMessage = error.code === 'ECONNREFUSED' 
+        ? 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' 
+        : 'เกิดข้อผิดพลาดในการดึงข้อมูล';
+        
+      res.status(statusCode).json({
         success: false,
-        message: 'เกิดข้อผิดพลาดในการดึงข้อมูล'
+        message: errorMessage,
+        error: error.message,
+        code: error.code
       });
     }
   }

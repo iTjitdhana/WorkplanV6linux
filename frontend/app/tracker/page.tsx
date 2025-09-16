@@ -73,27 +73,50 @@ export default function TrackerPage() {
   // Load workplans by date
   useEffect(() => {
     setIsLoading(true);
-    fetch(`/api/work-plans?date=${date}`)
+    console.log('[DEBUG] Starting to load workplans for date:', date);
+    
+    fetch(`/api/work-plans?date=${date}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    })
       .then(res => {
+        console.log('[DEBUG] API Response status:', res.status);
+        console.log('[DEBUG] API Response headers:', res.headers);
+        
         if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
+          throw new Error(`HTTP error! status: ${res.status} - ${res.statusText}`);
         }
         return res.json();
       })
       .then(data => {
+        console.log('[DEBUG] Raw API response:', data);
+        
         // ตรวจสอบว่า response มี success field และเป็น false หรือไม่
         if (data.success === false) {
           throw new Error(data.message || 'Backend returned error');
         }
+        
+        // ตรวจสอบว่า data.data มีอยู่และเป็น array
+        if (!data.data || !Array.isArray(data.data)) {
+          console.warn('[DEBUG] No data or data is not array:', data);
+          return { ...data, data: [] };
+        }
+        
         return data;
       })
       .then(data => {
-        console.log('[DEBUG] Loaded workplans (raw from API):', data);
-        console.log('[DEBUG] Workplans data (raw from API):', data.data);
+        console.log('[DEBUG] Loaded workplans (processed):', data);
+        console.log('[DEBUG] Workplans count:', data.data.length);
         console.log('[DEBUG] Requested date (from state):', date);
+        
         if (data.data && data.data.length > 0) {
-          console.log('[DEBUG] First workplan sample (raw from API):', data.data[0]);
-          console.log('[DEBUG] All workplans production dates (raw from API):', data.data.map((wp: any) => wp.production_date));
+          console.log('[DEBUG] First workplan sample:', data.data[0]);
+          console.log('[DEBUG] All workplans production dates:', data.data.map((wp: any) => wp.production_date));
+        } else {
+          console.log('[DEBUG] No workplans found for date:', date);
         }
         const filteredWorkplans = (data.data || []).filter((wp: any) => {
           // กรองงานที่ถูกยกเลิก
