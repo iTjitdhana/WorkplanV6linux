@@ -64,6 +64,10 @@ const testConnection = async () => {
     console.error('   Code:', error.code);
     console.error('   Errno:', error.errno);
     console.error('   SQL State:', error.sqlState);
+    console.error('   Host:', dbConfig.host);
+    console.error('   Port:', dbConfig.port);
+    console.error('   User:', dbConfig.user);
+    console.error('   Database:', dbConfig.database);
     
     // แสดงคำแนะนำการแก้ไขตาม environment
     console.log('\n💡 Possible solutions:');

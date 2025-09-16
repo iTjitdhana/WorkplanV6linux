@@ -132,6 +132,13 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API Base URL: http://192.168.0.94:${PORT}/api`);
   console.log(`✅ Server is ready to accept connections!`);
+  
+  // Test database connection after server starts
+  const { testConnection } = require('./config/database');
+  testConnection().catch(error => {
+    console.error('⚠️ Database connection test failed, but server continues running');
+    console.error('   This may cause API endpoints to fail');
+  });
 });
 
 // Keep-alive timeout

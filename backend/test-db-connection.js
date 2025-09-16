@@ -1,11 +1,14 @@
 const mysql = require('mysql2/promise');
 
+// Load environment variables
+require('dotenv').config({ path: './production.env' });
+
 const config = {
-  host: '192.168.0.94',
-  user: 'jitdhana',
-  password: 'iT12345$',
-  database: 'esp_tracker',
-  port: 3306,
+  host: process.env.DB_HOST || '192.168.0.94',
+  user: process.env.DB_USER || 'jitdhana',
+  password: process.env.DB_PASSWORD || 'iT12345$',
+  database: process.env.DB_NAME || 'esp_tracker',
+  port: process.env.DB_PORT || 3306,
   connectTimeout: 10000,
   acquireTimeout: 10000,
   timeout: 10000
