@@ -57,7 +57,7 @@ echo - Fixed JSON parsing errors
 echo ========================================
 echo.
 echo URLs:
-echo Backend: http://192.168.0.94:3102
+echo Backend: http://192.168.0.94:3101
 echo Frontend: http://192.168.0.94:3012
 echo ========================================
 echo.

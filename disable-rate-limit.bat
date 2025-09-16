@@ -22,7 +22,7 @@ echo.
 echo ========================================
 echo ✅ Rate limiting completely disabled!
 echo ========================================
-echo Backend: http://192.168.0.94:3102
+echo Backend: http://192.168.0.94:3101
 echo No more 429 errors!
 echo ========================================
 echo.

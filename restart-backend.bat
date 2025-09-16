@@ -21,7 +21,7 @@ echo.
 echo ========================================
 echo ✅ Backend server restarted!
 echo ========================================
-echo Backend: http://192.168.0.94:3102
+echo Backend: http://192.168.0.94:3101
 echo Rate limiting: Increased to 1000 requests/15min
 echo ========================================
 echo.
