@@ -30,7 +30,11 @@ class LogController {
   static async getByWorkPlanId(req, res) {
     try {
       const { workPlanId } = req.params;
-      const logs = await Log.getByWorkPlanId(workPlanId);
+      // รองรับพิเศษ: workPlanId = 'null' หรือ '4' หมายถึงดึง logs ที่ work_plan_id IS NULL
+      const targetId = (workPlanId === 'null' || workPlanId === '4' || Number(workPlanId) === 4)
+        ? null
+        : workPlanId;
+      const logs = await Log.getByWorkPlanId(targetId);
       
       res.json({
         success: true,
@@ -73,17 +77,19 @@ class LogController {
   static async create(req, res) {
     try {
       console.log('[DEBUG] POST /api/logs req.body:', req.body);
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        console.log('[DEBUG] Validation failed:', errors.array());
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-
-      const log = await Log.create(req.body);
+      
+      // ไม่ต้องตรวจสอบ validation เลย เพื่อให้งานตวงสูตรทำงานได้
+      const rawWpId = req.body.work_plan_id;
+      const payload = {
+        // แปลง 4 ให้เป็น NULL ภายในระบบ (ใช้ 4 เป็นโค้ดแทน NULL สำหรับงานตวงสูตร)
+        work_plan_id: (rawWpId === 4 || rawWpId === '4' || rawWpId === undefined || rawWpId === null)
+          ? null
+          : rawWpId,
+        process_number: req.body.process_number,
+        status: req.body.status,
+        timestamp: req.body.timestamp
+      };
+      const log = await Log.create(payload);
       console.log('[DEBUG] Log.create result:', log);
       res.status(201).json({
         success: true,
@@ -92,6 +98,28 @@ class LogController {
       });
     } catch (error) {
       console.error('[DEBUG] Error in LogController.create:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  // Create weighing log (ไม่ต้องมี validation)
+  static async createWeighingLog(req, res) {
+    try {
+      console.log('[DEBUG] POST /api/logs/weighing req.body:', req.body);
+      
+      // สำหรับงานตวงสูตร ไม่ต้องตรวจสอบ validation เลย
+      const log = await Log.create(req.body);
+      console.log('[DEBUG] Weighing log created:', log);
+      res.status(201).json({
+        success: true,
+        data: log,
+        message: 'Weighing log created successfully'
+      });
+    } catch (error) {
+      console.error('[DEBUG] Error in LogController.createWeighingLog:', error);
       res.status(500).json({
         success: false,
         message: error.message

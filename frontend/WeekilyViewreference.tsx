@@ -974,7 +974,7 @@ export default function MedicalAppointmentDashboard() {
       );
     }
     const staffList = staff.split(", ");
-    
+
     return (
       <div className="flex items-center space-x-2 sm:space-x-3">
         <div className="flex -space-x-2">
@@ -982,13 +982,13 @@ export default function MedicalAppointmentDashboard() {
             <Avatar
               key={index}
               className={`${isFormCollapsed ? "w-12 h-12 sm:w-14 sm:h-14" : "w-10 h-10 sm:w-12 sm:h-12"} border-2 border-white shadow-sm`}
-              >
-                <AvatarImage
+            >
+              <AvatarImage
                 src={staffImages[person] || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
-                  alt={person}
-                  className="object-cover object-center avatar-image"
-                  style={{ imageRendering: "crisp-edges" }}
-                />
+                alt={person}
+                className="object-cover object-center avatar-image"
+                style={{ imageRendering: "crisp-edges" }}
+              />
               <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
                 {person.charAt(0)}
               </AvatarFallback>
@@ -2497,19 +2497,19 @@ export default function MedicalAppointmentDashboard() {
             <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
               <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
+              <Button
+                variant="ghost"
                     className="hidden md:flex items-center space-x-1 text-sm text-green-100 hover:text-white hover:bg-white/10 transition-colors duration-200 p-2"
-                  >
-                    <span>ระบบจัดการข้อมูล</span>
+              >
+                    <span>เมนู</span>
                     <ChevronDownIcon className="w-3 h-3" />
-                  </Button>
+              </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
                       <span>หน้าหลัก</span>
-                    </Link>
+              </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/logs" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
@@ -2559,7 +2559,7 @@ export default function MedicalAppointmentDashboard() {
       {/* Main Content */}
       <div className="flex-1 w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-8 pt-17 sm:pt-20 md:pt-24">
         <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 md:gap-6 lg:gap-8">
-                    {/* Left Panel - Schedule Form */}
+          {/* Left Panel - Schedule Form */}
           <div
             className={`transition-all duration-300 ${isFormCollapsed ? "lg:w-0 lg:overflow-hidden" : "w-full lg:w-2/5"}`}
           >
@@ -2569,7 +2569,7 @@ export default function MedicalAppointmentDashboard() {
                   <CardTitle className="flex items-center space-x-2 text-sm sm:text-base md:text-lg">
                     <UserIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                     <span className="leading-7 text-2xl">เพิ่มงานที่ต้องการผลิต</span>
-                  </CardTitle>
+                    </CardTitle>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -2691,9 +2691,9 @@ export default function MedicalAppointmentDashboard() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
-                        </div>
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
                       </div>
+                    </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">เวลาสิ้นสุด</Label>
@@ -2710,7 +2710,7 @@ export default function MedicalAppointmentDashboard() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
                         </div>
                       </div>
                     </div>
@@ -2832,7 +2832,7 @@ export default function MedicalAppointmentDashboard() {
                                 {summary.capacityPercentage.toFixed(1)}%
                               </div>
                             </div>
-                          </div>
+          </div>
                           
                           {/* รายชื่อผู้ปฏิบัติงาน */}
                           <div className="bg-gray-50 p-3 rounded-lg border">
@@ -3162,65 +3162,65 @@ export default function MedicalAppointmentDashboard() {
 
                     {/* Weekly Calendar Table */}
                     {!isLoadingData && (
-                      <div className="overflow-x-auto">
-                        <div className="min-w-full">
-                          {/* Header Row */}
+                    <div className="overflow-x-auto">
+                      <div className="min-w-full">
+                        {/* Header Row */}
                           <div className="grid grid-cols-6 gap-1 mb-2">
-                            {weekDates.map((date, index) => {
-                              const dateStr = formatDateForAPI(date)
+                          {weekDates.map((date, index) => {
+                            const dateStr = formatDateForAPI(date)
                               const dayProduction = productionData.filter((item) => formatDateForAPI(item.production_date) === dateStr)
                               const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
 
-                              return (
+                            return (
                                 <div key={index} className={`${getDayBackgroundColor(date)} rounded-lg p-2 text-center`}>
                                   {/* ชื่อวัน - ขนาดใหญ่ขึ้น */}
-                                  <div
+                              <div
                                     className={`${isFormCollapsed ? "text-lg sm:text-xl font-bold" : "text-base sm:text-lg font-bold"} ${getDayTextColor(date)} mb-2`}
-                                  >
+                              >
                                     {getDayName(date)}
                                   </div>
 
                                   {/* วันที่และเดือนในบรรทัดเดียวกัน */}
                                   <div className="flex items-center justify-center space-x-1 mb-2">
-                                    <div
+                                <div
                                       className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} font-semibold ${getDayTextColor(date)}`}
-                                    >
+                                >
                                       {date.getDate()}
-                                    </div>
-                                    <div
-                                      className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} ${getDayTextColor(date)} opacity-90`}
-                                    >
-                                      {date.toLocaleDateString("th-TH", { month: "short" })}
-                                    </div>
-                                  </div>
-
-                                  <div
-                                    className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} ${getDayTextColor(date)} opacity-75 mt-1`}
-                                  >
-                                    {filteredDayProduction.length} งาน
-                                  </div>
                                 </div>
-                              )
-                            })}
-                          </div>
+                                <div
+                                      className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} ${getDayTextColor(date)} opacity-90`}
+                                >
+                                      {date.toLocaleDateString("th-TH", { month: "short" })}
+                                </div>
+                                  </div>
 
-                          {/* Production Content Grid */}
+                                <div
+                                    className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} ${getDayTextColor(date)} opacity-75 mt-1`}
+                                >
+                                    {filteredDayProduction.length} งาน
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Production Content Grid */}
                           <div className="grid grid-cols-6 gap-1">
-                            {weekDates.map((date, index) => {
-                              const dateStr = formatDateForAPI(date)
+                          {weekDates.map((date, index) => {
+                            const dateStr = formatDateForAPI(date)
                               const dayProduction = productionData.filter((item) => formatDateForAPI(item.production_date) === dateStr)
                               const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
 
-                              return (
-                                <div
-                                  key={index}
+                            return (
+                              <div
+                                key={index}
                                   className="border border-gray-200 rounded-lg p-2 bg-white min-h-[200px] sm:min-h-[400px] flex flex-col"
                                 >
                                   {filteredDayProduction.length > 0 ? (
                                     <div className="space-y-2 flex-1">
                                       {filteredDayProduction.map((item, itemIndex) => (
-                                        <div
-                                          key={item.id}
+                                      <div
+                                        key={item.id}
                                           className={`p-2 border-l-4 min-h-[140px] flex flex-col ${
                                             item.status === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
                                               ? "border-l-red-500 bg-red-50"
@@ -3229,71 +3229,71 @@ export default function MedicalAppointmentDashboard() {
                                                 : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
                                                   ? "border-l-gray-500 bg-gray-50"
                                                   : "border-l-gray-500 bg-gray-50"
-                                          }`}
-                                        >
-                                          {/* ชื่องานผลิต */}
-                                          <div
+                                        }`}
+                                      >
+                                        {/* ชื่องานผลิต */}
+                                        <div
                                             className={`font-medium text-gray-900 ${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} mb-1 leading-tight flex-1`}
-                                          >
+                                        >
                                             <span className="underline">งานที่ {itemIndex + 1} :</span> {item.job_name}
-                                          </div>
+                                        </div>
 
-                                          {/* เวลา */}
-                                          <div
+                                        {/* เวลา */}
+                                        <div
                                             className={`flex items-center space-x-1 ${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-gray-600 mb-2`}
-                                          >
-                                            <Clock
+                                        >
+                                          <Clock
                                               className={`${isFormCollapsed ? "w-3 h-3" : "w-2.5 h-2.5"} flex-shrink-0`}
-                                            />
+                                          />
                                             <span>{item.start_time?.substring(0, 5) || "08:00"} - {(item.end_time || "17:00:00").substring(0, 5)}</span>
-                                          </div>
+                                        </div>
 
-                                          {/* หมายเหตุ (ถ้ามี) */}
+                                        {/* หมายเหตุ (ถ้ามี) */}
                                           {(item.notes || item.note) && (
-                                            <div
+                                          <div
                                               className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-gray-500 italic mb-2`}
-                                            >
+                                          >
                                               หมายเหตุ: {item.notes || item.note}
-                                            </div>
-                                          )}
+                                          </div>
+                                        )}
 
-                                          {/* สถานะ */}
+                                        {/* สถานะ */}
                                           <div className="mt-auto">
-                                            <span
+                                          <span
                                               className={`inline-block px-1.5 py-0.5 rounded text-xs ${
                                                 item.status === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
                                                   ? "bg-red-100 text-red-700"
                                                   : item.status_name === "กำลังดำเนินการ"
-                                                    ? "bg-blue-100 text-blue-700"
+                                                  ? "bg-blue-100 text-blue-700"
                                                     : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
-                                                      ? "bg-green-100 text-green-700"
+                                                    ? "bg-green-100 text-green-700"
                                                       : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
                                                         ? "bg-gray-100 text-gray-700"
-                                                        : "bg-gray-100 text-gray-700"
+                                                      : "bg-gray-100 text-gray-700"
                                               }`}
-                                            >
+                                          >
                                               {item.status_name || "รอดำเนินการ"}
-                                            </span>
-                                          </div>
+                                          </span>
                                         </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center justify-center h-full text-gray-400">
-                                      <div className="text-center">
-                                        <Calendar
-                                          className={`${isFormCollapsed ? "w-8 h-8" : "w-6 h-6"} mx-auto mb-2 opacity-50`}
-                                        />
-                                        <p className={`${isFormCollapsed ? "text-xs" : "text-xs"}`}>ไม่มีงานผลิต</p>
                                       </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center h-full text-gray-400">
+                                    <div className="text-center">
+                                      <Calendar
+                                          className={`${isFormCollapsed ? "w-8 h-8" : "w-6 h-6"} mx-auto mb-2 opacity-50`}
+                                      />
+                                        <p className={`${isFormCollapsed ? "text-xs" : "text-xs"}`}>ไม่มีงานผลิต</p>
                                     </div>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
+                    </div>
                     )}
                   </div>
                 ) : (
@@ -3364,25 +3364,25 @@ export default function MedicalAppointmentDashboard() {
                               } ${isFormCollapsed ? "p-3 sm:p-4 md:p-6" : "p-2 sm:p-3 md:p-4"} rounded-r-lg`}
                             >
                               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-3">
-                                <div className="space-y-1 sm:space-y-2 flex-1 min-w-0">
-                                  <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                                    <Badge
-                                      variant="outline"
+                        <div className="space-y-1 sm:space-y-2 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                            <Badge
+                              variant="outline"
                                       className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} bg-blue-50 border-blue-300 text-blue-700 font-medium flex-shrink-0`}
-                                    >
+                            >
                                       {formatDateThaiShort(item.production_date)}
-                                    </Badge>
-                                    <h3
-                                      className={`font-bold text-gray-900 ${
-                                        isFormCollapsed
+                            </Badge>
+                            <h3
+                              className={`font-bold text-gray-900 ${
+                                isFormCollapsed
                                           ? "text-sm sm:text-lg md:text-xl"
-                                          : "text-xs sm:text-sm md:text-base"
-                                      } truncate`}
-                                    >
+                                  : "text-xs sm:text-sm md:text-base"
+                              } truncate`}
+                            >
                                       {getDisplayJobName(item, dailyProduction)}: {item.job_name}
-                                    </h3>
-                                    <Badge
-                                      variant="outline"
+                            </h3>
+                            <Badge
+                              variant="outline"
                                       className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} flex-shrink-0`}
                                     >
                                       ห้องผลิต: {getRoomName(item.production_room)}
@@ -3398,12 +3398,12 @@ export default function MedicalAppointmentDashboard() {
                                               : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
                                                 ? "border-green-500 text-green-700"
                                                 : "border-gray-500 text-gray-700"
-                                        } flex-shrink-0`}
-                                      >
+                              } flex-shrink-0`}
+                            >
                                         {item.status_name}
-                                      </Badge>
-                                      <Badge
-                                        variant="outline"
+                            </Badge>
+                            <Badge
+                              variant="outline"
                                         className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} ${
                                           getJobStatus(item) === "พิมพ์แล้ว"
                                             ? "border-green-500 text-green-700 bg-green-50"
@@ -3413,7 +3413,7 @@ export default function MedicalAppointmentDashboard() {
                                         } flex-shrink-0`}
                                       >
                                         {getJobStatus(item)}
-                                      </Badge>
+                            </Badge>
                                       {/* แสดง label "งานพิเศษ" เมื่อเปิดโหมดงานพิเศษ */}
                                       {shouldShowSpecialJobLabel(item) && (
                                         <Badge
@@ -3424,14 +3424,14 @@ export default function MedicalAppointmentDashboard() {
                                         </Badge>
                                       )}
                                     </div>
-                                  </div>
+                          </div>
 
                                   {/* Staff and Planner Section - ในแถวเดียวกัน */}
                                   <div className="flex items-center justify-between">
                                     {/* Staff Section - ด้านซ้าย */}
                                     <div className="flex items-center space-x-2 sm:space-x-3">
                                     {renderStaffAvatars(item.operators, isFormCollapsed)}
-                                  </div>
+                          </div>
 
                                     {/* ผู้วางแผนการผลิต - ด้านขวาสุด */}
                                     <div className="flex items-center space-x-2">
@@ -3493,8 +3493,8 @@ export default function MedicalAppointmentDashboard() {
                                   <div className="flex items-center justify-between">
                                     <div
                                       className={`flex items-center space-x-1 sm:space-x-2 ${isFormCollapsed ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}
-                                  >
-                                    <Clock
+                          >
+                            <Clock
                                       className={`${isFormCollapsed ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3 sm:w-4 sm:h-4"} text-gray-400 flex-shrink-0`}
                                     />
                                       <span className="text-blue-600 font-semibold">
@@ -3509,8 +3509,8 @@ export default function MedicalAppointmentDashboard() {
                                       </span>
                                     )}
                                   </div>
-                                </div>
-                                    </div>
+                          </div>
+                        </div>
 
                                 <div className="flex flex-col items-end space-y-2 flex-shrink-0">
                                   {/* ปุ่ม */}
@@ -3519,9 +3519,9 @@ export default function MedicalAppointmentDashboard() {
                                       {/* เพิ่มปุ่มสำหรับรายการที่มี จิ๋ว เพียงคนเดียวในการตรวจสอบ */}
                                       {(item.recordStatus === "บันทึกแบบร่าง" || item.recordStatus === "แบบร่าง" || item.recordStatus === "รอดำเนินการ") && (
                                         <>
-                                    <Button
+                          <Button
                                             variant="outline"
-                                            size="sm"
+                            size="sm"
                                             onClick={() => handleEditDraft(item)}
                                             className="border-2 border-gray-300 text-gray-600 hover:bg-gray-50 bg-white text-xs font-medium px-2 py-1"
                                           >
@@ -3541,47 +3541,47 @@ export default function MedicalAppointmentDashboard() {
                                             className="border-2 border-blue-300 text-blue-600 hover:bg-blue-50 bg-white text-xs font-medium px-2 py-1"
                                           >
                                             <Eye className="w-3 h-3" />
-                                        </Button>
+                          </Button>
                                       )}
                                       {/* เปลี่ยนปุ่มดินสอเป็นปุ่มกากบาทเมื่อสถานะเป็น "พิมพ์แล้ว" */}
                                       {getJobStatus(item) === "พิมพ์แล้ว" ? (
-                                        <Button
+                            <Button
                                             variant="outline"
                                             size="sm"
                                             onClick={() => handleCancelProduction(item.id)}
                                             className="border-2 border-red-300 text-red-600 hover:bg-red-50 bg-white text-xs font-medium px-2 py-1"
                                           >
                                             <XCircle className="w-3 h-3" />
-                                        </Button>
+                            </Button>
                                       ) : (
-                                        <Button
+                            <Button
                                             variant="outline"
                                             size="sm"
                                             onClick={() => handleEditDraft(item)}
                                             className="border-2 border-gray-300 text-gray-600 hover:bg-gray-50 bg-white text-xs font-medium px-2 py-1"
                                           >
                                             <Edit className="w-3 h-3" />
-                                        </Button>
+                            </Button>
                                       )}
                                         </>
                                     )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                             </div>
                             );
                           })}
                         </div>
                       ) : (
                         <div className="text-center py-6 sm:py-8 text-gray-500">
-                          <Calendar
+                      <Calendar
                             className={`${isFormCollapsed ? "w-12 h-12 sm:w-16 sm:h-16" : "w-8 h-8 sm:w-12 sm:h-12"} mx-auto mb-3 sm:mb-4 text-gray-300`}
-                          />
+                      />
                           <p className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}>
                                                          ไม่มีงานผลิตในวันที่ {formatDateForDisplay(new Date(selectedDate), 'full')}
-                          </p>
-                        </div>
+                      </p>
+                    </div>
                       );
                     })()}
                       </>
@@ -3934,6 +3934,6 @@ export default function MedicalAppointmentDashboard() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    )
+    </div>
+  )
 }

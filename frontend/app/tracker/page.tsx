@@ -41,6 +41,35 @@ export default function TrackerPage() {
   
 
 
+  // สร้างงานตวงสูตรแบบ virtual (ไม่บันทึกลง database)
+  const createVirtualWeighingJob = () => {
+    return [{
+      id: 'virtual_weighing_job',
+      job_code: 'WEIGHING',
+      job_name: 'งานตวงสูตร',
+      production_date: date,
+      operators: 'พี่ภา',
+      isWeighingJob: true // flag สำหรับระบุว่าเป็นงานตวงสูตร
+    }];
+  };
+
+  // สร้างขั้นตอนการผลิตสำหรับงานตวงสูตร
+  const createWeighingProcessSteps = (jobCode: string) => {
+    return [
+      { process_number: 1, process_description: 'ตวงสูตรรอบที่ 1' },
+      { process_number: 2, process_description: 'ตวงสูตรรอบที่ 2' },
+      { process_number: 3, process_description: 'ตวงสูตรรอบที่ 3' },
+      { process_number: 4, process_description: 'ตวงสูตรรอบที่ 4' }
+    ];
+  };
+
+  // สร้างขั้นตอนการผลิตสำหรับงานปกติ (new หรือ 1)
+  const createNormalProcessSteps = () => {
+    return [
+      { process_number: 1, process_description: 'เริ่มต้นผลิต-สิ้นสุดการผลิต' }
+    ];
+  };
+
   // Load workplans by date
   useEffect(() => {
     setIsLoading(true);
@@ -95,10 +124,22 @@ export default function TrackerPage() {
           console.log('[DEBUG] Keeping workplan:', wp.job_name, 'with date:', wpDate);
           return true;
         });
-                 console.log('[DEBUG] Filtered workplans (after frontend filter):', filteredWorkplans);
-         setWorkplans(filteredWorkplans);
-         // อัปเดตเวลาล่าสุดเมื่อโหลดข้อมูลครั้งแรก
-         setLastUpdateTime(new Date().toLocaleTimeString('th-TH'));
+
+        // เพิ่มงานตวงสูตรเข้าไปในรายการ
+        const weighingJobs = createVirtualWeighingJob();
+        const allWorkplans = [...filteredWorkplans, ...weighingJobs];
+        
+        console.log('[DEBUG] All workplans including weighing jobs:', allWorkplans);
+        setWorkplans(allWorkplans);
+        
+        // ไม่เลือกงานตวงสูตรโดยอัตโนมัติ เพื่อให้ผู้ใช้เลือกเอง
+        // if (!selectedWorkplan && weighingJobs.length > 0) {
+        //   console.log('[DEBUG] Auto-selecting weighing job:', weighingJobs[0]);
+        //   setSelectedWorkplan(weighingJobs[0]);
+        // }
+        
+        // อัปเดตเวลาล่าสุดเมื่อโหลดข้อมูลครั้งแรก
+        setLastUpdateTime(new Date().toLocaleTimeString('th-TH'));
        })
                        .catch((error: any) => {
           console.error('[DEBUG] Error loading workplans:', error);
@@ -140,6 +181,8 @@ export default function TrackerPage() {
           }
         })
        .finally(() => setIsLoading(false));
+     
+     // รีเซ็ต state เมื่อโหลดหน้าใหม่ (เมื่อ date เปลี่ยน)
      setSelectedWorkplan(null);
      setProcessSteps([]);
      setProcessLogs([]);
@@ -192,7 +235,11 @@ export default function TrackerPage() {
         return wpDateFormatted === date;
       });
       
-      setWorkplans(filteredWorkplans);
+      // เพิ่มงานตวงสูตรเข้าไปในรายการ
+      const weighingJobs = createVirtualWeighingJob();
+      const allWorkplans = [...filteredWorkplans, ...weighingJobs];
+      
+      setWorkplans(allWorkplans);
       
       // เก็บ selectedWorkplan ไว้หลัง refresh เสมอ
       if (selectedWorkplan) {
@@ -366,28 +413,45 @@ export default function TrackerPage() {
     
     const loadProcessData = async () => {
       try {
-        const [stepsRes, logsRes] = await Promise.all([
-          fetch(`/api/process-steps?job_code=${selectedWorkplan.job_code}`),
-          fetch(`/api/logs/work-plan/${selectedWorkplan.id}`)
-        ]);
-
-        if (!stepsRes.ok) {
-          throw new Error(`Process steps API error: ${stepsRes.status}`);
-        }
-        if (!logsRes.ok) {
-          throw new Error(`Logs API error: ${logsRes.status}`);
-        }
-
-        const [steps, logs] = await Promise.all([
-          stepsRes.json(),
-          logsRes.json()
-        ]);
-
-        console.log('[DEBUG] Loaded process steps:', steps);
-        console.log('[DEBUG] Loaded process logs:', logs);
+        let processSteps = [];
+        let processLogs = [];
         
-        setProcessSteps(steps.data || []);
-        setProcessLogs(logs.data || []);
+        // ตรวจสอบว่าเป็นงานตวงสูตรหรือไม่
+        if (selectedWorkplan.isWeighingJob) {
+          // งานตวงสูตร - ใช้ขั้นตอนที่กำหนดไว้
+          processSteps = createWeighingProcessSteps(selectedWorkplan.job_code);
+          console.log('[DEBUG] Using weighing process steps:', processSteps);
+        } else {
+          // งานปกติ - ตรวจสอบ job_code
+          if (selectedWorkplan.job_code === 'new' || selectedWorkplan.job_code === '1') {
+            // งาน new หรือ 1 - ใช้ขั้นตอนเริ่มต้นผลิต-สิ้นสุดการผลิต
+            processSteps = createNormalProcessSteps();
+            console.log('[DEBUG] Using normal process steps for new/1 job:', processSteps);
+          } else {
+            // งานอื่นๆ - โหลดจาก API
+            const stepsRes = await fetch(`/api/process-steps?job_code=${selectedWorkplan.job_code}`);
+            if (!stepsRes.ok) {
+              throw new Error(`Process steps API error: ${stepsRes.status}`);
+            }
+            const steps = await stepsRes.json();
+            processSteps = steps.data || [];
+            console.log('[DEBUG] Loaded process steps from API:', processSteps);
+          }
+          
+          // โหลด logs (สำหรับงานตวงสูตรจะไม่มี logs เริ่มต้น)
+          const logsRes = await fetch(`/api/logs/work-plan/${selectedWorkplan.id}`);
+          if (!logsRes.ok) {
+            throw new Error(`Logs API error: ${logsRes.status}`);
+          }
+          const logs = await logsRes.json();
+          processLogs = logs.data || [];
+        }
+        
+        console.log('[DEBUG] Final process steps:', processSteps);
+        console.log('[DEBUG] Final process logs:', processLogs);
+        
+        setProcessSteps(processSteps);
+        setProcessLogs(processLogs);
         setSelectedProcessIndex(0);
         setUsedSec(null);
       } catch (error) {
@@ -531,6 +595,21 @@ export default function TrackerPage() {
         console.error("[DEBUG] API error:", result);
         throw new Error(result.message || "API error");
       }
+
+      // เรียก finish flag โดยตรงเพื่ออัปเดตตาราง finished_flags ให้แน่นอน
+      try {
+        const finishRes = await fetch(`/api/work-plans/${selectedWorkplan.id}/finish`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          }
+        });
+        const finishResult = await finishRes.json().catch(() => ({}));
+        console.log("[DEBUG] Mark as finished response:", finishResult);
+      } catch (finishErr) {
+        console.warn("[DEBUG] Finish flag update failed (non-blocking):", finishErr);
+      }
       
              setMessage("จบงานผลิตแล้ว");
        setStatusType("success");
@@ -594,26 +673,32 @@ export default function TrackerPage() {
       workplan: selectedWorkplan.id,
       step: step.process_number,
       status,
-      timestamp
+      timestamp,
+      isWeighingJob: selectedWorkplan.isWeighingJob
     });
     
     try {
-      console.log("[DEBUG] ส่ง log ไป backend:", {
-        work_plan_id: selectedWorkplan.id,
-        process_number: step.process_number,
-        status,
-        timestamp
-      });
-      
-      const res = await fetch(`/api/logs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // สำหรับงานตวงสูตร virtual ส่ง work_plan_id = 4 (backend จะ map เป็น NULL)
+      const logData = selectedWorkplan.isWeighingJob ? 
+        {
+          work_plan_id: 4,
+          process_number: step.process_number,
+          status,
+          timestamp
+        } : 
+        {
           work_plan_id: selectedWorkplan.id,
           process_number: step.process_number,
           status,
           timestamp
-        })
+        };
+      
+      console.log("[DEBUG] ส่ง log ไป backend:", logData);
+      
+      const res = await fetch(`/api/logs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(logData)
       });
       
       const result = await res.json().catch(() => ({}));
@@ -634,7 +719,10 @@ export default function TrackerPage() {
       
       // reload logs
       console.log("[DEBUG] Reloading logs...");
-      const logs = await fetch(`/api/logs/work-plan/${selectedWorkplan.id}`).then(r => r.json());
+      const fetchUrl = selectedWorkplan.isWeighingJob
+        ? `/api/logs/work-plan/4`
+        : `/api/logs/work-plan/${selectedWorkplan.id}`;
+      const logs = await fetch(fetchUrl).then(r => r.json());
       console.log("[DEBUG] Reloaded logs:", logs);
       setProcessLogs(logs.data || []);
       
@@ -1006,34 +1094,7 @@ export default function TrackerPage() {
              </div>
            )}
           
-                     {/* จุดสถานะ Auto-refresh ที่มุมล่างขวา */}
-           <div className="fixed bottom-4 right-4 z-50">
-             <div className="flex flex-col items-end gap-2">
-               {/* สถานะการโหลดข้อมูล */}
-               <div className="bg-white rounded-lg shadow-lg px-3 py-2 text-xs">
-                 <div className="flex items-center gap-2">
-                   <div className={`w-2 h-2 rounded-full ${
-                     isAutoRefreshing ? 'bg-orange-500 animate-pulse' : 
-                     autoRefreshEnabled ? 'bg-green-500' : 'bg-gray-400'
-                   }`}></div>
-                   <span className="text-gray-600">
-                     {isAutoRefreshing ? 'กำลังอัปเดต...' : 
-                      autoRefreshEnabled ? 'Auto Refresh เปิด' : 'Auto Refresh ปิด'}
-                   </span>
-                 </div>
-                 {lastUpdateTime && (
-                   <div className="text-gray-500 mt-1">
-                     อัปเดตล่าสุด: {lastUpdateTime}
-                   </div>
-                 )}
-                 {!autoRefreshEnabled && (
-                   <div className="text-orange-600 mt-1 font-medium">
-                     เปิด Auto Refresh ในตั้งค่าเพื่ออัปเดตอัตโนมัติ
-                   </div>
-                 )}
-               </div>
-             </div>
-           </div>
+                     {/* ซ่อนการ์ด Auto-refresh ตามคำขอผู้ใช้ */}
        </div>
      </div>
    );

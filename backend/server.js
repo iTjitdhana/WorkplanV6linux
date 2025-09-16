@@ -98,6 +98,10 @@ app.use('/api/monitoring', require('./routes/monitoringRoutes'));
 app.use('/api/process-steps', require('./routes/processStepRoutes'));
 app.use('/api/send-to-google-sheet', require('./routes/googleSheetProxy'));
 
+// Role Menu Management Routes
+app.use('/api/admin', require('./routes/roleMenuRoutes'));
+app.use('/api/me', require('./routes/roleMenuRoutes'));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);

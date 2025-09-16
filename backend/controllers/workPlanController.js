@@ -331,6 +331,17 @@ class WorkPlanController {
       const updated = await WorkPlan.updateStatus(id, status_id);
       console.log('🔄 [DEBUG] Update result:', updated);
       
+      // ถ้าสถานะใหม่คือ 4 (จบงานผลิตแล้ว) ให้บันทึกธง finished_flags ด้วย
+      if (updated && Number(status_id) === 4) {
+        try {
+          await WorkPlan.markAsFinished(id);
+          console.log('✅ [DEBUG] finished_flags updated (is_finished = 1) for work_plan_id:', id);
+        } catch (e) {
+          console.error('⚠️ [DEBUG] Failed to update finished_flags:', e);
+          // ไม่ต้อง throw ต่อ เพื่อไม่ให้ล้มทั้งคำขอ ถ้าบันทึกธงล้มเหลว
+        }
+      }
+      
       if (!updated) {
         console.log('🔄 [DEBUG] Update failed');
         return res.status(500).json({

@@ -55,22 +55,44 @@ class Log {
   static async getByWorkPlanId(workPlanId) {
     try {
       console.log('[DEBUG] Log.getByWorkPlanId called with workPlanId:', workPlanId);
-      const query = `
-        SELECT 
-          l.id,
-          l.work_plan_id,
-          l.process_number,
-          l.status,
-          l.timestamp,
-          ps.process_description
-        FROM logs l
-        LEFT JOIN work_plans wp ON l.work_plan_id = wp.id
-        LEFT JOIN process_steps ps ON wp.job_code = ps.job_code AND l.process_number = ps.process_number
-        WHERE l.work_plan_id = ?
-        ORDER BY l.process_number, l.timestamp
-      `;
       
-      const [rows] = await pool.execute(query, [workPlanId]);
+      let rows;
+      // ถ้าเป็น null ให้ดึง logs ที่ work_plan_id IS NULL
+      if (workPlanId === null) {
+        const queryNull = `
+          SELECT 
+            l.id,
+            l.work_plan_id,
+            l.process_number,
+            l.status,
+            l.timestamp,
+            l.process_number as process_number,
+            ps.process_description
+          FROM logs l
+          LEFT JOIN process_steps ps ON ps.process_number = l.process_number
+          WHERE l.work_plan_id IS NULL
+          ORDER BY l.process_number, l.timestamp
+        `;
+        const result = await pool.execute(queryNull);
+        rows = result[0];
+      } else {
+        const query = `
+          SELECT 
+            l.id,
+            l.work_plan_id,
+            l.process_number,
+            l.status,
+            l.timestamp,
+            ps.process_description
+          FROM logs l
+          LEFT JOIN work_plans wp ON l.work_plan_id = wp.id
+          LEFT JOIN process_steps ps ON wp.job_code = ps.job_code AND l.process_number = ps.process_number
+          WHERE l.work_plan_id = ?
+          ORDER BY l.process_number, l.timestamp
+        `;
+        
+        [rows] = await pool.execute(query, [workPlanId]);
+      }
       console.log('[DEBUG] Raw logs from database:', rows);
       
       // จัดกลุ่ม logs ตาม process_number และคำนวณ start_time, stop_time, used_time
@@ -152,18 +174,21 @@ class Log {
   static async create(logData) {
     try {
       console.log('[DEBUG] Log.create called with logData:', logData);
-      const { work_plan_id, process_number, status, timestamp } = logData;
+      const { process_number, status } = logData;
+      // อนุญาตให้ work_plan_id เป็น null/undefined สำหรับงาน virtual (เช่น ตวงสูตร)
+      const workPlanId = logData.work_plan_id ?? null;
+
       let query, params, result, finalTimestamp;
 
-      if (timestamp) {
+      if (logData.timestamp) {
         // ถ้ามี timestamp ที่ส่งมา ให้แปลงเป็นเวลาประเทศไทย
-        const d = new Date(timestamp);
+        const d = new Date(logData.timestamp);
         finalTimestamp = new Date(d.getTime() + 7 * 60 * 60 * 1000);
         query = `
           INSERT INTO logs (work_plan_id, process_number, status, timestamp)
           VALUES (?, ?, ?, ?)
         `;
-        params = [work_plan_id, process_number, status, finalTimestamp];
+        params = [workPlanId, process_number, status, finalTimestamp];
         console.log('[DEBUG] Using timestamp branch - params:', params);
       } else {
         // ถ้าไม่ส่ง timestamp มา ใช้เวลาปัจจุบันของไทย
@@ -171,7 +196,7 @@ class Log {
           INSERT INTO logs (work_plan_id, process_number, status, timestamp)
           VALUES (?, ?, ?, CONVERT_TZ(NOW(), 'UTC', 'Asia/Bangkok'))
         `;
-        params = [work_plan_id, process_number, status];
+        params = [workPlanId, process_number, status];
         finalTimestamp = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
         console.log('[DEBUG] Using NOW() branch - params:', params);
       }
@@ -182,7 +207,7 @@ class Log {
 
       const returnData = {
         id: result.insertId,
-        work_plan_id,
+        work_plan_id: workPlanId,
         process_number,
         status,
         timestamp: finalTimestamp
@@ -275,6 +300,12 @@ class Log {
   // Get process status for work plan
   static async getProcessStatus(workPlanId) {
     try {
+      // ตรวจสอบว่าเป็น weighing job (string ID) หรือไม่
+      if (workPlanId === 'weighing_job') {
+        // สำหรับงานตวงสูตร ไม่มี logs ใน database
+        return [];
+      }
+      
       const query = `
         SELECT 
           l.process_number,
@@ -540,22 +571,30 @@ class Log {
       }
       
       // ตรวจสอบสถานะของแต่ละ process
-      const processStatusQuery = `
-        SELECT 
-          l.process_number,
-          l.status,
-          l.timestamp,
-          ps.process_description
-        FROM logs l
-        LEFT JOIN work_plans wp ON l.work_plan_id = wp.id
-        LEFT JOIN process_steps ps ON wp.job_code = ps.job_code AND l.process_number = ps.process_number
-        WHERE l.work_plan_id = ? AND l.id IN (
-          SELECT MAX(id) FROM logs 
-          WHERE work_plan_id = ? 
-          GROUP BY process_number
-        )
-        ORDER BY l.process_number
-      `;
+      let processStatusQuery;
+      
+      if (workPlanId === 'weighing_job') {
+        // สำหรับงานตวงสูตร ไม่มี logs ใน database
+        return { status: 'pending', message: 'รอดำเนินการ' };
+      } else {
+        // สำหรับงานปกติ
+        processStatusQuery = `
+          SELECT 
+            l.process_number,
+            l.status,
+            l.timestamp,
+            ps.process_description
+          FROM logs l
+          LEFT JOIN work_plans wp ON l.work_plan_id = wp.id
+          LEFT JOIN process_steps ps ON wp.job_code = ps.job_code AND l.process_number = ps.process_number
+          WHERE l.work_plan_id = ? AND l.id IN (
+            SELECT MAX(id) FROM logs 
+            WHERE work_plan_id = ? 
+            GROUP BY process_number
+          )
+          ORDER BY l.process_number
+        `;
+      }
       
       const [processRows] = await pool.execute(processStatusQuery, [workPlanId, workPlanId]);
       console.log(`[DEBUG] Process rows for work plan ${workPlanId}:`, processRows);

@@ -4,11 +4,8 @@ const LogController = require('../controllers/logController');
 
 const router = express.Router();
 
-// Validation middleware
+// Validation middleware - ไม่ต้อง validate work_plan_id เพื่อให้งานตวงสูตรทำงานได้
 const logValidation = [
-  body('work_plan_id')
-    .isInt({ min: 1 })
-    .withMessage('Work plan ID must be a positive integer'),
   body('process_number')
     .isInt({ min: 1 })
     .withMessage('Process number must be a positive integer'),
@@ -31,7 +28,7 @@ router.get('/work-plans/status', LogController.getWorkPlansStatus);
 router.get('/summary/:date', LogController.getProductionSummary);
 router.get('/:id', LogController.getById);
 
-router.post('/', logValidation, LogController.create);
+router.post('/', LogController.create);
 router.post('/start', LogController.startProcess);
 router.post('/stop', LogController.stopProcess);
 

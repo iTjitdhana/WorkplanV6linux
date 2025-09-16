@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   title: 'ระบบจัดการแผนการผลิตครัวกลาง บริษัท จิตต์ธนา จำกัด (สำนักงานใหญ่)',
   description: 'Created with v0',
   generator: 'v0.dev',
+  icons: {
+    icon: '/images/favicon.ico',
+  },
 }
 
 export default function RootLayout({

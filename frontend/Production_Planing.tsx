@@ -2495,58 +2495,66 @@ export default function MedicalAppointmentDashboard() {
               </h1>
             </div>
             <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
-              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+              {/* derive allowed menus from role cookie (frontend guard) */}
+              {(() => {
+                // Centralized menu logic
+                const { getRoleIdFromCookie } = require('./lib/menuLinks');
+                const { buildMenuHref, isMenuAllowed } = require('./lib/menuLinks');
+                const roleId = getRoleIdFromCookie();
+                const hasPermission = (key: string) => isMenuAllowed(key as any, roleId);
+
+                return (
+                  <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     className="hidden md:flex items-center space-x-1 text-sm text-green-100 hover:text-white hover:bg-white/10 transition-colors duration-200 p-2"
                   >
-                    <span>ระบบจัดการข้อมูล</span>
+                    <span>เมนู</span>
                     <ChevronDownIcon className="w-3 h-3" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
+                <DropdownMenuContent align="end" className="w-64 bg-white border border-gray-200 shadow-lg">
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
-                      <span>หน้าหลัก</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/logs" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
-                      <span>ระบบจัดการ Logs</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/tracker" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
-                      <span>ติดตามการผลิต</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/reports" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
-                      <span>รายงาน</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/users" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
-                      <span>จัดการผู้ใช้</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
-                      <span>ตั้งค่าระบบ</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/monitoring" className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
-                      <span>ติดตามสถานะ</span>
-                    </Link>
+                    <a
+                      href="http://localhost:3014/planner/logs"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer"
+                    >
+                      <span>ระบบประวัติการผลิต</span>
+                    </a>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+                  </DropdownMenu>
+                );
+              })()}
 
               <div className="flex items-center space-x-1 sm:space-x-2">
-                <span className="hidden sm:block text-xs sm:text-sm text-white">ผู้ใช้: Admin</span>
-                <span className="sm:hidden text-xs text-white">Admin</span>
+                {(() => {
+                  const roleNameMap: Record<number, string> = {1:'Planner',2:'Admin',4:'Viewer',5:'Operation'};
+                  // Render stable placeholder on server to avoid hydration mismatch
+                  // Then resolve role on client after mount
+                  const [name, setName] = useState<string>('');
+                  useEffect(() => {
+                    try {
+                      const cookieMatch = document.cookie.match(/(?:^|; )userRole=([^;]+)/);
+                      let roleId = cookieMatch ? parseInt(decodeURIComponent(cookieMatch[1])) : undefined;
+                      if (!roleId) {
+                        const segment = window.location.pathname.split('/').filter(Boolean)[0];
+                        const urlRoleMap: Record<string, number> = { planner: 1, admin: 2, viewer: 4, operation: 5 };
+                        roleId = urlRoleMap[segment];
+                      }
+                      if (roleId && roleNameMap[roleId]) setName(roleNameMap[roleId]);
+                    } catch {}
+                  }, []);
+                  return (
+                    <>
+                      <span className="hidden sm:block text-xs sm:text-sm text-white">ผู้ใช้: {name || ''}</span>
+                      <span className="sm:hidden text-xs text-white">{name || ''}</span>
+                    </>
+                  );
+                })()}
                 <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
                   <span className="text-white text-xs sm:text-sm font-medium">A</span>
                 </div>
