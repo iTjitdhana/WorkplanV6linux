@@ -76,7 +76,7 @@
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
     "react-select": "^5.10.2",
-    "react-window": "^2.1.1",
+    "react-window": "^1.8.8",
     "react-window-infinite-loader": "^2.0.0",
     "recharts": "2.15.0",
     "sonner": "^1.7.1",
