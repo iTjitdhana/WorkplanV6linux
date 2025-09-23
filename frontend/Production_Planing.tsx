@@ -2373,7 +2373,7 @@ export default function MedicalAppointmentDashboard() {
       room: item.production_room || '',
       staff: getOperatorsString(item.operators),
       time: `${item.start_time || ''} - ${item.end_time || ''}`,
-      status: item.status_name || '',
+      status: (item as any).status_name || item.status || '',
       recordStatus: getJobStatus(item) as "บันทึกแบบร่าง" | "บันทึกเสร็จสิ้น" | "พิมพ์แล้ว",
       notes: (item as any).note || (item as any).notes || '',
       createdAt: item.created_at,
