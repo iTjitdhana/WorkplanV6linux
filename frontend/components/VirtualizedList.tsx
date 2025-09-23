@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
 import { FixedSizeList as List } from 'react-window';
-import InfiniteLoader from 'react-window-infinite-loader';
+import { InfiniteLoader } from 'react-window-infinite-loader';
 
 interface VirtualizedListProps {
   items: any[];
