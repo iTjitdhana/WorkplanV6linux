@@ -2367,7 +2367,7 @@ export default function MedicalAppointmentDashboard() {
     return data
       .filter(item => !defaultCodes.includes((item as any).job_code))
       .map(item => ({
-      id: item.id,
+      id: parseInt(item.id) || 0,
       date: formatDateForAPI(item.production_date),
       title: item.job_name,
       room: item.production_room || '',
