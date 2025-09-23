@@ -30,6 +30,11 @@ WorkPlanV6/
 ├── 📚 docs/              # Documentation
 ├── 🛠️ tools/             # Development Tools
 ├── 📜 scripts/           # Build & Utility Scripts
+├── 🚀 deployment/        # Deployment Files & Scripts
+│   ├── linux/           # Linux deployment files
+│   ├── windows/         # Windows deployment files
+│   ├── guides/          # Deployment guides
+│   └── scripts/         # Additional scripts
 │
 ├── 🚀 start-workplan-system.bat  # Main Launcher
 ├── 🏭 run-production.bat         # Production Mode
