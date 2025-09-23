@@ -62,15 +62,15 @@ export const VirtualizedList: React.FC<VirtualizedListProps> = ({
 
   return (
     <div className={className}>
-      <InfiniteLoader
-        isItemLoaded={isItemLoaded}
-        itemCount={itemCount}
-        loadMoreItems={isNextPageLoading ? () => Promise.resolve() : loadNextPage}
-      >
-        {({ onItemsRendered, ref }) => (
+      {React.createElement(InfiniteLoader as any, {
+        isItemLoaded,
+        itemCount,
+        loadMoreItems: isNextPageLoading ? () => Promise.resolve() : loadNextPage,
+        children: ({ onItemsRendered, ref }: any) => (
           <List
             ref={ref}
             height={height}
+            width="100%"
             itemCount={itemCount}
             itemSize={itemHeight}
             itemData={items}
@@ -79,8 +79,8 @@ export const VirtualizedList: React.FC<VirtualizedListProps> = ({
           >
             {Item}
           </List>
-        )}
-      </InfiniteLoader>
+        )
+      })}
     </div>
   );
 };
