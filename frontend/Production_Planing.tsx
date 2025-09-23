@@ -2383,7 +2383,7 @@ export default function MedicalAppointmentDashboard() {
 
   const convertToProductionItem = (task: ProductionTask): ProductionItem => {
     // Find the original item from productionData
-    const originalItem = productionData.find(item => item.id === task.id)
+    const originalItem = productionData.find(item => item.id === task.id.toString())
     if (!originalItem) {
       throw new Error(`Production item with id ${task.id} not found`)
     }
@@ -2396,9 +2396,9 @@ export default function MedicalAppointmentDashboard() {
       operators: task.staff,
       start_time: task.time.split(' - ')[0],
       end_time: task.time.split(' - ')[1],
-      status_name: task.status,
+      status: task.status as any,
       note: task.notes,
-      production_date: new Date(task.date)
+      production_date: task.date
     }
   }
 
@@ -2406,14 +2406,14 @@ export default function MedicalAppointmentDashboard() {
   const handleTaskMove = (taskId: number, fromDate: string, toDate: string, fromIndex: number, toIndex: number) => {
     setProductionData(prev => {
       const updated = prev.map(p => 
-        p.id === taskId ? { ...p, production_date: new Date(toDate) } : p
+        p.id === taskId.toString() ? { ...p, production_date: toDate } : p
       )
       
       // Rebuild order for target day by inserting at position
       const target = updated.filter(p => formatDateForAPI(p.production_date) === toDate)
       const others = updated.filter(p => formatDateForAPI(p.production_date) !== toDate)
-      const moved = target.filter(p => p.id === taskId)[0]
-      const rest = target.filter(p => p.id !== taskId)
+      const moved = target.filter(p => p.id === taskId.toString())[0]
+      const rest = target.filter(p => p.id !== taskId.toString())
       const clampedPos = Math.min(Math.max(toIndex, 0), rest.length)
       rest.splice(clampedPos, 0, moved)
       
