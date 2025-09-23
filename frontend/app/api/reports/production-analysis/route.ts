@@ -13,9 +13,9 @@ export async function GET(request: NextRequest) {
     }
 
     const backendUrl = `${BACKEND_URL}/api/reports/production-analysis?${params}`;
-    console.log('[DEBUG] Frontend API calling backend:', backendUrl);
-    console.log('[DEBUG] Query parameters:', Object.fromEntries(params.entries()));
-    console.log('[DEBUG] Limit parameter:', params.get('limit'));
+    // console.log('[DEBUG] Frontend API calling backend:', backendUrl);
+    // console.log('[DEBUG] Query parameters:', Object.fromEntries(params.entries()));
+    // console.log('[DEBUG] Limit parameter:', params.get('limit'));
 
     const response = await fetch(backendUrl, {
       method: 'GET',

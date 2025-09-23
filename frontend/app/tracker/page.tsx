@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Noto_Sans_Thai } from "next/font/google";
 import { translations, Language } from "@/lib/translations";
+import { debugLog, debugError } from "@/lib/config";
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ["thai", "latin"],
@@ -17,11 +18,16 @@ function formatUsedTime(sec: number) {
 }
 
 export default function TrackerPage() {
-  const [date, setDate] = useState(() => {
-    // ใช้วันที่ปัจจุบัน
+  const [date, setDate] = useState('');
+  const [isClient, setIsClient] = useState(false);
+  
+  // แก้ไข hydration error
+  useEffect(() => {
+    setIsClient(true);
+    // ตั้งค่าวันที่ปัจจุบันหลังจาก component mount
     const today = new Date();
-    return today.toISOString().slice(0, 10);
-  });
+    setDate(today.toISOString().slice(0, 10));
+  }, []);
   const [workplans, setWorkplans] = useState<any[]>([]);
   const [selectedWorkplan, setSelectedWorkplan] = useState<any>(null);
   const [processSteps, setProcessSteps] = useState<any[]>([]);
@@ -73,7 +79,7 @@ export default function TrackerPage() {
   // Load workplans by date
   useEffect(() => {
     setIsLoading(true);
-    console.log('[DEBUG] Starting to load workplans for date:', date);
+    debugLog('Starting to load workplans for date:', date);
     
     fetch(`/api/work-plans?date=${date}`, {
       method: 'GET',
@@ -83,8 +89,8 @@ export default function TrackerPage() {
       }
     })
       .then(res => {
-        console.log('[DEBUG] API Response status:', res.status);
-        console.log('[DEBUG] API Response headers:', res.headers);
+        debugLog('API Response status:', res.status);
+        debugLog('API Response headers:', res.headers);
         
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status} - ${res.statusText}`);
@@ -92,7 +98,7 @@ export default function TrackerPage() {
         return res.json();
       })
       .then(data => {
-        console.log('[DEBUG] Raw API response:', data);
+        debugLog('Raw API response:', data);
         
         // ตรวจสอบว่า response มี success field และเป็น false หรือไม่
         if (data.success === false) {
@@ -101,27 +107,27 @@ export default function TrackerPage() {
         
         // ตรวจสอบว่า data.data มีอยู่และเป็น array
         if (!data.data || !Array.isArray(data.data)) {
-          console.warn('[DEBUG] No data or data is not array:', data);
+          debugLog('No data or data is not array:', data);
           return { ...data, data: [] };
         }
         
         return data;
       })
       .then(data => {
-        console.log('[DEBUG] Loaded workplans (processed):', data);
-        console.log('[DEBUG] Workplans count:', data.data.length);
-        console.log('[DEBUG] Requested date (from state):', date);
+        debugLog('Loaded workplans (processed):', data);
+        debugLog('Workplans count:', data.data.length);
+        debugLog('Requested date (from state):', date);
         
         if (data.data && data.data.length > 0) {
-          console.log('[DEBUG] First workplan sample:', data.data[0]);
-          console.log('[DEBUG] All workplans production dates:', data.data.map((wp: any) => wp.production_date));
+          debugLog('First workplan sample:', data.data[0]);
+          debugLog('All workplans production dates:', data.data.map((wp: any) => wp.production_date));
         } else {
-          console.log('[DEBUG] No workplans found for date:', date);
+          debugLog('No workplans found for date:', date);
         }
         const filteredWorkplans = (data.data || []).filter((wp: any) => {
           // กรองงานที่ถูกยกเลิก
           if (wp.status_name === 'งานผลิตถูกยกเลิก') {
-            console.log('[DEBUG] Filtering out cancelled workplan:', wp.job_name);
+            debugLog('Filtering out cancelled workplan:', wp.job_name);
             return false;
           }
           // กรองเฉพาะงานของวันที่เลือก
@@ -134,17 +140,17 @@ export default function TrackerPage() {
               wpDateFormatted = wpDate.split('T')[0];
             }
           }
-          console.log('[DEBUG] Comparing dates:', { 
+          debugLog('Comparing dates:', { 
             originalWpDate: wpDate, 
             formattedWpDate: wpDateFormatted, 
             requestedDate: date, 
             isEqual: wpDateFormatted === date 
           });
           if (wpDateFormatted !== date) {
-            console.log('[DEBUG] Filtering out workplan with different date:', wpDateFormatted, 'vs', date);
+            debugLog('Filtering out workplan with different date:', wpDateFormatted, 'vs', date);
             return false;
           }
-          console.log('[DEBUG] Keeping workplan:', wp.job_name, 'with date:', wpDate);
+          debugLog('Keeping workplan:', wp.job_name, 'with date:', wpDate);
           return true;
         });
 
@@ -152,12 +158,12 @@ export default function TrackerPage() {
         const weighingJobs = createVirtualWeighingJob();
         const allWorkplans = [...filteredWorkplans, ...weighingJobs];
         
-        console.log('[DEBUG] All workplans including weighing jobs:', allWorkplans);
+        debugLog('[DEBUG] All workplans including weighing jobs:', allWorkplans);
         setWorkplans(allWorkplans);
         
         // ไม่เลือกงานตวงสูตรโดยอัตโนมัติ เพื่อให้ผู้ใช้เลือกเอง
         // if (!selectedWorkplan && weighingJobs.length > 0) {
-        //   console.log('[DEBUG] Auto-selecting weighing job:', weighingJobs[0]);
+        //   debugLog('[DEBUG] Auto-selecting weighing job:', weighingJobs[0]);
         //   setSelectedWorkplan(weighingJobs[0]);
         // }
         
@@ -165,12 +171,12 @@ export default function TrackerPage() {
         setLastUpdateTime(new Date().toLocaleTimeString('th-TH'));
        })
                        .catch((error: any) => {
-          console.error('[DEBUG] Error loading workplans:', error);
+          debugError('[DEBUG] Error loading workplans:', error);
           setWorkplans([]);
           
           // จัดการ HTTP 429 error โดยเฉพาะ
           if (error.message && error.message.includes('429')) {
-            console.log('[DEBUG] Rate limit exceeded on initial load');
+            debugLog('[DEBUG] Rate limit exceeded on initial load');
             // เพิ่มเวลารอสำหรับการ refresh ครั้งถัดไป
             (window as any).lastRefreshTime = Date.now() + 60000; // รอ 1 นาที
             
@@ -215,7 +221,7 @@ export default function TrackerPage() {
 
      // Manual refresh functionality
    const refreshWorkplans = async () => {
-     console.log('[DEBUG] refreshWorkplans called, isLoading:', isLoading, 'isAutoRefreshing:', isAutoRefreshing);
+     debugLog('[DEBUG] refreshWorkplans called, isLoading:', isLoading, 'isAutoRefreshing:', isAutoRefreshing);
      if (isLoading) return; // Don't refresh if already loading
      
      // เพิ่มการป้องกัน Rate Limiting - ตรวจสอบว่าการ refresh ครั้งล่าสุดห่างกันอย่างน้อย 30 วินาที
@@ -224,7 +230,7 @@ export default function TrackerPage() {
      const timeSinceLastRefresh = now - lastRefreshTime;
      
      if (timeSinceLastRefresh < 30000) { // 30 วินาที
-       console.log('[DEBUG] Skipping refresh - too soon since last refresh:', timeSinceLastRefresh, 'ms');
+       debugLog('[DEBUG] Skipping refresh - too soon since last refresh:', timeSinceLastRefresh, 'ms');
        return;
      }
      
@@ -268,11 +274,11 @@ export default function TrackerPage() {
       if (selectedWorkplan) {
         const updatedSelectedWorkplan = filteredWorkplans.find((wp: any) => wp.id === selectedWorkplan.id);
         if (updatedSelectedWorkplan) {
-          console.log('[DEBUG] Found updated workplan, keeping selection:', updatedSelectedWorkplan.job_name);
+          debugLog('[DEBUG] Found updated workplan, keeping selection:', updatedSelectedWorkplan.job_name);
           setSelectedWorkplan(updatedSelectedWorkplan);
         } else {
           // ถ้าไม่เจอ workplan เดิม (อาจถูกลบหรือยกเลิก) ให้รีเซ็ต
-          console.log('[DEBUG] Workplan not found after refresh, resetting selection');
+          debugLog('[DEBUG] Workplan not found after refresh, resetting selection');
           setSelectedWorkplan(null);
           setProcessSteps([]);
           setProcessLogs([]);
@@ -283,13 +289,13 @@ export default function TrackerPage() {
       
       // อัปเดตเวลาล่าสุด
       setLastUpdateTime(new Date().toLocaleTimeString('th-TH'));
-      console.log('[DEBUG] Refresh completed successfully');
+      debugLog('[DEBUG] Refresh completed successfully');
          } catch (error: any) {
-       console.error('Refresh failed:', error);
+       debugError('Refresh failed:', error);
        
        // จัดการ HTTP 429 error โดยเฉพาะ
        if (error.message && error.message.includes('429')) {
-         console.log('[DEBUG] Rate limit exceeded, increasing refresh interval');
+         debugLog('[DEBUG] Rate limit exceeded, increasing refresh interval');
          // เพิ่มเวลารอสำหรับการ refresh ครั้งถัดไป
          (window as any).lastRefreshTime = Date.now() + 60000; // รอ 1 นาที
          
@@ -331,14 +337,14 @@ export default function TrackerPage() {
       const data = await response.json();
       if (data.success) {
         const newValue = data.autoRefreshEnabled;
-        console.log('[DEBUG] Auto refresh setting loaded:', newValue, 'current:', autoRefreshEnabled);
+        debugLog('[DEBUG] Auto refresh setting loaded:', newValue, 'current:', autoRefreshEnabled);
         if (newValue !== autoRefreshEnabled) {
-          console.log('[DEBUG] Auto refresh setting changed from', autoRefreshEnabled, 'to', newValue);
+          debugLog('[DEBUG] Auto refresh setting changed from', autoRefreshEnabled, 'to', newValue);
           setAutoRefreshEnabled(newValue);
         }
       }
           } catch (error) {
-        console.error('Error loading auto refresh setting:', error);
+        debugError('Error loading auto refresh setting:', error);
         setAutoRefreshEnabled(false); // default to false on error
       }
   };
@@ -352,7 +358,7 @@ export default function TrackerPage() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('[DEBUG] Page became visible, reloading auto refresh setting');
+        debugLog('[DEBUG] Page became visible, reloading auto refresh setting');
         loadAutoRefreshSetting();
       }
     };
@@ -368,17 +374,17 @@ export default function TrackerPage() {
     let interval: NodeJS.Timeout | null = null;
     
     if (autoRefreshEnabled) {
-      console.log('[DEBUG] Starting auto refresh setting check interval');
+      debugLog('[DEBUG] Starting auto refresh setting check interval');
       interval = setInterval(() => {
         loadAutoRefreshSetting();
       }, 5000); // Check every 5 seconds
     } else {
-      console.log('[DEBUG] Auto refresh disabled, not starting setting check interval');
+      debugLog('[DEBUG] Auto refresh disabled, not starting setting check interval');
     }
 
     return () => {
       if (interval) {
-        console.log('[DEBUG] Clearing auto refresh setting check interval');
+        debugLog('[DEBUG] Clearing auto refresh setting check interval');
         clearInterval(interval);
       }
     };
@@ -386,14 +392,14 @@ export default function TrackerPage() {
 
   // Force reload auto refresh setting when component mounts or date changes
   useEffect(() => {
-    console.log('[DEBUG] Component mounted or date changed, reloading auto refresh setting');
+    debugLog('[DEBUG] Component mounted or date changed, reloading auto refresh setting');
     loadAutoRefreshSetting();
   }, [date]);
 
   // Reload auto refresh setting when window gains focus
   useEffect(() => {
     const handleFocus = () => {
-      console.log('[DEBUG] Window gained focus, reloading auto refresh setting');
+      debugLog('[DEBUG] Window gained focus, reloading auto refresh setting');
       loadAutoRefreshSetting();
     };
 
@@ -408,22 +414,22 @@ export default function TrackerPage() {
     // Auto-refresh workplans every 120 seconds for real-time updates (เฉพาะเมื่อเปิดใช้งาน)
     let autoRefreshInterval: NodeJS.Timeout | null = null;
     if (autoRefreshEnabled) {
-      console.log('[DEBUG] Auto refresh is ENABLED, starting interval');
+      debugLog('[DEBUG] Auto refresh is ENABLED, starting interval');
       autoRefreshInterval = setInterval(async () => {
         if (!isLoading) {
-          console.log('[DEBUG] Auto-refreshing workplans...');
+          debugLog('[DEBUG] Auto-refreshing workplans...');
           setIsAutoRefreshing(true);
           await refreshWorkplans();
           setIsAutoRefreshing(false);
         }
       }, 120000); // 120 seconds (2 นาที)
     } else {
-      console.log('[DEBUG] Auto refresh is DISABLED, not starting interval');
+      debugLog('[DEBUG] Auto refresh is DISABLED, not starting interval');
     }
 
     return () => {
       if (autoRefreshInterval) {
-        console.log('[DEBUG] Clearing auto refresh interval');
+        debugLog('[DEBUG] Clearing auto refresh interval');
         clearInterval(autoRefreshInterval);
       }
     };
@@ -443,13 +449,13 @@ export default function TrackerPage() {
         if (selectedWorkplan.isWeighingJob) {
           // งานตวงสูตร - ใช้ขั้นตอนที่กำหนดไว้
           processSteps = createWeighingProcessSteps(selectedWorkplan.job_code);
-          console.log('[DEBUG] Using weighing process steps:', processSteps);
+          debugLog('[DEBUG] Using weighing process steps:', processSteps);
         } else {
           // งานปกติ - ตรวจสอบ job_code
           if (selectedWorkplan.job_code === 'new' || selectedWorkplan.job_code === '1') {
             // งาน new หรือ 1 - ใช้ขั้นตอนเริ่มต้นผลิต-สิ้นสุดการผลิต
             processSteps = createNormalProcessSteps();
-            console.log('[DEBUG] Using normal process steps for new/1 job:', processSteps);
+            debugLog('[DEBUG] Using normal process steps for new/1 job:', processSteps);
           } else {
             // งานอื่นๆ - โหลดจาก API
             const stepsRes = await fetch(`/api/process-steps?job_code=${selectedWorkplan.job_code}`);
@@ -458,7 +464,7 @@ export default function TrackerPage() {
             }
             const steps = await stepsRes.json();
             processSteps = steps.data || [];
-            console.log('[DEBUG] Loaded process steps from API:', processSteps);
+            debugLog('[DEBUG] Loaded process steps from API:', processSteps);
           }
           
           // โหลด logs (สำหรับงานตวงสูตรจะไม่มี logs เริ่มต้น)
@@ -470,15 +476,15 @@ export default function TrackerPage() {
           processLogs = logs.data || [];
         }
         
-        console.log('[DEBUG] Final process steps:', processSteps);
-        console.log('[DEBUG] Final process logs:', processLogs);
+        debugLog('[DEBUG] Final process steps:', processSteps);
+        debugLog('[DEBUG] Final process logs:', processLogs);
         
         setProcessSteps(processSteps);
         setProcessLogs(processLogs);
         setSelectedProcessIndex(0);
         setUsedSec(null);
       } catch (error) {
-        console.error('[DEBUG] Error loading process data:', error);
+        debugError('[DEBUG] Error loading process data:', error);
         setProcessSteps([]);
         setProcessLogs([]);
         setSelectedProcessIndex(0);
@@ -506,15 +512,15 @@ export default function TrackerPage() {
          
          // ตรวจสอบ HTTP status
          if (!logsResponse.ok) {
-           console.error('[DEBUG] Logs refresh failed with status:', logsResponse.status);
+           debugError('[DEBUG] Logs refresh failed with status:', logsResponse.status);
            return; // ไม่แสดง error message สำหรับ auto-refresh
          }
          
          const logsData = await logsResponse.json();
-         console.log('[DEBUG] Auto-refreshing logs...');
+         debugLog('[DEBUG] Auto-refreshing logs...');
          setProcessLogs(logsData.data || []);
        } catch (error) {
-         console.error('Error auto-refreshing logs:', error);
+         debugError('Error auto-refreshing logs:', error);
          // ไม่แสดง error message สำหรับ auto-refresh
        }
      };
@@ -541,7 +547,7 @@ export default function TrackerPage() {
     const step = processSteps[selectedProcessIndex];
     const log = processLogs.find((l: any) => l.process_number === step.process_number) || {};
     
-    console.log('[DEBUG] Timer update:', {
+    debugLog('[DEBUG] Timer update:', {
       step: step.process_number,
       log: log,
       start_time: log.start_time,
@@ -556,7 +562,7 @@ export default function TrackerPage() {
       const t = setInterval(() => {
         const currentSec = Math.floor((Date.now() - start.getTime()) / 1000);
         setUsedSec(currentSec);
-        console.log('[DEBUG] Timer tick:', currentSec);
+        debugLog('[DEBUG] Timer tick:', currentSec);
       }, 1000);
       setTimer(t);
       setUsedSec(Math.floor((Date.now() - start.getTime()) / 1000));
@@ -595,11 +601,11 @@ export default function TrackerPage() {
     setMessage("");
     setStatusType("info");
     
-    console.log("[DEBUG] handleFinishProduction called for workplan:", selectedWorkplan.id);
+    debugLog("[DEBUG] handleFinishProduction called for workplan:", selectedWorkplan.id);
     
     try {
-      console.log("[DEBUG] Workplan ID:", selectedWorkplan.id);
-      console.log("[DEBUG] Full URL:", `/api/work-plans/${selectedWorkplan.id}/status`);
+      debugLog("[DEBUG] Workplan ID:", selectedWorkplan.id);
+      debugLog("[DEBUG] Full URL:", `/api/work-plans/${selectedWorkplan.id}/status`);
       
       // อัปเดตสถานะงานเป็น "เสร็จสิ้น" (status_id = 4)
       const res = await fetch(`/api/work-plans/${selectedWorkplan.id}/status`, {
@@ -612,10 +618,10 @@ export default function TrackerPage() {
       });
       
       const result = await res.json();
-      console.log("[DEBUG] Finish production response:", result);
+      debugLog("[DEBUG] Finish production response:", result);
       
       if (!res.ok || !result.success) {
-        console.error("[DEBUG] API error:", result);
+        debugError("[DEBUG] API error:", result);
         throw new Error(result.message || "API error");
       }
 
@@ -629,7 +635,7 @@ export default function TrackerPage() {
           }
         });
         const finishResult = await finishRes.json().catch(() => ({}));
-        console.log("[DEBUG] Mark as finished response:", finishResult);
+        debugLog("[DEBUG] Mark as finished response:", finishResult);
       } catch (finishErr) {
         console.warn("[DEBUG] Finish flag update failed (non-blocking):", finishErr);
       }
@@ -643,7 +649,7 @@ export default function TrackerPage() {
        }, 2000);
       
       // Reload workplans เพื่ออัปเดตสถานะ
-      console.log("[DEBUG] Reloading workplans...");
+      debugLog("[DEBUG] Reloading workplans...");
       const workplansRes = await fetch(`/api/work-plans?date=${date}`);
       const workplansData = await workplansRes.json();
       setWorkplans((workplansData.data || []).filter((wp: any) => wp.status_name !== 'งานผลิตถูกยกเลิก'));
@@ -655,10 +661,10 @@ export default function TrackerPage() {
       }
       
     } catch (e: any) {
-      console.error("[DEBUG] Error in handleFinishProduction:", e);
-      console.error("[DEBUG] Error name:", e.name);
-      console.error("[DEBUG] Error message:", e.message);
-      console.error("[DEBUG] Error stack:", e.stack);
+      debugError("[DEBUG] Error in handleFinishProduction:", e);
+      debugError("[DEBUG] Error name:", e.name);
+      debugError("[DEBUG] Error message:", e.message);
+      debugError("[DEBUG] Error stack:", e.stack);
       
       let errorMessage = "เกิดข้อผิดพลาดในการจบงานผลิต";
       if (e.name === 'TypeError' && e.message.includes('Failed to fetch')) {
@@ -691,7 +697,7 @@ export default function TrackerPage() {
     const status = isStart ? "start" : "stop";
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
     
-    console.log("[DEBUG] handleLog called:", {
+    debugLog("[DEBUG] handleLog called:", {
       isStart,
       workplan: selectedWorkplan.id,
       step: step.process_number,
@@ -716,7 +722,7 @@ export default function TrackerPage() {
           timestamp
         };
       
-      console.log("[DEBUG] ส่ง log ไป backend:", logData);
+      debugLog("[DEBUG] ส่ง log ไป backend:", logData);
       
       const res = await fetch(`/api/logs`, {
         method: "POST",
@@ -725,10 +731,10 @@ export default function TrackerPage() {
       });
       
       const result = await res.json().catch(() => ({}));
-      console.log("[DEBUG] log response:", result);
+      debugLog("[DEBUG] log response:", result);
       
       if (!res.ok || !result.success) {
-        console.error("[DEBUG] API error:", result);
+        debugError("[DEBUG] API error:", result);
         throw new Error(result.message || "API error");
       }
       
@@ -741,16 +747,16 @@ export default function TrackerPage() {
        }, 2000);
       
       // reload logs
-      console.log("[DEBUG] Reloading logs...");
+      debugLog("[DEBUG] Reloading logs...");
       const fetchUrl = selectedWorkplan.isWeighingJob
         ? `/api/logs/work-plan/4`
         : `/api/logs/work-plan/${selectedWorkplan.id}`;
       const logs = await fetch(fetchUrl).then(r => r.json());
-      console.log("[DEBUG] Reloaded logs:", logs);
+      debugLog("[DEBUG] Reloaded logs:", logs);
       setProcessLogs(logs.data || []);
       
     } catch (e: any) {
-      console.error("[DEBUG] Error in handleLog:", e);
+      debugError("[DEBUG] Error in handleLog:", e);
              setMessage("เกิดข้อผิดพลาดในการบันทึก: " + (e?.message || ""));
        setStatusType("fail");
        
@@ -772,6 +778,22 @@ export default function TrackerPage() {
     const sec = Math.floor((maxStop.getTime() - minStart.getTime()) / 1000);
     return formatUsedTime(sec);
   })();
+
+  // แก้ไข hydration error - รอให้ client-side render เสร็จก่อน
+  if (!isClient) {
+    return (
+      <div className={`min-h-screen bg-gray-50 py-4 px-2 sm:px-4 text-base sm:text-lg ${notoSansThai.className}`}>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">กำลังโหลด...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen bg-gray-50 py-4 px-2 sm:px-4 text-base sm:text-lg ${notoSansThai.className}`}>
@@ -808,21 +830,18 @@ export default function TrackerPage() {
                  <div className="font-semibold whitespace-nowrap">{t.workPlan}</div>
                  <select
                    className="border rounded px-2 py-1 min-w-[180px]"
-                   value={selectedWorkplan?.id || ""}
+                   value={isClient ? (selectedWorkplan?.id || "") : ""}
                    onChange={e => {
                      const wp = workplans.find(w => w.id == e.target.value);
                      setSelectedWorkplan(wp || null);
                    }}
                  >
                    <option value="">{t.pleaseSelect}</option>
-                   {workplans.map(wp => {
-                     console.log('[DEBUG] Workplan option:', { id: wp.id, job_name: wp.job_name, job_code: wp.job_code, production_date: wp.production_date });
-                     return (
-                       <option key={wp.id} value={wp.id}>
-                         {wp.job_name || wp.job_code || 'ไม่ระบุชื่อ'}
-                       </option>
-                     );
-                   })}
+                   {workplans.map(wp => (
+                     <option key={wp.id} value={wp.id}>
+                       {wp.job_name || wp.job_code || 'ไม่ระบุชื่อ'}
+                     </option>
+                   ))}
                  </select>
                </div>
                {selectedWorkplan && (
@@ -996,21 +1015,18 @@ export default function TrackerPage() {
                  <div className="font-semibold whitespace-nowrap">{t.workPlan}</div>
                  <select
                    className="border rounded px-2 py-1 min-w-[180px]"
-                   value={selectedWorkplan?.id || ""}
+                   value={isClient ? (selectedWorkplan?.id || "") : ""}
                    onChange={e => {
                      const wp = workplans.find(w => w.id == e.target.value);
                      setSelectedWorkplan(wp || null);
                    }}
                  >
                    <option value="">{t.pleaseSelect}</option>
-                   {workplans.map(wp => {
-                     console.log('[DEBUG] Workplan option:', { id: wp.id, job_name: wp.job_name, job_code: wp.job_code, production_date: wp.production_date });
-                     return (
-                       <option key={wp.id} value={wp.id}>
-                         {wp.job_name || wp.job_code || 'ไม่ระบุชื่อ'}
-                       </option>
-                     );
-                   })}
+                   {workplans.map(wp => (
+                     <option key={wp.id} value={wp.id}>
+                       {wp.job_name || wp.job_code || 'ไม่ระบุชื่อ'}
+                     </option>
+                   ))}
                  </select>
                </div>
                {selectedWorkplan && (

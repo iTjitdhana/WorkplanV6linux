@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { config } from '@/lib/config';
 
-const API_BASE_URL = process.env.BACKEND_URL || 'http://192.168.0.94:3101';
+const API_BASE_URL = process.env.BACKEND_URL || config.api.baseUrl;
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     const response = await fetch(`${API_BASE_URL}/api/process-steps/search?query=${encodeURIComponent(query)}`);
     
     if (!response.ok) {
-      console.error('Backend search failed:', response.status, response.statusText);
+      // console.error('Backend search failed:', response.status, response.statusText);
       return NextResponse.json(
         { success: false, message: 'Search failed', data: [] },
         { status: response.status }
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error in search endpoint:', error);
+    // console.error('Error in search endpoint:', error);
     return NextResponse.json(
       { success: false, message: 'Search failed', data: [] },
       { status: 500 }

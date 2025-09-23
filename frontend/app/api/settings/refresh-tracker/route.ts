@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       shouldRefresh: true
     };
 
-    console.log('[DEBUG] Refresh signal set:', refreshSignal);
+    // console.log('[DEBUG] Refresh signal set:', refreshSignal);
 
     return NextResponse.json({
       success: true,
@@ -41,7 +41,7 @@ export async function GET() {
       // Reset signal after reading
       refreshSignal.shouldRefresh = false;
       
-      console.log('[DEBUG] Refresh signal detected, returning true');
+      // console.log('[DEBUG] Refresh signal detected, returning true');
       
       return NextResponse.json({
         success: true,

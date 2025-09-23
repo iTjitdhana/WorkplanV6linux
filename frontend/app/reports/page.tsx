@@ -107,9 +107,9 @@ export default function ReportsPage() {
         const startDateStr = format(startDate, 'yyyy-MM-dd');
         const endDateStr = format(endDate, 'yyyy-MM-dd');
         url += `&start_date=${startDateStr}&end_date=${endDateStr}`;
-        console.log('Generating report for date range:', { startDateStr, endDateStr });
+        // console.log('Generating report for date range:', { startDateStr, endDateStr });
       } else {
-        console.log('Generating report for all data (no date filter)');
+        // console.log('Generating report for all data (no date filter)');
       }
       
       const response = await fetch(url);
@@ -117,12 +117,12 @@ export default function ReportsPage() {
       
       if (data.success) {
         setReportData(data.data);
-        console.log('Report generated successfully');
-        console.log('Total jobs found:', data.data.job_statistics?.length || 0);
-        console.log('Summary:', data.data.summary);
+        // console.log('Report generated successfully');
+        // console.log('Total jobs found:', data.data.job_statistics?.length || 0);
+        // console.log('Summary:', data.data.summary);
         
         if (data.data.job_statistics && data.data.job_statistics.length > 0) {
-          console.log('Sample job statistics:', data.data.job_statistics.slice(0, 3));
+          // console.log('Sample job statistics:', data.data.job_statistics.slice(0, 3));
         }
       } else {
         console.error('Failed to generate report:', data.message);

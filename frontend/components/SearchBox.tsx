@@ -221,12 +221,19 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
   }, [highlightIndex, options.length, showAddNew]);
 
   const selectOption = useCallback((item: SearchOption) => {
-    onSelect(item);
-    justSelectedRef.current = true;
+    justSelectedRef.current = true; // ตั้งค่าก่อน onSelect
     setShowDropdown(false);
     setOptions([]);
     setHighlightIndex(-1);
-    setError(null); // เคลียร์ error เมื่อเลือกตัวเลือก
+    setError(null);
+    
+    // เรียก onSelect หลังจากปิด dropdown แล้ว พร้อม trim ข้อมูล
+    setTimeout(() => {
+      onSelect({
+        job_code: item.job_code.trim(),
+        job_name: item.job_name.trim()
+      });
+    }, 0);
   }, [onSelect]);
 
   const handleAddNew = useCallback(() => {
@@ -257,13 +264,22 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
 
   // ฟังก์ชันสำหรับจัดการการเปลี่ยนแปลงค่า input
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    // ถ้าเพิ่งเลือกจาก dropdown ไม่ให้แสดง dropdown ใหม่
+    if (justSelectedRef.current) {
+      onChange(e.target.value);
+      justSelectedRef.current = false;
+      return;
+    }
+    
     onChange(e.target.value);
     setHighlightIndex(-1);
     setError(null); // เคลียร์ error เมื่อผู้ใช้พิมพ์ใหม่
     
-    // แสดง dropdown ทันทีเมื่อมีข้อความ
+    // แสดง dropdown ทันทีเมื่อมีข้อความ (และไม่ใช่การเลือกจาก dropdown)
     if (e.target.value.trim().length > 0) {
       setShowDropdown(true);
+    } else {
+      setShowDropdown(false);
     }
   }, [onChange]);
 

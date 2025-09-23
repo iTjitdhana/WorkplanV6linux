@@ -105,7 +105,7 @@ export default function MonitoringPage() {
       const data = await response.json();
       if (data.success) {
         setIsMonitoring(true);
-        console.log('Monitoring started');
+        // console.log('Monitoring started');
       }
     } catch (error) {
       console.error('Error starting monitoring:', error);
@@ -121,7 +121,7 @@ export default function MonitoringPage() {
       const data = await response.json();
       if (data.success) {
         setIsMonitoring(false);
-        console.log('Monitoring stopped');
+        // console.log('Monitoring stopped');
       }
     } catch (error) {
       console.error('Error stopping monitoring:', error);
@@ -136,7 +136,7 @@ export default function MonitoringPage() {
       const data = await response.json();
       if (data.success) {
         setAlerts([]);
-        console.log('Alerts cleared');
+        // console.log('Alerts cleared');
       }
     } catch (error) {
       console.error('Error clearing alerts:', error);
@@ -151,7 +151,7 @@ export default function MonitoringPage() {
       const data = await response.json();
       if (data.success) {
         await fetchStats();
-        console.log('Health check completed');
+        // console.log('Health check completed');
       }
     } catch (error) {
       console.error('Error checking health:', error);

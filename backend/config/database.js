@@ -10,24 +10,29 @@ const dbConfig = {
   // Local MySQL configuration (default)
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'jitdhana',
-  password: process.env.DB_PASSWORD || 'iT12345$',
+  password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME || 'esp_tracker',
   port: process.env.DB_PORT || 3306,
-  connectionLimit: 10,
-  // Connection pool settings
-  idleTimeout: 60000,
+  connectionLimit: 25, // เพิ่มจาก 10 เป็น 25
+  // Connection pool settings (optimized)
+  idleTimeout: 300000,    // 5 minutes (เพิ่มจาก 1 นาที)
   queueLimit: 0,
+  maxIdle: 10,           // จำนวน idle connections สูงสุด
   // Remote connection settings
   ssl: false,
-  // Connection timeout
-  connectTimeout: 60000,
-  acquireTimeout: 60000,
-  timeout: 60000,
+  // Connection timeout (optimized)
+  connectTimeout: 30000,  // 30 seconds (ลดจาก 60)
+  acquireTimeout: 30000,  // 30 seconds (ลดจาก 60)
+  timeout: 30000,         // 30 seconds (ลดจาก 60)
+  // Performance settings
+  reconnect: true,        // Auto reconnect
+  charset: 'utf8mb4',     // รองรับ Unicode
+  timezone: '+07:00',     // Thailand timezone
   // Authentication
   authPlugins: {
     mysql_native_password: () => {
       console.log('🔄 Using mysql_native_password authentication');
-      return Buffer.from(dbConfig.password + '\0');
+      return Buffer.from((dbConfig.password || '') + '\0');
     }
   }
 };
@@ -78,7 +83,7 @@ const testConnection = async () => {
       console.log('2. Verify username and password:', dbConfig.user, '/ [password hidden]');
       console.log('3. Check if user has permission to connect from this host');
       console.log('4. Run this MySQL command as root:');
-      console.log(`   GRANT ALL PRIVILEGES ON ${dbConfig.database}.* TO "${dbConfig.user}"@"%" IDENTIFIED BY "${dbConfig.password}";`);
+      console.log(`   GRANT ALL PRIVILEGES ON ${dbConfig.database}.* TO "${dbConfig.user}"@"%" IDENTIFIED BY "[PASSWORD_HIDDEN]";`);
       console.log('   FLUSH PRIVILEGES;');
       console.log('5. Check if MySQL allows remote connections:');
       console.log('   Edit /etc/mysql/mysql.conf.d/mysqld.cnf');

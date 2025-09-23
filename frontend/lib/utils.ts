@@ -10,11 +10,50 @@ export function cn(...inputs: ClassValue[]) {
 import type { ProductionItem } from '../types/production';
 
 // Helper function to get operators as array
-export const getOperatorsArray = (operators: string | string[]): string[] => {
+export const getOperatorsArray = (operators: any): string[] => {
+  // Handle null, undefined, or empty values
+  if (!operators) return [];
+  
+  // Handle arrays
   if (Array.isArray(operators)) {
-    return operators;
+    return operators.map(op => {
+      if (typeof op === 'object' && op !== null) {
+        return op.name || op.id_code || '';
+      }
+      return String(op || '');
+    }).filter(op => op.trim());
   }
-  return operators ? operators.split(', ').filter(op => op.trim()) : [];
+  
+  // Handle strings
+  if (typeof operators === 'string') {
+    return operators.split(', ').map(op => op.trim()).filter(op => op);
+  }
+  
+  // Handle objects (ถ้า operators เป็น JSON)
+  if (typeof operators === 'object') {
+    try {
+      // ถ้าเป็น object ที่มี name หรือ id_code
+      if (operators.name || operators.id_code) {
+        return [operators.name || operators.id_code || ''].filter(op => op.trim());
+      }
+      
+      // ลอง parse เป็น JSON
+      const parsed = JSON.parse(JSON.stringify(operators));
+      if (Array.isArray(parsed)) {
+        return parsed.map(op => {
+          if (typeof op === 'object' && op !== null) {
+            return op.name || op.id_code || '';
+          }
+          return String(op || '');
+        }).filter(op => op.trim());
+      }
+    } catch {
+      // ถ้า parse ไม่ได้ให้ return empty array
+    }
+  }
+  
+  // Fallback: convert to string
+  return [String(operators).trim()].filter(op => op);
 };
 
 // Helper function to get operators as string

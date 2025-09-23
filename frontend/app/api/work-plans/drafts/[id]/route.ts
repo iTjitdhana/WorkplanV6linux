@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { config } from '@/lib/config';
 
-const API_BASE_URL = process.env.BACKEND_URL || 'http://192.168.0.94:3101';
+const API_BASE_URL = process.env.BACKEND_URL || config.api.baseUrl;
 
 export async function PUT(
   request: NextRequest,
@@ -13,8 +14,8 @@ export async function PUT(
     // แยก ID จาก format "draft_1753" เป็น "1753"
     const cleanId = id.startsWith('draft_') ? id.replace('draft_', '') : id;
     
-    console.log('📝 [DEBUG] Original ID:', id);
-    console.log('📝 [DEBUG] Clean ID:', cleanId);
+    // console.log('📝 [DEBUG] Original ID:', id);
+    // console.log('📝 [DEBUG] Clean ID:', cleanId);
     
     const response = await fetch(`${API_BASE_URL}/api/work-plans/drafts/${cleanId}`, {
       method: 'PUT',
@@ -43,8 +44,8 @@ export async function DELETE(
     // แยก ID จาก format "draft_1753" เป็น "1753"
     const cleanId = id.startsWith('draft_') ? id.replace('draft_', '') : id;
     
-    console.log('🗑️ [DEBUG] Original ID:', id);
-    console.log('🗑️ [DEBUG] Clean ID:', cleanId);
+    // console.log('🗑️ [DEBUG] Original ID:', id);
+    // console.log('🗑️ [DEBUG] Clean ID:', cleanId);
     
     const response = await fetch(`${API_BASE_URL}/api/work-plans/drafts/${cleanId}`, {
       method: 'DELETE',

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { debugError } from '@/lib/config';
 
 export default function HomePage() {
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function HomePage() {
           router.push('/login');
         }
       } catch (error) {
-        console.error('Error redirecting:', error);
+        debugError('Error redirecting:', error);
         setError('ไม่สามารถ redirect ได้');
         setLoading(false);
       }

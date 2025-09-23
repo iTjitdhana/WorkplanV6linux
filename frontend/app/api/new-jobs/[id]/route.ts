@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { config } from '@/lib/config';
 
 export async function GET(
   request: NextRequest,
@@ -6,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const response = await fetch(`${process.env.BACKEND_URL || 'http://192.168.0.94:3101'}/api/new-jobs/${id}`);
+    const response = await fetch(`${process.env.BACKEND_URL || config.api.baseUrl}/api/new-jobs/${id}`);
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
@@ -21,7 +22,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const response = await fetch(`${process.env.BACKEND_URL || 'http://192.168.0.94:3101'}/api/new-jobs/${id}`, {
+    const response = await fetch(`${process.env.BACKEND_URL || config.api.baseUrl}/api/new-jobs/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -41,7 +42,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const response = await fetch(`${process.env.BACKEND_URL || 'http://192.168.0.94:3101'}/api/new-jobs/${id}`, {
+    const response = await fetch(`${process.env.BACKEND_URL || config.api.baseUrl}/api/new-jobs/${id}`, {
       method: 'DELETE',
     });
     const data = await response.json();

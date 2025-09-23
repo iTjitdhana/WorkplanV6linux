@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { config } from '@/lib/config';
 
-const API_BASE_URL = process.env.BACKEND_URL || 'http://192.168.0.94:3101';
+const API_BASE_URL = process.env.BACKEND_URL || config.api.baseUrl;
 
 export async function GET(request: NextRequest) {
   try {

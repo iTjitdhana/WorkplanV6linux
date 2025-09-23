@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { config } from '@/lib/config';
+import { createErrorResponse, createInternalServerErrorResponse } from '@/lib/api';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://192.168.0.94:3101';
+const BACKEND_URL = process.env.BACKEND_URL || config.api.baseUrl;
 
 export async function GET(
   request: NextRequest,
@@ -17,21 +19,19 @@ export async function GET(
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with status: ${response.status}`);
+      const errorResponse = createErrorResponse(
+        `Backend responded with status: ${response.status}`,
+        null,
+        response.status
+      );
+      return NextResponse.json(errorResponse, { status: response.status });
     }
 
     const data = await response.json();
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('Error fetching work plan logs:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'เกิดข้อผิดพลาดในการดึงข้อมูล Logs',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }, 
-      { status: 500 }
-    );
+    const errorResponse = createInternalServerErrorResponse(error);
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }

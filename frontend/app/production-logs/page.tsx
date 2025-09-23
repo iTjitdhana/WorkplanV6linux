@@ -67,7 +67,7 @@ export default function ProductionLogsPage() {
         setWorkPlans(data.data);
       }
     } catch (error) {
-      console.error('Error loading work plans:', error);
+      // console.error('Error loading work plans:', error);
       toast({
         title: "ข้อผิดพลาด",
         description: "ไม่สามารถโหลดข้อมูลงานได้",
@@ -90,7 +90,7 @@ export default function ProductionLogsPage() {
         setLogs(data.data);
       }
     } catch (error) {
-      console.error('Error loading logs:', error);
+      // console.error('Error loading logs:', error);
     }
   };
 
@@ -104,7 +104,7 @@ export default function ProductionLogsPage() {
         return data.data;
       }
     } catch (error) {
-      console.error('Error getting previous material data:', error);
+      // console.error('Error getting previous material data:', error);
     }
     return null;
   };
@@ -188,7 +188,7 @@ export default function ProductionLogsPage() {
         });
       }
     } catch (error) {
-      console.error('Error saving logs:', error);
+      // console.error('Error saving logs:', error);
       toast({
         title: "ข้อผิดพลาด",
         description: "ไม่สามารถบันทึกข้อมูลได้",
@@ -222,7 +222,7 @@ export default function ProductionLogsPage() {
         });
       }
     } catch (error) {
-      console.error('Error deleting log:', error);
+      // console.error('Error deleting log:', error);
       toast({
         title: "ข้อผิดพลาด",
         description: "ไม่สามารถลบข้อมูลได้",

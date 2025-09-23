@@ -8,6 +8,9 @@ const path = require('path');
 // Load environment variables
 require('dotenv').config({ path: './production.env' });
 
+// Import middleware
+const responseMonitoring = require('./middleware/responseMonitoring');
+
 const app = express();
 const PORT = process.env.PORT || 3101;
 
@@ -18,12 +21,43 @@ console.log('🔌 Port:', PORT);
 console.log('🌐 CORS Origin:', process.env.CORS_ORIGIN || 'http://192.168.0.94:3012');
 console.log('🗄️ Database Host:', process.env.DB_HOST || 'localhost');
 
-// Performance optimizations
-app.use(compression()); // Enable gzip compression
+// Performance optimizations - Enhanced compression
+app.use(compression({
+  level: 6,        // ระดับการบีบอัด (1-9, 6 = balance ระหว่างเร็วและเล็ก)
+  threshold: 1024, // บีบอัดเมื่อข้อมูล > 1KB
+  filter: (req, res) => {
+    // บีบอัดเฉพาะ content types ที่เหมาะสม
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  chunkSize: 1024, // ขนาด chunk สำหรับการบีบอัด
+}));
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
 }));
+
+// Performance headers middleware
+app.use((req, res, next) => {
+  // เพิ่ม performance headers
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '1; mode=block',
+    // Cache headers สำหรับ static resources
+    ...(req.url.includes('/api/') && {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    })
+  });
+  next();
+});
+
+// Response monitoring middleware
+app.use(responseMonitoring);
 
 // Rate limiting for API protection (very relaxed for development)
 const limiter = rateLimit({

@@ -121,3 +121,21 @@ export interface PaginatedResponse<T> {
   limit: number;
   message?: string;
 }
+
+// Standardized API Response Types
+export interface ApiErrorResponse {
+  success: false;
+  message: string;
+  error: string;
+  statusCode: number;
+  timestamp: string;
+}
+
+export interface ApiSuccessResponse<T = any> {
+  success: true;
+  message: string;
+  data: T;
+  timestamp: string;
+}
+
+export type ApiResponse<T = any> = ApiSuccessResponse<T> | ApiErrorResponse;

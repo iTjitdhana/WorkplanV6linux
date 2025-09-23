@@ -1,86 +1,63 @@
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+*/node_modules/
 
 # Build outputs
-.next/
-out/
-build/
-dist/
+frontend/.next/
+frontend/out/
+frontend/dist/
+backend/dist/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+backend/.env
+frontend/.env.local
 
 # Logs
 logs/
 *.log
+npm-debug.log*
 
-# Runtime data
-pids/
-*.pid
-*.seed
-*.pid.lock
+# Runtime
+.cache/
+.temp/
+temp/
 
-# Coverage directory used by tools like istanbul
-coverage/
+# Database
+*.sql.backup
+database/backups/
 
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-
-# IDE files
+# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+
+# Archive folders (เก็บไฟล์เก่า)
+docs/archive/
+tools/archive/
+scripts/archive/
 
 # Temporary files
 *.tmp
-*.temp
-
-# Database files
-*.sqlite
-*.db
-
-# Backup files
 *.bak
-*.backup
+*.swp
+*.swo
 
-# PowerShell scripts (optional - remove if you want to include them)
-*.ps1
-# *.bat
+# SSL certificates (ถ้ามี)
+ssl/
+*.pem
+*.key
+*.crt
 
-# MySQL dumps
-*.sql 
+# Linux deployment files
+docker-compose.linux.yml
+deploy-linux.sh
+install-docker.sh
+upload-*.bat
+upload-*.ps1

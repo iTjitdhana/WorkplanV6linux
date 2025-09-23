@@ -52,7 +52,7 @@ export default function RoleManagementPage() {
         setRoles(data.data);
       }
     } catch (error) {
-      console.error('Error fetching roles:', error);
+      // console.error('Error fetching roles:', error);
       setMessage({ type: 'error', text: 'ไม่สามารถดึงรายการบทบาทได้' });
     }
   };
@@ -66,7 +66,7 @@ export default function RoleManagementPage() {
         setMenus(data.data);
       }
     } catch (error) {
-      console.error('Error fetching menus:', error);
+      // console.error('Error fetching menus:', error);
       setMessage({ type: 'error', text: 'ไม่สามารถดึงรายการเมนูได้' });
     }
   };
@@ -80,7 +80,7 @@ export default function RoleManagementPage() {
         setRolePermissions(data.data);
       }
     } catch (error) {
-      console.error('Error fetching role permissions:', error);
+      // console.error('Error fetching role permissions:', error);
       setMessage({ type: 'error', text: 'ไม่สามารถดึงสิทธิ์ของบทบาทได้' });
     }
   };
@@ -125,7 +125,7 @@ export default function RoleManagementPage() {
         setMessage({ type: 'error', text: data.message || 'เกิดข้อผิดพลาดในการอัปเดต' });
       }
     } catch (error) {
-      console.error('Error updating permissions:', error);
+      // console.error('Error updating permissions:', error);
       setMessage({ type: 'error', text: 'ไม่สามารถอัปเดตสิทธิ์ได้' });
     } finally {
       setSaving(false);

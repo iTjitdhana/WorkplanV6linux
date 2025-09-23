@@ -6,7 +6,7 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJ0u_K-ggpyO
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('📡 [Frontend API] Sending to Google Sheet:', body);
+    // console.log('📡 [Frontend API] Sending to Google Sheet:', body);
     
     // เรียกไปที่ Google Apps Script โดยตรง
     const response = await fetch(GOOGLE_SCRIPT_URL, {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     });
     
-    console.log('📡 [Frontend API] Google Script response status:', response.status);
+    // console.log('📡 [Frontend API] Google Script response status:', response.status);
     
     if (!response.ok) {
       console.error('📡 [Frontend API] Google Script error status:', response.status);
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
     
     const result = await response.text();
-    console.log('📡 [Frontend API] Google Script response:', result);
+    // console.log('📡 [Frontend API] Google Script response:', result);
     
     return NextResponse.json({ 
       success: true, 

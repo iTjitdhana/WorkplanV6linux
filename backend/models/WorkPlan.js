@@ -2,13 +2,14 @@ const { pool } = require('../config/database');
 const { formatDateForDatabase } = require('../utils/dateUtils');
 
 class WorkPlan {
-  // Get all work plans with operators
-  static async getAll(date = null) {
+  // Get all work plans with operators (optimized version)
+  static async getAll(date = null, page = 1, limit = 50, filters = {}) {
     try {
       console.log('🔍 WorkPlan.getAll called with date:', date);
       console.log('🔍 Date type:', typeof date);
       
-      let query = `
+      // Step 1: ดึงข้อมูล work plans พื้นฐานก่อน (เร็วกว่า) - Optimized fields
+      let mainQuery = `
         SELECT 
           wp.id,
           DATE_FORMAT(wp.production_date, '%Y-%m-%d') as production_date,
@@ -16,27 +17,19 @@ class WorkPlan {
           wp.job_name,
           wp.start_time,
           wp.end_time,
-          wp.notes,
           wp.operators,
           COALESCE(wp.status_id, 1) as status_id,
           COALESCE(ps.name, 'รอดำเนินการ') as status_name,
           COALESCE(ps.color, '#FF6B6B') as status_color,
-          ff.is_finished,
-          ff.updated_at as finished_at,
-          GROUP_CONCAT(DISTINCT u.name ORDER BY u.name SEPARATOR ', ') as operators_from_join,
-          GROUP_CONCAT(DISTINCT wpo.id_code ORDER BY wpo.id_code SEPARATOR ', ') as operator_codes,
-          pr.room_name as production_room_name,
-          m.machine_name as machine_name
+          ff.is_finished
         FROM work_plans wp
         LEFT JOIN production_statuses ps ON wp.status_id = ps.id
         LEFT JOIN finished_flags ff ON wp.id = ff.work_plan_id
-        LEFT JOIN work_plan_operators wpo ON wp.id = wpo.work_plan_id
-        LEFT JOIN users u ON wpo.user_id = u.id OR wpo.id_code = u.id_code
-        LEFT JOIN production_rooms pr ON wp.production_room_id = pr.id
-        LEFT JOIN machines m ON wp.machine_id = m.id
       `;
       
       const params = [];
+      const conditions = [];
+      
       if (date) {
         // ตรวจสอบรูปแบบวันที่และแปลงให้ถูกต้อง
         let formattedDate = date;
@@ -53,30 +46,98 @@ class WorkPlan {
         }
         
         // ใช้การเปรียบเทียบวันที่ที่ยืดหยุ่นมากขึ้น
-        query += ` WHERE DATE(wp.production_date) = ? OR wp.production_date = ?`;
+        conditions.push('(DATE(wp.production_date) = ? OR wp.production_date = ?)');
         params.push(formattedDate, formattedDate);
         
         console.log('🔍 Formatted date:', formattedDate);
-        console.log('🔍 SQL Query:', query);
+        console.log('🔍 SQL Query:', mainQuery);
         console.log('🔍 Params:', params);
       } else {
         console.log('⚠️ No date parameter provided, will return all work plans');
       }
       
-      query += ` GROUP BY wp.id, wp.production_date, wp.job_code, wp.job_name, wp.start_time, wp.end_time, wp.notes, wp.operators, wp.status_id, ps.name, ps.color, ff.is_finished, ff.updated_at, pr.room_name, m.machine_name
-                 ORDER BY 
+      // เพิ่ม filters อื่นๆ
+      if (filters.search) {
+        conditions.push('(wp.job_name LIKE ? OR wp.job_code LIKE ?)');
+        params.push(`%${filters.search}%`, `%${filters.search}%`);
+      }
+      
+      if (filters.status) {
+        conditions.push('wp.status_id = ?');
+        params.push(filters.status);
+      }
+      
+      if (filters.job_code) {
+        conditions.push('wp.job_code LIKE ?');
+        params.push(`%${filters.job_code}%`);
+      }
+      
+      // เพิ่ม WHERE clause ถ้ามี conditions
+      if (conditions.length > 0) {
+        mainQuery += ` WHERE ${conditions.join(' AND ')}`;
+      }
+      
+      mainQuery += ` ORDER BY 
+                 wp.production_date DESC,  -- วันที่ใหม่ไปเก่าก่อน
                  CASE 
                    WHEN COALESCE(wp.status_id, 1) = 10 THEN 2  -- งานพิเศษ (status_id = 10) อยู่ล่างสุด
                    ELSE 1  -- งานปกติอยู่บนสุด
                  END ASC,
-                 wp.start_time ASC, 
-                 CASE 
-                   WHEN GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) LIKE 'อ%' THEN 0 
-                   ELSE 1 
-                 END ASC,
-                 GROUP_CONCAT(DISTINCT u.name ORDER BY u.name) ASC`;
+                 wp.start_time ASC`;
       
-      const [rows] = await pool.execute(query, params);
+      // เพิ่ม pagination
+      if (limit && limit > 0) {
+        const offset = (page - 1) * limit;
+        mainQuery += ` LIMIT ${limit} OFFSET ${offset}`;
+      }
+      
+      const [rows] = await pool.execute(mainQuery, params);
+      
+      // Step 2: ดึงข้อมูล operators แยกต่างหาก (เฉพาะ work plans ที่ได้)
+      if (rows.length > 0) {
+        const workPlanIds = rows.map(row => row.id);
+        
+        // ดึงข้อมูล operators
+        const operatorsQuery = `
+          SELECT 
+            wpo.work_plan_id,
+            GROUP_CONCAT(DISTINCT u.name ORDER BY u.name SEPARATOR ', ') as operators_from_join,
+            GROUP_CONCAT(DISTINCT wpo.id_code ORDER BY wpo.id_code SEPARATOR ', ') as operator_codes
+          FROM work_plan_operators wpo
+          LEFT JOIN users u ON wpo.user_id = u.id OR wpo.id_code = u.id_code
+          WHERE wpo.work_plan_id IN (${workPlanIds.map(() => '?').join(',')})
+          GROUP BY wpo.work_plan_id
+        `;
+        
+        const [operatorsData] = await pool.execute(operatorsQuery, workPlanIds);
+        
+        // ดึงข้อมูล rooms และ machines
+        const roomsQuery = `SELECT id, room_name FROM production_rooms WHERE id IN (${rows.map(r => r.production_room_id).filter(Boolean).map(() => '?').join(',') || '0'})`;
+        const machinesQuery = `SELECT id, machine_name FROM machines WHERE id IN (${rows.map(r => r.machine_id).filter(Boolean).map(() => '?').join(',') || '0'})`;
+        
+        const roomIds = rows.map(r => r.production_room_id).filter(Boolean);
+        const machineIds = rows.map(r => r.machine_id).filter(Boolean);
+        
+        const [roomsData] = roomIds.length > 0 ? await pool.execute(roomsQuery, roomIds) : [[]];
+        const [machinesData] = machineIds.length > 0 ? await pool.execute(machinesQuery, machineIds) : [[]];
+        
+        // รวมข้อมูลเข้าด้วยกัน
+        const operatorsMap = new Map(operatorsData.map(op => [op.work_plan_id, op]));
+        const roomsMap = new Map(roomsData.map(room => [room.id, room.room_name]));
+        const machinesMap = new Map(machinesData.map(machine => [machine.id, machine.machine_name]));
+        
+        // เพิ่มข้อมูลที่ดึงมาใส่ในผลลัพธ์
+        rows.forEach(row => {
+          const operators = operatorsMap.get(row.id);
+          if (operators) {
+            row.operators_from_join = operators.operators_from_join;
+            row.operator_codes = operators.operator_codes;
+          }
+          
+          row.production_room_name = roomsMap.get(row.production_room_id) || null;
+          row.machine_name = machinesMap.get(row.machine_id) || null;
+        });
+      }
       console.log('✅ Found work plans:', rows.length);
       
       if (rows.length > 0) {

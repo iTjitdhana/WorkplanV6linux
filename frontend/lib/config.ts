@@ -62,14 +62,22 @@ export const isProduction = (): boolean => {
 };
 
 // Debug logging utility
-export const debugLog = (message: string, data?: any): void => {
+export const debugLog = (message: string, ...args: any[]): void => {
   if (config.development.enableDebugLogs) {
-    console.log(`[DEBUG] ${message}`, data || '');
+    if (args.length > 0) {
+      console.log(`[DEBUG] ${message}`, ...args);
+    } else {
+      console.log(`[DEBUG] ${message}`);
+    }
   }
 };
 
-export const debugError = (message: string, error?: any): void => {
+export const debugError = (message: string, ...args: any[]): void => {
   if (config.development.enableDebugLogs) {
-    console.error(`[ERROR] ${message}`, error || '');
+    if (args.length > 0) {
+      console.error(`[ERROR] ${message}`, ...args);
+    } else {
+      console.error(`[ERROR] ${message}`);
+    }
   }
 };

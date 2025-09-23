@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { config } from '@/lib/config';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://192.168.0.94:3101';
+const BACKEND_URL = process.env.BACKEND_URL || config.api.baseUrl;
 
 export async function GET(
   request: NextRequest,
@@ -22,7 +23,7 @@ export async function GET(
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching production log:', error);
+    // console.error('Error fetching production log:', error);
     return NextResponse.json(
       { 
         success: false, 
@@ -57,7 +58,7 @@ export async function PUT(
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error updating production log:', error);
+    // console.error('Error updating production log:', error);
     return NextResponse.json(
       { 
         success: false, 
@@ -89,7 +90,7 @@ export async function DELETE(
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error deleting production log:', error);
+    // console.error('Error deleting production log:', error);
     return NextResponse.json(
       { 
         success: false, 

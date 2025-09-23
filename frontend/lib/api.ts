@@ -220,5 +220,56 @@ export const createAbortController = (): AbortController => {
   return new AbortController();
 };
 
+// Standardized Error Response Functions
+export const createErrorResponse = (
+  message: string,
+  error?: unknown,
+  statusCode: number = 500
+) => {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  debugError(`API Error [${statusCode}]: ${message}`, error);
+  
+  return {
+    success: false,
+    message,
+    error: errorMessage,
+    statusCode,
+    timestamp: new Date().toISOString()
+  };
+};
+
+export const createSuccessResponse = <T>(
+  data: T,
+  message: string = 'Operation successful'
+) => {
+  return {
+    success: true,
+    message,
+    data,
+    timestamp: new Date().toISOString()
+  };
+};
+
+// Standard HTTP Error Responses
+export const createNotFoundResponse = (resource: string = 'Resource') => {
+  return createErrorResponse(`${resource} not found`, null, 404);
+};
+
+export const createValidationErrorResponse = (message: string) => {
+  return createErrorResponse(`Validation Error: ${message}`, null, 400);
+};
+
+export const createUnauthorizedResponse = () => {
+  return createErrorResponse('Unauthorized access', null, 401);
+};
+
+export const createForbiddenResponse = () => {
+  return createErrorResponse('Forbidden access', null, 403);
+};
+
+export const createInternalServerErrorResponse = (error?: unknown) => {
+  return createErrorResponse('Internal Server Error', error, 500);
+};
+
 // Export types for convenience
 export type { ApiError };

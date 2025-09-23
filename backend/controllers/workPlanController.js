@@ -46,10 +46,10 @@ class WorkPlanController {
   // ดึงรายการงานทั้งหมด
   static async getAllWorkPlans(req, res) {
     try {
-      const { date } = req.query;
+      const { date, page = 1, limit = 50, search, status, job_code } = req.query;
       console.log('🔍 getAllWorkPlans called');
       console.log('📅 Requested date:', date);
-      console.log('📅 Date type:', typeof date);
+      console.log('📄 Page:', page, 'Limit:', limit);
       console.log('🔗 Query parameters:', req.query);
       console.log('🌐 Full request URL:', req.url);
       console.log('📋 Request headers:', req.headers);
@@ -78,7 +78,18 @@ class WorkPlanController {
       }
       
       console.log('🔄 Calling WorkPlan.getAll...');
-      const workPlans = await WorkPlan.getAll(date);
+      const pageNum = parseInt(page) || 1;
+      const limitNum = parseInt(limit) || 50;
+      
+      // เพิ่ม filters object
+      const filters = {
+        date,
+        search,
+        status,
+        job_code
+      };
+      
+      const workPlans = await WorkPlan.getAll(date, pageNum, limitNum, filters);
       console.log('✅ Found work plans:', workPlans.length);
       
       if (workPlans.length > 0) {
@@ -130,13 +141,63 @@ class WorkPlanController {
       console.log('Full request URL:', req.url);
       console.log('Request headers:', req.headers);
       
-      const workPlans = await WorkPlan.getAll(date);
+      const pageNum = parseInt(req.query.page) || 1;
+      const limitNum = parseInt(req.query.limit) || 50;
+      const workPlans = await WorkPlan.getAll(date, pageNum, limitNum);
       console.log('Found work plans:', workPlans.length);
       console.log('Work plans data:', workPlans);
       
+      // ดึงจำนวนทั้งหมดสำหรับ pagination info
+      const totalQuery = date ? 
+        `SELECT COUNT(*) as total FROM work_plans WHERE DATE(production_date) = ? OR production_date = ?` :
+        `SELECT COUNT(*) as total FROM work_plans`;
+      const totalParams = date ? [date, date] : [];
+      
+      let total = 0;
+      try {
+        const { pool } = require('../config/database');
+        const [totalResult] = await pool.execute(totalQuery, totalParams);
+        total = totalResult[0].total;
+      } catch (error) {
+        console.error('Error getting total count:', error);
+        total = workPlans.length; // fallback
+      }
+
+      // Optimize response data - ส่งเฉพาะฟิลด์ที่จำเป็น
+      const optimizedWorkPlans = workPlans.map(wp => ({
+        id: wp.id,
+        production_date: wp.production_date,
+        job_code: wp.job_code,
+        job_name: wp.job_name,
+        start_time: wp.start_time,
+        end_time: wp.end_time,
+        operators: wp.operators,
+        status_id: wp.status_id,
+        status_name: wp.status_name,
+        status_color: wp.status_color,
+        is_finished: wp.is_finished,
+        // เพิ่มเฉพาะข้อมูลที่ frontend ใช้จริง
+        ...(wp.operators_from_join && { operators_from_join: wp.operators_from_join }),
+        ...(wp.production_room_name && { production_room_name: wp.production_room_name }),
+        ...(wp.machine_name && { machine_name: wp.machine_name })
+      }));
+
       res.json({
         success: true,
-        data: workPlans
+        data: optimizedWorkPlans,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: total,
+          totalPages: Math.ceil(total / limitNum),
+          hasNextPage: pageNum * limitNum < total,
+          hasPrevPage: pageNum > 1
+        },
+        message: `พบงานทั้งหมด ${workPlans.length} รายการ (หน้า ${pageNum}/${Math.ceil(total / limitNum)})${date ? ` สำหรับวันที่ ${date}` : ''}`,
+        _meta: {
+          timestamp: new Date().toISOString(),
+          responseSize: JSON.stringify(optimizedWorkPlans).length
+        }
       });
     } catch (error) {
       console.error('Error in getAll:', error);

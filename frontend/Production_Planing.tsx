@@ -25,18 +25,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import AutosizeTextarea from "@/components/AutosizeTextarea"
+import dynamic from "next/dynamic"
+const RichNoteEditor = dynamic(() => import("@/components/RichNoteEditor"), { ssr: false })
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Noto_Sans_Thai } from "next/font/google"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SearchBox, SearchOption } from "./components/SearchBox";
+import { JobSearchSelect } from "./components/JobSearchSelect";
+import { SimpleDatePicker } from "./components/SimpleDatePicker";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { TableSkeletonLoader, CardSkeletonLoader } from "@/components/SkeletonLoader";
+import { WeeklyCalendar } from "@/components/WeeklyCalendar";
+import { ProductionTask } from "@/lib/types/weekly-calendar";
+import { arrayMove } from "@dnd-kit/sortable";
 import { createSafeDate, formatDateForDisplay, formatDateForAPI, formatDateThaiShort } from "@/lib/dateUtils";
 import { config, debugLog, debugError } from "@/lib/config";
 import { api, handleApiError, createAbortController } from "@/lib/api";
-import { getOperatorsArray, getOperatorsString } from "@/lib/utils";
+import { getOperatorsArray, getOperatorsString, isDraftItem, isSpecialItem } from "@/lib/utils";
+import { clientCache, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import type { 
   User, 
   Machine, 
@@ -68,21 +77,14 @@ const notoSansThai = Noto_Sans_Thai({
 const hasJobNumberPrefix = (name: string) => /^([A-D]|\d+)\s/.test(name);
 
 export default function MedicalAppointmentDashboard() {
-  // Helper function for API URL - ใช้ config
-  const getApiUrl = (endpoint: string) => {
-    return config.api.baseUrl + endpoint;
-  };
-
-  // เปลี่ยน default selectedDate เป็นวันที่ปัจจุบัน (dynamic)
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  });
+  // ===== ALL STATE DECLARATIONS FIRST (ป้องกัน hooks order error) =====
+  // Client-side check สำหรับแก้ไข hydration error
+  const [isClient, setIsClient] = useState(false);
+  
+  // เปลี่ยน default selectedDate เป็นวันที่ปัจจุบัน (แก้ไข hydration error)
+  const [selectedDate, setSelectedDate] = useState('');
   const [searchTerm, setSearchTerm] = useState("")
-  const [currentWeek, setCurrentWeek] = useState(new Date())
+  const [currentWeek, setCurrentWeek] = useState<Date | null>(null)
   const [viewMode, setViewMode] = useState<"daily" | "weekly">("daily")
   const [isFormCollapsed, setIsFormCollapsed] = useState(false)
   const [selectedWeekDay, setSelectedWeekDay] = useState<string | null>(null)
@@ -96,10 +98,8 @@ export default function MedicalAppointmentDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
-  // เพิ่ม state สำหรับ dropdown และ autocomplete
+  // เพิ่ม state สำหรับ job search (ใช้ react-select แล้ว)
   const [jobQuery, setJobQuery] = useState("");
-  const [jobOptions, setJobOptions] = useState<JobOption[]>([]);
-  const [showJobDropdown, setShowJobDropdown] = useState(false);
   const [jobCode, setJobCode] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -161,7 +161,7 @@ export default function MedicalAppointmentDashboard() {
       m += step;
       if (m >= 60) { h++; m = m - 60; }
     }
-    console.log('⏰ Generated time options:', result);
+    debugLog('⏰ Generated time options:', result);
     return result;
   };
   const timeOptions = generateTimeOptions();
@@ -181,76 +181,166 @@ export default function MedicalAppointmentDashboard() {
   const [productionData, setProductionData] = useState<ProductionItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Loading states
+  const [isLoadingHistorical, setIsLoadingHistorical] = useState(false);
+  
+  // User role state (ย้ายจาก JSX)
+  const [userName, setUserName] = useState<string>('');
+  
+  // ===== ALL USEEFFECTS AFTER STATE DECLARATIONS =====
+  // Client setup
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // ตั้งค่าวันที่ปัจจุบันหลัง client mount
+  useEffect(() => {
+    if (isClient && !selectedDate) {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayString = `${yyyy}-${mm}-${dd}`;
+      setSelectedDate(todayString);
+      debugLog('📅 Setting initial selectedDate:', todayString);
+    }
+  }, [isClient, selectedDate]);
+
+  // ตั้งค่า currentWeek หลัง client mount
+  useEffect(() => {
+    if (isClient && !currentWeek) {
+      setCurrentWeek(new Date());
+    }
+  }, [isClient, currentWeek]);
+
+  // ตั้งค่า userName หลัง client mount
+  useEffect(() => {
+    if (isClient) {
+      try {
+        const cookieMatch = document.cookie.match(/(?:^|; )userRole=([^;]+)/);
+        let roleId = cookieMatch ? parseInt(decodeURIComponent(cookieMatch[1])) : undefined;
+        if (!roleId) {
+          const segment = window.location.pathname.split('/').filter(Boolean)[0];
+          const roleMap: Record<string, number> = {planner:1,admin:2,viewer:4,operation:5};
+          roleId = roleMap[segment] || 2;
+        }
+        const roleNameMap: Record<number, string> = {1:'Planner',2:'Admin',4:'Viewer',5:'Operation'};
+        setUserName(roleNameMap[roleId] || 'Admin');
+      } catch (error) {
+        setUserName('Admin');
+      }
+    }
+  }, [isClient]);
+  
   // ดึงข้อมูลแผนผลิตจริงและแบบร่างมารวมกัน
   useEffect(() => {
       loadAllProductionData();
   }, []);
 
+  // ===== HELPER FUNCTIONS AFTER HOOKS =====
+  // Helper function for API URL - ใช้ config
+  const getApiUrl = (endpoint: string) => {
+    return config.api.baseUrl + endpoint;
+  };
+
   // Fetch dropdown data on mount
   useEffect(() => {
-    console.log('🔍 Fetching dropdown data...');
-    console.log('API URL:', process.env.NEXT_PUBLIC_API_URL);
+    debugLog('🔍 Fetching dropdown data...');
+    debugLog('API URL:', process.env.NEXT_PUBLIC_API_URL);
     
-    // Fetch users
-    fetch(`/api/users`)
-      .then(res => {
-        console.log('Users API response status:', res.status);
-        return res.json();
-      })
-      .then(data => {
-        console.log('Users data:', data);
-        setUsers(data.data || []);
-      })
-      .catch(err => {
-        console.error('Error fetching users:', err);
-        setUsers([]);
-      });
+    // Fetch users with cache
+    const cachedUsers = clientCache.get(CACHE_KEYS.USERS);
+    if (cachedUsers) {
+      debugLog('Using cached users data');
+      setUsers(cachedUsers as User[]);
+    } else {
+      fetch(`/api/users`)
+        .then(res => {
+          debugLog('Users API response status:', res.status);
+          return res.json();
+        })
+        .then(data => {
+          debugLog('Users data:', data);
+          const usersData = data.data || [];
+          setUsers(usersData);
+          // Cache for 15 minutes (master data)
+          clientCache.set(CACHE_KEYS.USERS, usersData, CACHE_TTL.VERY_LONG);
+        })
+        .catch(err => {
+          debugError('Error fetching users:', err);
+          setUsers([] as User[]);
+        });
+    }
     
-    // Fetch machines
-    fetch(`/api/machines`)
-      .then(res => {
-        console.log('Machines API response status:', res.status);
-        return res.json();
-      })
-      .then(data => {
-        console.log('Machines data:', data);
-        setMachines(data.data || []);
-      })
-      .catch(err => {
-        console.error('Error fetching machines:', err);
-        setMachines([]);
-      });
+    // Fetch machines with cache
+    const cachedMachines = clientCache.get(CACHE_KEYS.MACHINES);
+    if (cachedMachines) {
+      debugLog('Using cached machines data');
+      setMachines(cachedMachines as Machine[]);
+    } else {
+      fetch(`/api/machines`)
+        .then(res => {
+          debugLog('Machines API response status:', res.status);
+          return res.json();
+        })
+        .then(data => {
+          debugLog('Machines data:', data);
+          const machinesData = data.data || [];
+          setMachines(machinesData);
+          // Cache for 15 minutes (master data)
+          clientCache.set(CACHE_KEYS.MACHINES, machinesData, CACHE_TTL.VERY_LONG);
+        })
+        .catch(err => {
+          debugError('Error fetching machines:', err);
+          setMachines([] as Machine[]);
+        });
+    }
     
     // Fetch production rooms
     fetch(`/api/production-rooms`)
       .then(res => {
-        console.log('Rooms API response status:', res.status);
+        debugLog('Rooms API response status:', res.status);
         return res.json();
       })
       .then(data => {
-        console.log('Rooms data:', data);
+        debugLog('Rooms data:', data);
         setRooms(data.data || []);
       })
       .catch(err => {
-        console.error('Error fetching rooms:', err);
+        debugError('Error fetching rooms:', err);
         setRooms([]);
       });
   }, []);
 
   // Debug state changes
   useEffect(() => {
-    console.log('👥 Users state updated:', users);
-    console.log('⏰ Time options state updated:', timeOptions);
+    debugLog('👥 Users state updated:', users);
+    debugLog('⏰ Time options state updated:', timeOptions);
   }, [users, timeOptions]);
 
-  // Autocomplete job name/code - ใช้ local search แทน API เพื่อความเร็ว
+  // Autocomplete job name/code - ใช้ local search แทน API เพื่อความเร็ว (ปิดใช้งานแล้ว)
+  /*
   useEffect(() => {
+  // ถ้าเพิ่งเลือกจาก dropdown ให้ข้าม effect นี้
   if (justSelectedFromDropdownRef.current) {
+    debugLog('🔒 Skipping search - just selected from dropdown');
     justSelectedFromDropdownRef.current = false;
+    setShowJobDropdown(false); // บังคับปิด dropdown
+    setJobOptions([]); // เคลียร์ options
     return;
   }
 
-  if (debouncedJobQuery.length < 1) {
+  debugLog('🔍 useEffect triggered with debouncedJobQuery:', `"${debouncedJobQuery}"`);
+  debugLog('🔍 Trimmed length:', debouncedJobQuery.trim().length);
+  
+  if (debouncedJobQuery.trim().length < 1) {
+    debugLog('🚫 Empty search term, hiding dropdown');
     setShowJobDropdown(false);
     setJobOptions([]);
     setIsSearching(false);
@@ -259,7 +349,8 @@ export default function MedicalAppointmentDashboard() {
 
   setIsSearching(false);
 
-  const searchTerm = debouncedJobQuery.toLowerCase().trim();
+  const searchTerm = debouncedJobQuery.trim().toLowerCase();
+  debugLog('🔍 Searching for:', `"${searchTerm}"`);
   const allCachedResults: { job_code: string; job_name: string }[] = [];
 
   for (const results of searchCacheRef.current.values()) {
@@ -281,7 +372,7 @@ export default function MedicalAppointmentDashboard() {
   setJobOptions(uniqueResults);
   setShowJobDropdown(uniqueResults.length > 0);
 
-  if (uniqueResults.length === 0 && debouncedJobQuery.length >= 2) {
+  if (uniqueResults.length === 0 && debouncedJobQuery.trim().length >= 2) {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -310,7 +401,7 @@ export default function MedicalAppointmentDashboard() {
         })
         .catch(err => {
           if (err.name !== 'AbortError') {
-            console.error('Error fetching job options:', err);
+            debugError('Error fetching job options:', err);
             setJobOptions([]);
             setShowJobDropdown(false);
           }
@@ -327,12 +418,13 @@ export default function MedicalAppointmentDashboard() {
     };
   }
 }, [debouncedJobQuery]);
+*/
 
   // ฟังก์ชันสร้าง job_code ใหม่ (เลขงานอัตโนมัติ)
   const handleAddNewJob = () => {
     // หาเลขงานที่ยังไม่ซ้ำ (เริ่มจาก 1)
     let jobNumber = 1;
-    const allCodes = jobOptions.map(j => j.job_code.toLowerCase());
+    const allCodes = productionData.map((item: any) => item.job_code?.toLowerCase()).filter(Boolean);
     
     // หาเลขงานที่ยังไม่ซ้ำ
     while (allCodes.includes(jobNumber.toString())) {
@@ -342,8 +434,7 @@ export default function MedicalAppointmentDashboard() {
     // สร้าง job_code เป็นเลขงาน
     const newJobCode = jobNumber.toString();
     setJobCode(newJobCode);
-    setJobName(jobQuery);
-    setShowJobDropdown(false);
+    return newJobCode;
   };
 
   // Helper functions for week navigation
@@ -363,12 +454,6 @@ export default function MedicalAppointmentDashboard() {
     return week
   }
 
-  const navigateWeek = (direction: "prev" | "next") => {
-    const newWeek = new Date(currentWeek)
-    newWeek.setDate(currentWeek.getDate() + (direction === "next" ? 7 : -7))
-    setCurrentWeek(newWeek)
-    setSelectedWeekDay(null) // Reset selected day when navigating weeks
-  }
 
 
 
@@ -412,39 +497,8 @@ export default function MedicalAppointmentDashboard() {
     })
   }
 
-  const getDayName = (date: Date) => {
-    const days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสฯ", "ศุกร์", "เสาร์"]
-    return days[date.getDay()]
-  }
 
   // เพิ่มฟังก์ชันสำหรับสีของแต่ละวัน
-  const getDayBackgroundColor = (date: Date) => {
-    const dayIndex = date.getDay() // 0 = อาทิตย์, 1 = จันทร์, ...
-    const colors = [
-      "bg-red-100 border-red-200", // อาทิตย์ - สีแดง
-      "bg-yellow-100 border-yellow-200", // จันทร์ - สีเหลือง
-      "bg-pink-100 border-pink-200", // อังคาร - สีชมพู
-      "bg-emerald-200 border-emerald-300", // พุธ - สีเขียวเข้ม
-      "bg-orange-100 border-orange-200", // พฤหัสบดี - สีส้ม
-      "bg-blue-100 border-blue-200", // ศุกร์ - สีฟ้า
-      "bg-purple-100 border-purple-200", // เสาร์ - สีม่วง
-    ]
-    return colors[dayIndex]
-  }
-
-  const getDayTextColor = (date: Date) => {
-    const dayIndex = date.getDay()
-    const colors = [
-      "text-red-800", // อาทิตย์
-      "text-yellow-800", // จันทร์
-      "text-pink-800", // อังคาร
-      "text-emerald-900", // พุธ - สีเขียวเข้ม
-      "text-orange-800", // พฤหัสบดี
-      "text-blue-800", // ศุกร์
-      "text-purple-800", // เสาร์
-    ]
-    return colors[dayIndex]
-  }
 
   // Staff image mapping
   const staffImages: { [key: string]: string } = {
@@ -478,39 +532,8 @@ export default function MedicalAppointmentDashboard() {
     Jak: "/images/staff/แจ็ค.jpg",
   }
 
-  const weekDates = getWeekDates(currentWeek)
-  const weekRange = `${formatDateForDisplay(weekDates[0], 'full')} - ${formatDateForDisplay(weekDates[5], 'full')}`
 
   // Get production data for current week
-  const getWeekProduction = () => {
-    const weekStart = formatDateForAPI(weekDates[0]);
-    const weekEnd = formatDateForAPI(weekDates[5]);
-    const defaultCodes = ['A', 'B', 'C', 'D'];
-    const filteredData = productionData
-      .filter((item) => {
-        const isInWeekRange = item.production_date >= weekStart && item.production_date <= weekEnd;
-        // กรองออกงาน A, B, C, D ทั้งหมด (ทั้งแบบร่างและเสร็จแล้ว)
-        const isNotDefaultJob = !defaultCodes.includes(item.job_code);
-        return isInWeekRange && isNotDefaultJob;
-      })
-      .sort((a, b) => {
-        const dateComparison = a.production_date.localeCompare(b.production_date);
-        if (dateComparison !== 0) return dateComparison;
-        const timeA = a.start_time || "00:00";
-        const timeB = b.start_time || "00:00";
-        const timeComparison = timeA.localeCompare(timeB);
-        if (timeComparison !== 0) return timeComparison;
-        const operatorA = (typeof a.operators === 'string' ? a.operators : "").split(", ")[0] || "";
-        const operatorB = (typeof b.operators === 'string' ? b.operators : "").split(", ")[0] || "";
-        const indexA = operatorA.indexOf("อ");
-        const indexB = operatorB.indexOf("อ");
-        if (indexA === 0 && indexB !== 0) return -1;
-        if (indexB === 0 && indexA !== 0) return 1;
-        return operatorA.localeCompare(operatorB);
-      });
-    // ไม่เติม prefix ใด ๆ
-    return filteredData;
-  };
 
   // Get production data for selected day
   const getSelectedDayProduction = () => {
@@ -524,35 +547,39 @@ export default function MedicalAppointmentDashboard() {
     const dayData = productionData.filter(item => normalizeDate(item.production_date) === normalizeDate(targetDate));
     
     // งาน default (A,B,C,D)
-    let defaultDrafts = dayData.filter(item => item.isDraft && defaultCodes.includes(item.job_code));
+    let defaultDrafts = dayData.filter(item => isDraftItem(item) && defaultCodes.includes(item.job_code));
     defaultDrafts.sort((a, b) => defaultCodes.indexOf(a.job_code) - defaultCodes.indexOf(b.job_code));
 
     // งานปกติ (is_special !== 1 และ workflow_status_id !== 10, ไม่ใช่ default, isDraft = false)
     const normalJobs = dayData.filter(item => 
       !defaultCodes.includes(item.job_code) && 
-      item.is_special !== 1 && 
-      item.workflow_status_id !== 10 && 
-      !item.isDraft
+      !isSpecialItem(item) && 
+      !isDraftItem(item)
     );
     
     // งานพิเศษ (is_special === 1 หรือ workflow_status_id === 10, isDraft = false)
     const specialJobs = dayData.filter(item => 
       !defaultCodes.includes(item.job_code) && 
-      (item.is_special === 1 || item.workflow_status_id === 10) && 
-      !item.isDraft
+      isSpecialItem(item) && 
+      !isDraftItem(item)
     );
     
     // งาน draft (isDraft = true, ไม่ใช่ default)
-    const draftJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && item.isDraft);
+    const draftJobs = dayData.filter(item => !defaultCodes.includes(item.job_code) && isDraftItem(item));
 
-    // ฟังก์ชันเรียงตามเวลา/คน
+    // ฟังก์ชันเรียงตามเวลา/คน (ปรับปรุงให้ robust)
     const sortFn = (a: any, b: any) => {
-      const timeA = a.start_time || "00:00";
-      const timeB = b.start_time || "00:00";
+      const timeA = String(a.start_time || "00:00");
+      const timeB = String(b.start_time || "00:00");
       const timeComparison = timeA.localeCompare(timeB);
       if (timeComparison !== 0) return timeComparison;
-      const operatorA = getOperatorsArray(a.operators)[0] || "";
-      const operatorB = getOperatorsArray(b.operators)[0] || "";
+      
+      // ป้องกัน error โดยใช้ getOperatorsArray และ String()
+      const operatorsA = getOperatorsArray(a.operators);
+      const operatorsB = getOperatorsArray(b.operators);
+      const operatorA = String(operatorsA[0] || "");
+      const operatorB = String(operatorsB[0] || "");
+      
       const indexA = operatorA.indexOf("อ");
       const indexB = operatorB.indexOf("อ");
       if (indexA === 0 && indexB !== 0) return -1;
@@ -565,15 +592,15 @@ export default function MedicalAppointmentDashboard() {
     draftJobs.sort(sortFn);
 
     // Debug: แสดงข้อมูลการแยกงาน
-    console.log("🔍 [DEBUG] getSelectedDayProduction แยกงาน:");
-    console.log("🔍 [DEBUG] งานปกติ:", normalJobs.length, "รายการ");
-    console.log("🔍 [DEBUG] งานพิเศษ:", specialJobs.length, "รายการ");
-    console.log("🔍 [DEBUG] งานปกติ:", normalJobs.map(item => ({ 
+    debugLog("🔍 [DEBUG] getSelectedDayProduction แยกงาน:");
+    debugLog("🔍 [DEBUG] งานปกติ:", normalJobs.length, "รายการ");
+    debugLog("🔍 [DEBUG] งานพิเศษ:", specialJobs.length, "รายการ");
+    debugLog("🔍 [DEBUG] งานปกติ:", normalJobs.map(item => ({ 
       job_name: item.job_name, 
       is_special: item.is_special, 
       workflow_status_id: item.workflow_status_id 
     })));
-    console.log("🔍 [DEBUG] งานพิเศษ:", specialJobs.map(item => ({ 
+    debugLog("🔍 [DEBUG] งานพิเศษ:", specialJobs.map(item => ({ 
       job_name: item.job_name, 
       is_special: item.is_special, 
       workflow_status_id: item.workflow_status_id 
@@ -584,41 +611,35 @@ export default function MedicalAppointmentDashboard() {
   };
 
   // Use useMemo to recalculate when productionData changes
-  const weekProduction = useMemo(() => {
-    const result = getWeekProduction();
-    console.log('📊 [DEBUG] weekProduction length:', result.length);
-    console.log('📊 [DEBUG] weekProduction sample:', result.slice(0, 3));
-    return result;
-  }, [productionData, currentWeek]);
 
   const selectedDayProduction = useMemo(() => {
     const result = getSelectedDayProduction();
-    console.log('🎯 [DEBUG] selectedDayProduction useMemo recalculated');
-    console.log('🎯 [DEBUG] selectedDayProduction length:', result.length);
-    console.log('🎯 [DEBUG] selectedDayProduction sample:', result.slice(0, 3));
+    debugLog('🎯 [DEBUG] selectedDayProduction useMemo recalculated');
+    debugLog('🎯 [DEBUG] selectedDayProduction length:', result.length);
+    debugLog('🎯 [DEBUG] selectedDayProduction sample:', result.slice(0, 3));
     return result;
   }, [productionData, selectedDate, selectedWeekDay, viewMode]);
 
   // เพิ่มฟังก์ชันส่งข้อมูลไป Google Sheet
   const sendToGoogleSheet = async (data: any) => {
-    console.log("🟡 [DEBUG] call sendToGoogleSheet", data);
+    debugLog("🟡 [DEBUG] call sendToGoogleSheet", data);
     // เรียกไปที่ frontend API route แทน backend
     const url = '/api/send-to-google-sheet';
-    console.log("🟡 [DEBUG] Google Sheet URL:", url);
+    debugLog("🟡 [DEBUG] Google Sheet URL:", url);
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      console.log("🟡 [DEBUG] Google Sheet response status:", res.status);
+      debugLog("🟡 [DEBUG] Google Sheet response status:", res.status);
       const result = await res.text();
-      console.log("🟢 [DEBUG] Google Sheet result:", result);
+      debugLog("🟢 [DEBUG] Google Sheet result:", result);
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
     } catch (err) {
-      console.error("🔴 [DEBUG] Google Sheet error:", err);
+      debugError("🔴 [DEBUG] Google Sheet error:", err);
       throw err; // Re-throw เพื่อให้ handleSyncDrafts จับ error ได้
     }
   };
@@ -643,26 +664,26 @@ export default function MedicalAppointmentDashboard() {
       const operatorB = getOperatorsArray(b.operators)[0] || ""
       
       // หาตำแหน่งของ "อ" ในชื่อ (indexOf จะ return -1 ถ้าไม่เจอ)
-      const indexA = operatorA.indexOf("อ")
-      const indexB = operatorB.indexOf("อ")
+      const indexA = String(operatorA).indexOf("อ")
+      const indexB = String(operatorB).indexOf("อ")
       
       // ถ้า A มี "อ" ที่ตำแหน่งแรก (index 0) และ B ไม่มี "อ" หรือมี "อ" ที่ตำแหน่งอื่น
       if (indexA === 0 && indexB !== 0) {
-        console.log(`🔍 [DEBUG] A (${operatorA}) comes before B (${operatorB}) because A has "อ" at first position`);
+        debugLog(`🔍 [DEBUG] A (${operatorA}) comes before B (${operatorB}) because A has "อ" at first position`);
         return -1
       }
       // ถ้า B มี "อ" ที่ตำแหน่งแรก (index 0) และ A ไม่มี "อ" หรือมี "อ" ที่ตำแหน่งอื่น
       if (indexB === 0 && indexA !== 0) {
-        console.log(`🔍 [DEBUG] B (${operatorB}) comes before A (${operatorA}) because B has "อ" at first position`);
+        debugLog(`🔍 [DEBUG] B (${operatorB}) comes before A (${operatorA}) because B has "อ" at first position`);
         return 1
       }
       // ถ้าทั้งคู่มี "อ" ที่ตำแหน่งแรก หรือทั้งคู่ไม่มี "อ" ที่ตำแหน่งแรก เรียงตามตัวอักษร
       const result = operatorA.localeCompare(operatorB);
-      console.log(`🔍 [DEBUG] Both have same "อ" position, comparing alphabetically: ${result}`);
+      debugLog(`🔍 [DEBUG] Both have same "อ" position, comparing alphabetically: ${result}`);
       return result
     });
 
-    console.log('🔍 [DEBUG] Sorted week data:', sortedJobs.map((item: any) => ({
+    debugLog('🔍 [DEBUG] Sorted week data:', sortedJobs.map((item: any) => ({
       job_name: item.job_name,
       start_time: item.start_time,
       operators: item.operators,
@@ -695,9 +716,9 @@ export default function MedicalAppointmentDashboard() {
   const isJobNameDuplicate = (name: string) => {
     // ตรวจสอบกับข้อมูลที่มีอยู่จริงในระบบเฉพาะวันที่เลือก
     const normalizedName = normalize(name);
-    console.log('🔍 [DEBUG] Checking for duplicate job name:', name);
-    console.log('🔍 [DEBUG] Normalized name:', normalizedName);
-    console.log('🔍 [DEBUG] Selected date:', selectedDate);
+    debugLog('🔍 [DEBUG] Checking for duplicate job name:', name);
+    debugLog('🔍 [DEBUG] Normalized name:', normalizedName);
+    debugLog('🔍 [DEBUG] Selected date:', selectedDate);
     
     // กรองข้อมูลเฉพาะวันที่เลือก
     const jobsOfSelectedDate = productionData.filter(item => {
@@ -705,14 +726,14 @@ export default function MedicalAppointmentDashboard() {
       return itemDate === selectedDate;
     });
     
-    console.log('🔍 [DEBUG] Jobs of selected date:', jobsOfSelectedDate.map(item => ({
+    debugLog('🔍 [DEBUG] Jobs of selected date:', jobsOfSelectedDate.map(item => ({
       job_name: item.job_name || '',
       normalized: normalize(item.job_name || ''),
       production_date: item.production_date
     })));
     
     const isDuplicate = jobsOfSelectedDate.some(item => normalize(item.job_name || '') === normalizedName);
-    console.log('🔍 [DEBUG] Is duplicate:', isDuplicate);
+    debugLog('🔍 [DEBUG] Is duplicate:', isDuplicate);
     return isDuplicate;
   };
 
@@ -760,7 +781,7 @@ export default function MedicalAppointmentDashboard() {
                      startTime.trim() !== "" && 
                      endTime.trim() !== "" && 
                      selectedRoom.trim() !== "";
-      console.log("[DEBUG] isValid:", isValid);
+      debugLog("[DEBUG] isValid:", isValid);
       // ใช้ค่าเริ่มต้นหากไม่มีการใส่เวลา
       const finalStartTime = startTime.trim() || "00:00";
       const finalEndTime = endTime.trim() || "00:00";
@@ -776,21 +797,21 @@ export default function MedicalAppointmentDashboard() {
         job_name: jobName || jobQuery,
         start_time: finalStartTime,
         end_time: finalEndTime,
-        machine_id: machines.find(m => m.machine_code === selectedMachine)?.id || null,
+        machine_id: machines.find(m => m.machine_code === selectedMachine)?.id || selectedMachine || null,
         production_room_id: rooms.find(r => r.room_code === selectedRoom)?.id || null,
         notes: note,
         workflow_status_id: isValid ? 2 : 1, // 2 = บันทึกเสร็จสิ้น, 1 = แบบร่าง
         operators: operatorsToSend,
         work_order: workOrder // เพิ่มลำดับงาน
       };
-      console.log("[DEBUG] requestBody:", requestBody);
+      debugLog("[DEBUG] requestBody:", requestBody);
       const res = await fetch(`/api/work-plans/drafts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
       const data = await res.json();
-      console.log("[DEBUG] API response:", data);
+      debugLog("[DEBUG] API response:", data);
       if (data.success) {
         resetForm();
         await loadAllProductionData();
@@ -798,14 +819,14 @@ export default function MedicalAppointmentDashboard() {
         console.warn("[DEBUG] API error message:", data.message);
       }
     } catch (err) {
-      console.error("[DEBUG] API error:", err);
+      debugError("[DEBUG] API error:", err);
     }
     setIsSubmitting(false);
   };
 
   const handleSaveDraft = async () => {
-    console.log('🔧 handleSaveDraft called');
-    console.log('🔧 Current state:', {
+    debugLog('🔧 handleSaveDraft called');
+    debugLog('🔧 Current state:', {
       jobName,
       jobQuery,
       jobCode,
@@ -819,7 +840,7 @@ export default function MedicalAppointmentDashboard() {
     });
 
     if (isSubmitting) {
-      console.log('🔧 Already submitting, returning');
+      debugLog('🔧 Already submitting, returning');
       return; // ป้องกัน submit ซ้ำ
     }
     
@@ -828,10 +849,10 @@ export default function MedicalAppointmentDashboard() {
 
     // Validation สำหรับแบบร่าง - ยืดหยุ่นกว่า
     const hasJobName = jobName?.trim() || jobQuery?.trim();
-    console.log('🔧 Has job name:', hasJobName);
+    debugLog('🔧 Has job name:', hasJobName);
     
     if (!hasJobName) {
-      console.log('🔧 No job name provided');
+      debugLog('🔧 No job name provided');
       setMessage("กรุณากรอกชื่องาน");
       setIsSubmitting(false);
       return;
@@ -839,7 +860,7 @@ export default function MedicalAppointmentDashboard() {
     
     // ตรวจสอบเวลาถ้ามีการกรอก
     if (startTime?.trim() && endTime?.trim() && !isEndTimeAfterStartTime(startTime, endTime)) {
-      console.log('🔧 Invalid time range');
+      debugLog('🔧 Invalid time range');
       setMessage("เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม");
       setIsSubmitting(false);
       return;
@@ -847,20 +868,20 @@ export default function MedicalAppointmentDashboard() {
     
     // ตรวจสอบชื่องานซ้ำเฉพาะถ้ามีการกรอกชื่องาน
     const finalJobName = hasJobName || "";
-    console.log('🔧 Final job name:', finalJobName);
+    debugLog('🔧 Final job name:', finalJobName);
     
     if (finalJobName && isJobNameDuplicate(finalJobName)) {
-      console.log('🔧 Duplicate job name');
+      debugLog('🔧 Duplicate job name');
       setMessage("ชื่องานนี้มีอยู่แล้ว");
       setIsSubmitting(false);
       return;
     }
 
     try {
-      console.log('🔧 Starting API call');
-      console.log('📅 Saving draft with date:', selectedDate);
-      console.log('📅 selectedDate type:', typeof selectedDate);
-      console.log('📅 selectedDate value:', selectedDate);
+      debugLog('🔧 Starting API call');
+      debugLog('📅 Saving draft with date:', selectedDate);
+      debugLog('📅 selectedDate type:', typeof selectedDate);
+      debugLog('📅 selectedDate value:', selectedDate);
       
       // ไม่ใส่ค่า default ถ้าไม่ได้กรอก
       const finalStartTime = startTime?.trim() || "";
@@ -875,7 +896,7 @@ export default function MedicalAppointmentDashboard() {
         job_name: finalJobName,
         start_time: finalStartTime,
         end_time: finalEndTime,
-        machine_id: machines.find(m => m.machine_code === selectedMachine)?.id || null,
+        machine_id: machines.find(m => m.machine_code === selectedMachine)?.id || selectedMachine || null,
         production_room_id: rooms.find(r => r.room_code === selectedRoom)?.id || null,
         notes: note || "",
         workflow_status_id: 1, // 1 = draft
@@ -885,8 +906,8 @@ export default function MedicalAppointmentDashboard() {
         })
       };
       
-      console.log('📅 Request body:', requestBody);
-      console.log('📅 API URL:', `/api/work-plans/drafts`);
+      debugLog('📅 Request body:', requestBody);
+      debugLog('📅 API URL:', `/api/work-plans/drafts`);
       
       const res = await fetch(`/api/work-plans/drafts`, {
         method: 'POST',
@@ -894,35 +915,35 @@ export default function MedicalAppointmentDashboard() {
         body: JSON.stringify(requestBody),
       });
       
-      console.log('📅 Response status:', res.status);
+      debugLog('📅 Response status:', res.status);
       const data = await res.json();
-      console.log('📅 Response data:', data);
+      debugLog('📅 Response data:', data);
       
       setMessage(data.success ? 'บันทึกแบบร่างสำเร็จ' : 'เกิดข้อผิดพลาด');
       if (data.success) {
-        console.log('🔧 Success - resetting form and reloading data');
+        debugLog('🔧 Success - resetting form and reloading data');
         resetForm(); // ล้างค่าฟอร์มหลังบันทึกแบบร่างสำเร็จ
         await loadAllProductionData();
       } else {
-        console.log('🔧 API returned success: false');
+        debugLog('🔧 API returned success: false');
       }
     } catch (err) {
-      console.error('📅 Error saving draft:', err);
+      debugError('📅 Error saving draft:', err);
       setMessage('เกิดข้อผิดพลาดในการเชื่อมต่อ API');
     }
-    console.log('🔧 Setting isSubmitting to false');
+    debugLog('🔧 Setting isSubmitting to false');
     setIsSubmitting(false);
   };
 
   // Helper function to get room name from room code or ID
   const getRoomName = (roomCodeOrId: string | number) => {
     if (!roomCodeOrId || roomCodeOrId === 'ไม่ระบุ') {
-      console.log('🏠 [DEBUG] getRoomName - No room data:', roomCodeOrId);
+      debugLog('🏠 [DEBUG] getRoomName - No room data:', roomCodeOrId);
       return 'ไม่ระบุ';
     }
     
-    console.log('🏠 [DEBUG] getRoomName input:', roomCodeOrId, 'type:', typeof roomCodeOrId);
-    console.log('🏠 [DEBUG] Available rooms:', rooms.map(r => ({ id: r.id, room_code: r.room_code, room_name: r.room_name })));
+    debugLog('🏠 [DEBUG] getRoomName input:', roomCodeOrId, 'type:', typeof roomCodeOrId);
+    debugLog('🏠 [DEBUG] Available rooms:', rooms.map(r => ({ id: r.id, room_code: r.room_code, room_name: r.room_name })));
     
     // ลองหาโดยใช้ room_code ก่อน
     let room = rooms.find(r => r.room_code === roomCodeOrId);
@@ -938,7 +959,7 @@ export default function MedicalAppointmentDashboard() {
     }
     
     const result = room ? room.room_name : (typeof roomCodeOrId === 'number' ? roomCodeOrId.toString() : roomCodeOrId);
-    console.log('🏠 [DEBUG] getRoomName result:', result);
+    debugLog('🏠 [DEBUG] getRoomName result:', result);
     return result;
   };
 
@@ -965,38 +986,46 @@ export default function MedicalAppointmentDashboard() {
 
 
   // Helper function to render staff avatars
-  const renderStaffAvatars = (staff: string, isFormCollapsed: boolean) => {
-    if (!staff || staff.trim() === "") {
+  const renderStaffAvatars = (staff: any, isFormCollapsed: boolean) => {
+    const staffString = String(staff || '');
+    if (!staffString || staffString.trim() === "") {
       return (
         <span className="text-sm sm:text-base text-gray-500">
           ไม่มีผู้ปฏิบัติงาน
         </span>
       );
     }
-    const staffList = staff.split(", ");
+    const staffList = getOperatorsArray(staffString);
     
     return (
       <div className="flex items-center space-x-2 sm:space-x-3">
         <div className="flex -space-x-2">
-          {staffList.map((person, index) => (
-            <Avatar
-              key={index}
-              className={`${isFormCollapsed ? "w-12 h-12 sm:w-14 sm:h-14" : "w-10 h-10 sm:w-12 sm:h-12"} border-2 border-white shadow-sm`}
+          {staffList.map((person, index) => {
+            // แปลง person เป็น string ถ้าเป็น object
+            const personName = typeof person === 'object' ? ((person as any)?.name || (person as any)?.id_code || '') : String(person || '');
+            
+            return (
+              <Avatar
+                key={index}
+                className={`${isFormCollapsed ? "w-12 h-12 sm:w-14 sm:h-14" : "w-10 h-10 sm:w-12 sm:h-12"} border-2 border-white shadow-sm`}
               >
                 <AvatarImage
-                src={staffImages[person] || `/placeholder.svg?height=80&width=80&text=${person.charAt(0)}`}
-                  alt={person}
+                  src={staffImages[personName] || `/placeholder.svg?height=80&width=80&text=${personName.charAt(0)}`}
+                  alt={personName}
                   className="object-cover object-center avatar-image"
                   style={{ imageRendering: "crisp-edges" }}
                 />
-              <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
-                {person.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
-          ))}
+                <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
+                  {personName.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            );
+          })}
         </div>
         <span className={`${isFormCollapsed ? "text-base sm:text-lg" : "text-sm sm:text-base"} truncate text-slate-900`}>
-          ผู้ปฏิบัติงาน: {staff}
+          ผู้ปฏิบัติงาน: {staffList.map(person => 
+            typeof person === 'object' ? ((person as any)?.name || (person as any)?.id_code || '') : String(person || '')
+          ).join(', ')}
         </span>
       </div>
     )
@@ -1031,14 +1060,14 @@ export default function MedicalAppointmentDashboard() {
   // Prefill ข้อมูลเมื่อเปิด modal
   useEffect(() => {
     if (editDraftModalOpen && editDraftData && users.length > 0) {
-      console.log('🔧 Setting up edit form with data:', editDraftData);
+      debugLog('🔧 Setting up edit form with data:', editDraftData);
       
       setEditJobName(editDraftData.job_name || "");
       
       // ตั้งค่าผู้ปฏิบัติงาน
       let operatorNames = ["", "", "", ""];
       if (editDraftData.operators) {
-        console.log('🔧 Processing operators:', editDraftData.operators);
+        debugLog('🔧 Processing operators:', editDraftData.operators);
         
         try {
           if (Array.isArray(editDraftData.operators)) {
@@ -1059,7 +1088,7 @@ export default function MedicalAppointmentDashboard() {
               }
             } catch {
               // ถ้าไม่ใช่ JSON ให้แยกด้วย comma
-              const names = editDraftData.operators.split(',').map((name: string) => name.trim());
+              const names = getOperatorsArray(editDraftData.operators);
               operatorNames = names.slice(0, 4); // จำกัดแค่ 4 ตำแหน่ง
             }
           }
@@ -1069,9 +1098,9 @@ export default function MedicalAppointmentDashboard() {
             operatorNames.push("");
           }
           
-          console.log('🔧 Final operator names:', operatorNames);
+          debugLog('🔧 Final operator names:', operatorNames);
         } catch (error) {
-          console.error('Error processing operators:', error);
+          debugError('Error processing operators:', error);
           operatorNames = ["", "", "", ""];
         }
       }
@@ -1107,7 +1136,7 @@ export default function MedicalAppointmentDashboard() {
       setEditNote(editDraftData.notes || editDraftData.note || "");
       setEditDate(editDraftData.production_date ? (editDraftData.production_date.split("T")[0]) : "");
       
-      console.log('🔧 Form setup complete:', {
+      debugLog('🔧 Form setup complete:', {
         jobName: editDraftData.job_name,
         operators: operatorNames,
         startTime: editDraftData.start_time,
@@ -1120,7 +1149,7 @@ export default function MedicalAppointmentDashboard() {
   }, [editDraftModalOpen, editDraftData, users, machines, rooms]);
 
   const handleEditDraft = (draftItem: any) => {
-    console.log('✏️ Opening edit modal for draft item:', draftItem);
+    debugLog('✏️ Opening edit modal for draft item:', draftItem);
     
     // ใช้ข้อมูลจริงแทนข้อมูล test
     const realData = {
@@ -1139,19 +1168,19 @@ export default function MedicalAppointmentDashboard() {
       workflow_status_id: draftItem.workflow_status_id
     };
     
-    console.log('✏️ Using real data:', realData);
+    debugLog('✏️ Using real data:', realData);
     
     // ตั้งค่า state ก่อน
     setEditDraftData(realData);
     setEditDraftId(realData.id.toString());
     
     // เปิด modal หลังจากตั้งค่า state แล้ว
-    console.log('✏️ Setting modal open to true');
+    debugLog('✏️ Setting modal open to true');
     setEditDraftModalOpen(true);
     
     // ตรวจสอบ state หลังจากตั้งค่า
     setTimeout(() => {
-      console.log('✏️ Modal state check:', {
+      debugLog('✏️ Modal state check:', {
         editDraftModalOpen: true,
         editDraftData: realData,
         editDraftId: realData.id.toString()
@@ -1167,16 +1196,16 @@ export default function MedicalAppointmentDashboard() {
     const endTimeValid = editEndTime.trim() !== "";
     const roomValid = editRoom.trim() !== "";
     
-    console.log('🔍 Validating edit draft:');
-    console.log('  - editJobName:', editJobName, 'valid:', jobNameValid);
-    console.log('  - editOperators:', editOperators, 'valid:', operatorsValid);
-    console.log('  - editStartTime:', editStartTime, 'valid:', startTimeValid);
-    console.log('  - editEndTime:', editEndTime, 'valid:', endTimeValid);
-    console.log('  - editRoom:', editRoom, 'valid:', roomValid);
-    console.log('  - editMachine:', editMachine, 'valid:', editMachine.trim() !== ""); // แสดงแต่ไม่ใช้ในการ validate
+    debugLog('🔍 Validating edit draft:');
+    debugLog('  - editJobName:', editJobName, 'valid:', jobNameValid);
+    debugLog('  - editOperators:', editOperators, 'valid:', operatorsValid);
+    debugLog('  - editStartTime:', editStartTime, 'valid:', startTimeValid);
+    debugLog('  - editEndTime:', editEndTime, 'valid:', endTimeValid);
+    debugLog('  - editRoom:', editRoom, 'valid:', roomValid);
+    debugLog('  - editMachine:', editMachine, 'valid:', editMachine.trim() !== ""); // แสดงแต่ไม่ใช้ในการ validate
     
     const isValid = jobNameValid && operatorsValid && startTimeValid && endTimeValid && roomValid;
-    console.log('  - Overall validation result:', isValid);
+    debugLog('  - Overall validation result:', isValid);
     
     return isValid;
   };
@@ -1242,12 +1271,12 @@ export default function MedicalAppointmentDashboard() {
   // เพิ่มฟังก์ชัน Sync Drafts
   const handleSyncDrafts = async () => {
     // เปิด Google Sheet ก่อน
-    console.log("🟢 [DEBUG] กำลังเปิด Google Sheet...");
+    debugLog("🟢 [DEBUG] กำลังเปิด Google Sheet...");
     try {
       window.open("https://docs.google.com/spreadsheets/d/1lzsYNoIbTd1Uy5r37xUtK5PuOHyNlYYiqS7xZvrU8C8", "_blank");
-      console.log("🟢 [DEBUG] เปิด Google Sheet สำเร็จ");
+      debugLog("🟢 [DEBUG] เปิด Google Sheet สำเร็จ");
     } catch (err) {
-      console.error("🔴 [DEBUG] ไม่สามารถเปิด Google Sheet ได้:", err);
+      debugError("🔴 [DEBUG] ไม่สามารถเปิด Google Sheet ได้:", err);
       // ลองเปิดด้วยวิธีอื่น
       const link = document.createElement('a');
       link.href = "https://docs.google.com/spreadsheets/d/1lzsYNoIbTd1Uy5r37xUtK5PuOHyNlYYiqS7xZvrU8C8/edit?gid=1601393572#gid=1601393572";
@@ -1299,8 +1328,8 @@ export default function MedicalAppointmentDashboard() {
         const timeB = b.start_time || "00:00";
         const timeComparison = timeA.localeCompare(timeB);
         if (timeComparison !== 0) return timeComparison;
-        const operatorA = getOperatorsArray(a.operators)[0] || "";
-        const operatorB = getOperatorsArray(b.operators)[0] || "";
+        const operatorA = String(getOperatorsArray(a.operators)[0] || "");
+        const operatorB = String(getOperatorsArray(b.operators)[0] || "");
         const indexA = operatorA.indexOf("อ");
         const indexB = operatorB.indexOf("อ");
         if (indexA === 0 && indexB !== 0) return -1;
@@ -1316,15 +1345,15 @@ export default function MedicalAppointmentDashboard() {
       });
       
       // Debug: แสดงข้อมูลการแยกงาน
-      console.log("🔍 [DEBUG] แยกงานพิเศษ:");
-      console.log("🔍 [DEBUG] งานปกติ:", normalJobs.length, "รายการ");
-      console.log("🔍 [DEBUG] งานพิเศษ:", specialJobs.length, "รายการ");
-      console.log("🔍 [DEBUG] งานปกติ:", normalJobs.map(item => ({ 
+      debugLog("🔍 [DEBUG] แยกงานพิเศษ:");
+      debugLog("🔍 [DEBUG] งานปกติ:", normalJobs.length, "รายการ");
+      debugLog("🔍 [DEBUG] งานพิเศษ:", specialJobs.length, "รายการ");
+      debugLog("🔍 [DEBUG] งานปกติ:", normalJobs.map(item => ({ 
         job_name: item.job_name, 
         is_special: item.is_special, 
         workflow_status_id: item.workflow_status_id 
       })));
-      console.log("🔍 [DEBUG] งานพิเศษ:", specialJobs.map(item => ({ 
+      debugLog("🔍 [DEBUG] งานพิเศษ:", specialJobs.map(item => ({ 
         job_name: item.job_name, 
         is_special: item.is_special, 
         workflow_status_id: item.workflow_status_id 
@@ -1334,9 +1363,9 @@ export default function MedicalAppointmentDashboard() {
       const filtered = [...sortedNormalJobs, ...sortedSpecialJobs];
       
       // Debug: แสดงข้อมูลที่ส่งไป Google Sheet
-      console.log("🔍 [DEBUG] ข้อมูลที่ส่งไป Google Sheet:");
-      console.log("🔍 [DEBUG] จำนวนงานทั้งหมด:", filtered.length);
-      console.log("🔍 [DEBUG] ลำดับงาน:", filtered.map((item, idx) => ({
+      debugLog("🔍 [DEBUG] ข้อมูลที่ส่งไป Google Sheet:");
+      debugLog("🔍 [DEBUG] จำนวนงานทั้งหมด:", filtered.length);
+      debugLog("🔍 [DEBUG] ลำดับงาน:", filtered.map((item, idx) => ({
         ลำดับ: idx + 1,
         job_name: item.job_name,
         is_special: item.is_special,
@@ -1361,17 +1390,17 @@ export default function MedicalAppointmentDashboard() {
         ];
       });
       // 2. ส่ง batch ไป 1.ใบสรุปงาน v.4
-      console.log("🟡 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4:", summaryRows.length, "แถว");
-      console.log("🟡 [DEBUG] ข้อมูล summaryRows:", summaryRows);
+      debugLog("🟡 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4:", summaryRows.length, "แถว");
+      debugLog("🟡 [DEBUG] ข้อมูล summaryRows:", summaryRows);
       try {
         await sendToGoogleSheet({
           sheetName: "1.ใบสรุปงาน v.4",
           rows: summaryRows,
           clearSheet: true
         });
-        console.log("🟢 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4 สำเร็จ");
+        debugLog("🟢 [DEBUG] ส่งข้อมูลไป 1.ใบสรุปงาน v.4 สำเร็จ");
       } catch (error) {
-        console.error("🔴 [DEBUG] เกิดข้อผิดพลาดในการส่งข้อมูลไป 1.ใบสรุปงาน v.4:", error);
+        debugError("🔴 [DEBUG] เกิดข้อผิดพลาดในการส่งข้อมูลไป 1.ใบสรุปงาน v.4:", error);
         throw error; // Re-throw เพื่อให้ caller จับได้
       }
 
@@ -1384,12 +1413,12 @@ export default function MedicalAppointmentDashboard() {
        const dateValue = selectedDateObj ? formatDateForValue(selectedDateObj) : 'Invalid Date';
       const timeStamp = new Date().toLocaleString('en-GB') + ', ' + new Date().toLocaleTimeString('en-GB');
 
-      console.log("🟡 [DEBUG] Date processing:");
-      console.log("🟡 [DEBUG] selectedDate (input):", selectedDate);
-      console.log("🟡 [DEBUG] selectedDateObj:", selectedDateObj);
-      console.log("🟡 [DEBUG] dateString:", dateString);
-      console.log("🟡 [DEBUG] dateValue:", dateValue);
-      console.log("🟡 [DEBUG] timeStamp:", timeStamp);
+      debugLog("🟡 [DEBUG] Date processing:");
+      debugLog("🟡 [DEBUG] selectedDate (input):", selectedDate);
+      debugLog("🟡 [DEBUG] selectedDateObj:", selectedDateObj);
+      debugLog("🟡 [DEBUG] dateString:", dateString);
+      debugLog("🟡 [DEBUG] dateValue:", dateValue);
+      debugLog("🟡 [DEBUG] timeStamp:", timeStamp);
 
       // หาข้อมูลงาน A B C D ที่มีข้อมูลจริงๆ ในฐานข้อมูล (ทั้ง work_plans และ work_plan_drafts)
       const defaultJobsData = productionData.filter(item => 
@@ -1397,10 +1426,10 @@ export default function MedicalAppointmentDashboard() {
         defaultCodes.includes(item.job_code)
       );
 
-      console.log("🔍 [DEBUG] ข้อมูลงาน A B C D ที่หาได้:", defaultJobsData);
-      console.log("🔍 [DEBUG] selectedDate:", selectedDate);
-      console.log("🔍 [DEBUG] defaultCodes:", defaultCodes);
-      console.log("🔍 [DEBUG] productionData ทั้งหมด:", productionData.filter(item => item.production_date === selectedDate));
+      debugLog("🔍 [DEBUG] ข้อมูลงาน A B C D ที่หาได้:", defaultJobsData);
+      debugLog("🔍 [DEBUG] selectedDate:", selectedDate);
+      debugLog("🔍 [DEBUG] defaultCodes:", defaultCodes);
+      debugLog("🔍 [DEBUG] productionData ทั้งหมด:", productionData.filter(item => item.production_date === selectedDate));
 
       // ถ้าไม่มีข้อมูลงาน A B C D ในฐานข้อมูล ให้ใช้ข้อมูล default
       if (defaultJobsData.length === 0) {
@@ -1494,46 +1523,46 @@ export default function MedicalAppointmentDashboard() {
 
       // 4. ส่ง batch ไป Log_แผนผลิต (แยกการส่ง)
       if (logRows.length > 0) {
-        console.log("🟡 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต:", logRows.length, "แถว");
-        console.log("🟡 [DEBUG] ข้อมูล logRows:", logRows);
+        debugLog("🟡 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต:", logRows.length, "แถว");
+        debugLog("🟡 [DEBUG] ข้อมูล logRows:", logRows);
         try {
           await sendToGoogleSheet({
             sheetName: "Log_แผนผลิต",
             rows: logRows,
             clearSheet: true
           });
-          console.log("🟢 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต สำเร็จ");
+          debugLog("🟢 [DEBUG] ส่งข้อมูลไป Log_แผนผลิต สำเร็จ");
         } catch (error) {
-          console.error("🔴 [DEBUG] เกิดข้อผิดพลาดในการส่งข้อมูลไป Log_แผนผลิต:", error);
+          debugError("🔴 [DEBUG] เกิดข้อผิดพลาดในการส่งข้อมูลไป Log_แผนผลิต:", error);
           throw error; // Re-throw เพื่อให้ caller จับได้
         }
       } else {
-        console.log("🟡 [DEBUG] ไม่มีข้อมูล logRows ที่จะส่ง");
+        debugLog("🟡 [DEBUG] ไม่มีข้อมูล logRows ที่จะส่ง");
       }
       // 5. อัปเดตวันที่ใน D1 ของ sheet รายงาน-เวลาผู้ปฏิบัติงาน
       const reportSheetName = "รายงาน-เวลาผู้ปฏิบัติงาน";
-      console.log("🟡 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน:", dateValue);
-      console.log("🟡 [DEBUG] Sheet name:", reportSheetName);
-      console.log("🟡 [DEBUG] Sheet name length:", reportSheetName.length);
-      console.log("🟡 [DEBUG] selectedDate:", selectedDate);
-      console.log("🟡 [DEBUG] dateValue:", dateValue);
+      debugLog("🟡 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน:", dateValue);
+      debugLog("🟡 [DEBUG] Sheet name:", reportSheetName);
+      debugLog("🟡 [DEBUG] Sheet name length:", reportSheetName.length);
+      debugLog("🟡 [DEBUG] selectedDate:", selectedDate);
+      debugLog("🟡 [DEBUG] dateValue:", dateValue);
       try {
         await sendToGoogleSheet({
           sheetName: reportSheetName,
           "Date Value": dateValue,
           "วันที่": dateString
         });
-        console.log("🟢 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน สำเร็จ");
+        debugLog("🟢 [DEBUG] อัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน สำเร็จ");
       } catch (error) {
-        console.error("🔴 [DEBUG] เกิดข้อผิดพลาดในการอัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน:", error);
+        debugError("🔴 [DEBUG] เกิดข้อผิดพลาดในการอัปเดตวันที่ในรายงาน-เวลาผู้ปฏิบัติงาน:", error);
         throw error; // Re-throw เพื่อให้ caller จับได้
       }
       setIsSubmitting(false);
       
       // เพิ่มการ reload productionData หลัง sync สำเร็จ
-      console.log("🔄 [DEBUG] Sync completed, reloading production data...");
+      debugLog("🔄 [DEBUG] Sync completed, reloading production data...");
       await loadAllProductionData();
-      console.log("🟢 [DEBUG] Production data reloaded successfully");
+      debugLog("🟢 [DEBUG] Production data reloaded successfully");
       
       // แสดงข้อความสำเร็จ
       setMessage("Sync และพิมพ์ใบงานผลิตสำเร็จ");
@@ -1548,20 +1577,20 @@ export default function MedicalAppointmentDashboard() {
 
   // เพิ่มฟังก์ชันยกเลิกการผลิต
   const handleCancelProduction = async (workPlanId: string) => {
-    console.log('🔴 [DEBUG] handleCancelProduction called with workPlanId:', workPlanId);
+    debugLog('🔴 [DEBUG] handleCancelProduction called with workPlanId:', workPlanId);
     
     if (!confirm("คุณต้องการยกเลิกการผลิตนี้หรือไม่?")) {
-      console.log('🔴 [DEBUG] User cancelled the confirmation dialog');
+      debugLog('🔴 [DEBUG] User cancelled the confirmation dialog');
       return;
     }
     
-    console.log('🔴 [DEBUG] User confirmed cancellation, proceeding...');
+    debugLog('🔴 [DEBUG] User confirmed cancellation, proceeding...');
     setIsSubmitting(true);
     setMessage("");
     
     try {
           const url = `http://192.168.0.94:3101/api/work-plans/${workPlanId}/cancel`;
-    console.log('🔴 [DEBUG] Making PATCH request to:', url);
+    debugLog('🔴 [DEBUG] Making PATCH request to:', url);
     
     const res = await fetch(url, {
       method: "PATCH",
@@ -1572,35 +1601,35 @@ export default function MedicalAppointmentDashboard() {
       mode: 'cors'
     });
       
-      console.log('🔴 [DEBUG] Response status:', res.status);
-      console.log('🔴 [DEBUG] Response ok:', res.ok);
+      debugLog('🔴 [DEBUG] Response status:', res.status);
+      debugLog('🔴 [DEBUG] Response ok:', res.ok);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       
       const data = await res.json();
-      console.log('🔴 [DEBUG] Response data:', data);
+      debugLog('🔴 [DEBUG] Response data:', data);
       
       if (data.success) {
-        console.log('🔴 [DEBUG] Cancel successful, reloading production data...');
+        debugLog('🔴 [DEBUG] Cancel successful, reloading production data...');
         setMessage("ยกเลิกการผลิตสำเร็จ");
         await loadAllProductionData(); // reload ข้อมูลหลังจากยกเลิก
-        console.log('🔴 [DEBUG] Production data reloaded');
+        debugLog('🔴 [DEBUG] Production data reloaded');
       } else {
-        console.log('🔴 [DEBUG] Cancel failed:', data.message);
+        debugLog('🔴 [DEBUG] Cancel failed:', data.message);
         setMessage(data.message || "เกิดข้อผิดพลาดในการยกเลิกการผลิต");
       }
     } catch (err) {
-      console.error('🔴 [DEBUG] Error in handleCancelProduction:', err);
+      debugError('🔴 [DEBUG] Error in handleCancelProduction:', err);
       setMessage("เกิดข้อผิดพลาดในการเชื่อมต่อ API");
     }
     setIsSubmitting(false);
-    console.log('🔴 [DEBUG] handleCancelProduction completed');
+    debugLog('🔴 [DEBUG] handleCancelProduction completed');
   };
 
   const handleViewProductionDetails = async (item: any) => {
-    console.log('👁️ [DEBUG] handleViewProductionDetails called with item:', item);
+    debugLog('👁️ [DEBUG] handleViewProductionDetails called with item:', item);
     
     setProductionDetailsData(item);
     setProductionDetailsModalOpen(true);
@@ -1612,13 +1641,13 @@ export default function MedicalAppointmentDashboard() {
       
       if (data.success) {
         setProductionLogs(data.data || []);
-        console.log('👁️ [DEBUG] Production logs loaded:', data.data);
+        debugLog('👁️ [DEBUG] Production logs loaded:', data.data);
       } else {
-        console.log('👁️ [DEBUG] Failed to load logs:', data.message);
+        debugLog('👁️ [DEBUG] Failed to load logs:', data.message);
         setProductionLogs([]);
       }
     } catch (error) {
-      console.error('👁️ [DEBUG] Error loading production logs:', error);
+      debugError('👁️ [DEBUG] Error loading production logs:', error);
       setProductionLogs([]);
     }
   };
@@ -1653,8 +1682,8 @@ export default function MedicalAppointmentDashboard() {
   };
 
   const handleDeleteDraft = async (draftId: string) => {
-    console.log('🗑️ Attempting to delete draft with ID:', draftId);
-    console.log('🗑️ Edit draft data:', editDraftData);
+    debugLog('🗑️ Attempting to delete draft with ID:', draftId);
+    debugLog('🗑️ Edit draft data:', editDraftData);
     
     if (!confirm("คุณต้องการลบแบบร่างนี้หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้")) {
       return;
@@ -1663,14 +1692,14 @@ export default function MedicalAppointmentDashboard() {
     setIsSubmitting(true);
     setMessage("");
     try {
-          console.log('🗑️ Making DELETE request to:', `/api/work-plans/drafts/${draftId}`);
+          debugLog('🗑️ Making DELETE request to:', `/api/work-plans/drafts/${draftId}`);
     const res = await fetch(`/api/work-plans/drafts/${draftId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
     });
-      console.log('🗑️ Response status:', res.status);
+      debugLog('🗑️ Response status:', res.status);
       const data = await res.json();
-      console.log('🗑️ Response data:', data);
+      debugLog('🗑️ Response data:', data);
       
       if (data.success) {
         setMessage("ลบแบบร่างสำเร็จ");
@@ -1680,7 +1709,7 @@ export default function MedicalAppointmentDashboard() {
         setMessage(data.message || "เกิดข้อผิดพลาดในการลบแบบร่าง");
       }
     } catch (err) {
-      console.error('🗑️ Error deleting draft:', err);
+      debugError('🗑️ Error deleting draft:', err);
       setMessage("เกิดข้อผิดพลาดในการเชื่อมต่อ API");
     }
     setIsSubmitting(false);
@@ -1711,8 +1740,8 @@ export default function MedicalAppointmentDashboard() {
         // กรอง drafts ที่มีในวันที่เลือก
         const dayDrafts = existingDrafts.filter((draft: any) => draft.production_date === selectedDate);
         
-        console.log(`[AUTO-DRAFT] Checking drafts for date: ${selectedDate}`);
-        console.log(`[AUTO-DRAFT] Found ${dayDrafts.length} existing drafts`);
+        debugLog(`[AUTO-DRAFT] Checking drafts for date: ${selectedDate}`);
+        debugLog(`[AUTO-DRAFT] Found ${dayDrafts.length} existing drafts`);
         
         for (const draft of defaultDrafts) {
           // เช็คว่ามี draft นี้ใน database แล้วหรือไม่
@@ -1722,7 +1751,7 @@ export default function MedicalAppointmentDashboard() {
           );
           
           if (!exists) {
-            console.log(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
+            debugLog(`[AUTO-DRAFT] Creating draft: ${draft.job_code} ${draft.job_name}`);
             const response = await fetch(getApiUrl('/api/work-plans/drafts'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1741,21 +1770,21 @@ export default function MedicalAppointmentDashboard() {
             });
             
             if (response.ok) {
-              console.log(`[AUTO-DRAFT] Successfully created: ${draft.job_code} ${draft.job_name}`);
+              debugLog(`[AUTO-DRAFT] Successfully created: ${draft.job_code} ${draft.job_name}`);
             } else {
-              console.error(`[AUTO-DRAFT] Failed to create: ${draft.job_code} ${draft.job_name}`);
+              debugError(`[AUTO-DRAFT] Failed to create: ${draft.job_code} ${draft.job_name}`);
             }
           } else {
-            console.log(`[AUTO-DRAFT] Already exists in database: ${draft.job_code} ${draft.job_name}`);
+            debugLog(`[AUTO-DRAFT] Already exists in database: ${draft.job_code} ${draft.job_name}`);
           }
         }
         
         // โหลดข้อมูลใหม่หลังจากสร้าง drafts
         await loadAllProductionData();
         
-        console.log(`[AUTO-DRAFT] Completed creating drafts for date: ${selectedDate}`);
+        debugLog(`[AUTO-DRAFT] Completed creating drafts for date: ${selectedDate}`);
       } catch (error) {
-        console.error('[AUTO-DRAFT] Error creating drafts:', error);
+        debugError('[AUTO-DRAFT] Error creating drafts:', error);
       } finally {
         isCreatingRef.current = false;
       }
@@ -1771,7 +1800,7 @@ export default function MedicalAppointmentDashboard() {
         method: 'POST'
       });
       if (res.ok) {
-        console.log(`[SYNC] work_order synced for date: ${date}`);
+        debugLog(`[SYNC] work_order synced for date: ${date}`);
       } else {
         console.warn(`[SYNC] Failed to sync work_order for date: ${date}`);
       }
@@ -1793,6 +1822,98 @@ export default function MedicalAppointmentDashboard() {
     setJobCode("");
   };
 
+  // ฟังก์ชันโหลดข้อมูลย้อนหลัง 30 วัน (background)
+  const loadHistoricalData = async (currentDate: string) => {
+    try {
+      setIsLoadingHistorical(true);
+      debugLog('🕐 Loading historical data (30 days) in background...');
+      
+      // คำนวณวันที่ 30 วันย้อนหลัง
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const startDate = thirtyDaysAgo.toISOString().slice(0, 10);
+      
+      // โหลดข้อมูลย้อนหลังแบบ chunks (ไม่ให้หนักเกินไป)
+      const chunkSize = 100;
+      let page = 1;
+      let hasMore = true;
+      const historicalData: any[] = [];
+      
+      while (hasMore && page <= 5) { // จำกัดไม่เกิน 5 หน้า
+        const response = await fetch(
+          getApiUrl(`/api/work-plans?page=${page}&limit=${chunkSize}`)
+        );
+        const data = await response.json();
+        
+        if (data.success && data.data && data.data.length > 0) {
+          // กรองเฉพาะข้อมูล 30 วันย้อนหลัง
+          const filteredData = data.data.filter((item: any) => {
+            const itemDate = new Date(item.production_date);
+            const currentDateObj = new Date(currentDate);
+            const diffDays = Math.ceil((currentDateObj.getTime() - itemDate.getTime()) / (1000 * 60 * 60 * 24));
+            return diffDays >= 0 && diffDays <= 30;
+          });
+          
+          historicalData.push(...filteredData);
+          debugLog(`📦 Loaded chunk ${page}: ${filteredData.length} items (total: ${historicalData.length})`);
+          
+          hasMore = data.pagination?.hasNextPage || false;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      // รวมข้อมูลเก่าเข้ากับข้อมูลปัจจุบัน
+      if (historicalData.length > 0) {
+        setProductionData(prev => {
+          // ลบข้อมูลซ้ำ (ถ้ามี)
+          const existingIds = new Set(prev.map((item: any) => item.id));
+          const newData = historicalData.filter((item: any) => !existingIds.has(item.id));
+          
+          debugLog(`📈 Added ${newData.length} historical items to existing ${prev.length} items`);
+          return [...prev, ...newData];
+        });
+      }
+      
+    } catch (error) {
+      debugError('Error loading historical data:', error);
+    } finally {
+      setIsLoadingHistorical(false);
+    }
+  };
+
+  // ฟังก์ชันโหลดข้อมูลหน้าถัดไป
+  const loadMoreData = async () => {
+    if (isLoadingMore || !hasNextPage) return;
+    
+    try {
+      setIsLoadingMore(true);
+      const nextPage = currentPage + 1;
+      
+      const response = await fetch(getApiUrl(`/api/work-plans?page=${nextPage}&limit=100`));
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        // เพิ่มข้อมูลใหม่เข้าไปใน array เดิม
+        setProductionData(prev => [...prev, ...data.data]);
+        
+        // อัปเดต pagination info
+        if (data.pagination) {
+          setCurrentPage(data.pagination.page);
+          setTotalPages(data.pagination.totalPages);
+          setHasNextPage(data.pagination.hasNextPage);
+        }
+      }
+    } catch (error) {
+      debugError('Error loading more data:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // ลบ infinite scroll logic แล้ว - ให้แสดงยาวลงมาเลย
+
   // เพิ่มฟังก์ชันโหลดข้อมูลทั้งหมด
   const loadAllProductionData = async () => {
     try {
@@ -1800,10 +1921,26 @@ export default function MedicalAppointmentDashboard() {
       // if (selectedDate) {
       //   await syncWorkOrder(selectedDate);
       // }
+      // โหลดข้อมูลสำหรับ weekly view (ไม่จำกัด limit)
+      debugLog('📅 Loading data for weekly view...');
       const [plans, drafts] = await Promise.all([
-        fetch(getApiUrl('/api/work-plans')).then(res => res.json()),
+        fetch(getApiUrl(`/api/work-plans?limit=1000`)).then(res => res.json()), // เพิ่ม limit สำหรับ weekly
         fetch(getApiUrl('/api/work-plans/drafts')).then(res => res.json())
       ]);
+      
+      debugLog('📊 Loaded plans for selected date:', plans.data?.length || 0);
+      
+      // อัปเดต pagination info
+      if (plans.pagination) {
+        setCurrentPage(plans.pagination.page);
+        setTotalPages(plans.pagination.totalPages);
+        setHasNextPage(plans.pagination.hasNextPage);
+      }
+      
+      // โหลดข้อมูลเพิ่มเติมสำหรับ weekly view ใน background
+      setTimeout(() => {
+        loadHistoricalData(selectedDate);
+      }, 100);
       
       // ดึงสถานะจาก logs สำหรับ work plans ที่ sync แล้ว
       const workPlanIds = (plans.data || []).map((p: any) => p.id).filter(Boolean);
@@ -1811,18 +1948,18 @@ export default function MedicalAppointmentDashboard() {
       
       if (workPlanIds.length > 0) {
         try {
-          console.log('[DEBUG] Fetching logs status for workPlanIds:', workPlanIds);
+          debugLog('[DEBUG] Fetching logs status for workPlanIds:', workPlanIds);
           const logsResponse = await fetch(
             getApiUrl(`/api/logs/work-plans/status?workPlanIds=${workPlanIds.join(',')}`)
           );
           const logsData = await logsResponse.json();
-          console.log('[DEBUG] Logs response:', logsData);
+          debugLog('[DEBUG] Logs response:', logsData);
           if (logsData.success) {
             logsStatusMap = logsData.data;
-            console.log('[DEBUG] Logs status map:', logsStatusMap);
+            debugLog('[DEBUG] Logs status map:', logsStatusMap);
           }
         } catch (error) {
-          console.error('Error fetching logs status:', error);
+          debugError('Error fetching logs status:', error);
         }
       }
       // สร้าง map สำหรับ lookup draft ตาม job_code+job_name+production_date
@@ -1883,22 +2020,22 @@ export default function MedicalAppointmentDashboard() {
           let status = 'รอดำเนินการ';
           let status_name = 'รอดำเนินการ';
           
-          console.log(`[DEBUG] Work plan ${p.id} logs status:`, logsStatus);
-          console.log(`[DEBUG] Work plan ${p.id} status_id:`, p.status_id);
+          debugLog(`[DEBUG] Work plan ${p.id} logs status:`, logsStatus);
+          debugLog(`[DEBUG] Work plan ${p.id} status_id:`, p.status_id);
           
           // ตรวจสอบ status_id จากฐานข้อมูลก่อน
           if (p.status_id === 9) {
             status = 'ยกเลิกการผลิต';
             status_name = 'ยกเลิกการผลิต';
-            console.log(`[DEBUG] Work plan ${p.id} is cancelled (status_id: 9)`);
+            debugLog(`[DEBUG] Work plan ${p.id} is cancelled (status_id: 9)`);
           } else if (logsStatus) {
             status = logsStatus.message;
             status_name = logsStatus.message;
-            console.log(`[DEBUG] Using logs status for work plan ${p.id}: ${status}`);
+            debugLog(`[DEBUG] Using logs status for work plan ${p.id}: ${status}`);
           } else {
             status = p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status;
             status_name = p.status === 'แผนจริง' || !p.status ? 'บันทึกสำเร็จ' : p.status;
-            console.log(`[DEBUG] Using default status for work plan ${p.id}: ${status}`);
+            debugLog(`[DEBUG] Using default status for work plan ${p.id}: ${status}`);
           }
           
           // Parse operators จาก draft หรือจาก work plan
@@ -1918,7 +2055,7 @@ export default function MedicalAppointmentDashboard() {
               }
             }
           } catch (e) {
-            console.error('Error parsing operators for work plan', p.id, e);
+            debugError('Error parsing operators for work plan', p.id, e);
             operatorNames = '';
           }
           
@@ -1940,11 +2077,11 @@ export default function MedicalAppointmentDashboard() {
         })
       ];
              setProductionData(allData);
-       console.log('📊 [DEBUG] All production data loaded:', allData.length, 'items');
-       console.log('📊 [DEBUG] Sample data:', allData.slice(0, 3));
+       debugLog('📊 [DEBUG] All production data loaded:', allData.length, 'items');
+       debugLog('📊 [DEBUG] Sample data:', allData.slice(0, 3));
        isCreatingRef.current = false; // reset flag หลังโหลดข้อมูลเสร็จ
      } catch (error) {
-       console.error('Error loading production data:', error);
+       debugError('Error loading production data:', error);
      } finally {
        setIsLoadingData(false);
      }
@@ -1999,7 +2136,7 @@ export default function MedicalAppointmentDashboard() {
 
     validJobs.forEach(job => {
       // เพิ่มผู้ปฏิบัติงานในงานนี้เข้าไปใน Set (ไม่ซ้ำ)
-      const workers = job.operators.split(', ').filter((w: string) => w.trim());
+      const workers = getOperatorsArray(job.operators);
       workers.forEach((worker: string) => allWorkers.add(worker));
 
       // คำนวณเวลาที่ใช้ในงานนี้ (หักเวลาพักเที่ยง)
@@ -2151,8 +2288,8 @@ export default function MedicalAppointmentDashboard() {
       const timeB = b.start_time || "00:00";
       const timeComparison = timeA.localeCompare(timeB);
       if (timeComparison !== 0) return timeComparison;
-      const opA = getOperatorsArray(a.operators)[0] || "";
-      const opB = getOperatorsArray(b.operators)[0] || "";
+      const opA = String(getOperatorsArray(a.operators)[0] || "");
+      const opB = String(getOperatorsArray(b.operators)[0] || "");
       const indexA = opA.indexOf("อ");
       const indexB = opB.indexOf("อ");
       if (indexA === 0 && indexB !== 0) return -1;
@@ -2183,39 +2320,118 @@ export default function MedicalAppointmentDashboard() {
     ];
   };
 
-  // ฟังก์ชันสำหรับ Weekly View: ไม่รวมงาน A, B, C, D
-  const getSortedWeeklyProduction = (jobs: any[]) => {
-    const defaultCodes = ['A', 'B', 'C', 'D'];
-    // กรองออกงาน A, B, C, D ทั้งหมด
-    const filteredJobs = jobs.filter(j => !defaultCodes.includes(j.job_code));
+
+  // ===== Weekly board interactions =====
+  const handleEditClick = (item: any) => {
+    try {
+      if (isDraftItem(item)) {
+        handleEditDraft(item)
+      } else {
+        debugLog("Open view/edit for non-draft item", item)
+      }
+    } catch (e) {
+      debugError("handleEditClick error", e)
+    }
+  }
+
+  const handleQuickAdd = (dateKey: string) => {
+    setSelectedDate(dateKey)
+    setViewMode("daily")
+  }
+
+  const handleReorderSameDay = (dateKey: string, newOrder: any[]) => {
+    setProductionData(prev => {
+      const keepOthers = prev.filter(p => formatDateForAPI(p.production_date) !== dateKey)
+      return [...keepOthers, ...newOrder]
+    })
+  }
+
+  const handleMoveAcrossDays = (fromKey: string, toKey: string, item: any, position: number) => {
+    setProductionData(prev => {
+      const updated = prev.map(p => (p.id === item.id ? { ...p, production_date: toKey } : p))
+      // Rebuild order for target day by inserting at position
+      const target = updated.filter(p => formatDateForAPI(p.production_date) === toKey)
+      const others = updated.filter(p => formatDateForAPI(p.production_date) !== toKey)
+      const moved = target.filter(p => p.id === item.id)[0]
+      const rest = target.filter(p => p.id !== item.id)
+      const clampedPos = Math.min(Math.max(position, 0), rest.length)
+      rest.splice(clampedPos, 0, moved)
+      return [...others, ...rest]
+    })
+  }
+
+  // Helper functions for WeeklyCalendar
+  const convertToProductionTasks = (data: ProductionItem[]): ProductionTask[] => {
+    // Hide default A/B/C/D jobs in weekly view
+    const defaultCodes = ['A', 'B', 'C', 'D']
+    return data
+      .filter(item => !defaultCodes.includes((item as any).job_code))
+      .map(item => ({
+      id: item.id,
+      date: formatDateForAPI(item.production_date),
+      title: item.job_name,
+      room: item.production_room || '',
+      staff: getOperatorsString(item.operators),
+      time: `${item.start_time || ''} - ${item.end_time || ''}`,
+      status: item.status_name || '',
+      recordStatus: getJobStatus(item) as "บันทึกแบบร่าง" | "บันทึกเสร็จสิ้น" | "พิมพ์แล้ว",
+      notes: (item as any).note || (item as any).notes || '',
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
+    }))
+  }
+
+  const convertToProductionItem = (task: ProductionTask): ProductionItem => {
+    // Find the original item from productionData
+    const originalItem = productionData.find(item => item.id === task.id)
+    if (!originalItem) {
+      throw new Error(`Production item with id ${task.id} not found`)
+    }
     
-    // งานพิเศษ (is_special === 1)
-    const specialJobs = filteredJobs.filter(j => j.is_special === 1);
-    // งานปกติ (is_special !== 1)
-    const normalJobs = filteredJobs.filter(j => j.is_special !== 1);
-    
-    const sortFn = (a: any, b: any) => {
-      const timeA = a.start_time || "00:00";
-      const timeB = b.start_time || "00:00";
-      const timeComparison = timeA.localeCompare(timeB);
-      if (timeComparison !== 0) return timeComparison;
-      const opA = getOperatorsArray(a.operators)[0] || "";
-      const opB = getOperatorsArray(b.operators)[0] || "";
-      const indexA = opA.indexOf("อ");
-      const indexB = opB.indexOf("อ");
-      if (indexA === 0 && indexB !== 0) return -1;
-      if (indexB === 0 && indexA !== 0) return 1;
-      return opA.localeCompare(opB);
-    };
-    
-    normalJobs.sort(sortFn);
-    specialJobs.sort(sortFn);
-    
-    return [
-      ...normalJobs,
-      ...specialJobs
-    ];
-  };
+    // Update the original item with new data
+    return {
+      ...originalItem,
+      job_name: task.title,
+      production_room: task.room,
+      operators: task.staff,
+      start_time: task.time.split(' - ')[0],
+      end_time: task.time.split(' - ')[1],
+      status_name: task.status,
+      note: task.notes,
+      production_date: new Date(task.date)
+    }
+  }
+
+  // WeeklyCalendar event handlers
+  const handleTaskMove = (taskId: number, fromDate: string, toDate: string, fromIndex: number, toIndex: number) => {
+    setProductionData(prev => {
+      const updated = prev.map(p => 
+        p.id === taskId ? { ...p, production_date: new Date(toDate) } : p
+      )
+      
+      // Rebuild order for target day by inserting at position
+      const target = updated.filter(p => formatDateForAPI(p.production_date) === toDate)
+      const others = updated.filter(p => formatDateForAPI(p.production_date) !== toDate)
+      const moved = target.filter(p => p.id === taskId)[0]
+      const rest = target.filter(p => p.id !== taskId)
+      const clampedPos = Math.min(Math.max(toIndex, 0), rest.length)
+      rest.splice(clampedPos, 0, moved)
+      
+      return [...others, ...rest]
+    })
+  }
+
+  const handleTaskReorder = (taskId: number, date: string, fromIndex: number, toIndex: number) => {
+    setProductionData(prev => {
+      const dayItems = prev.filter(p => formatDateForAPI(p.production_date) === date)
+      const otherItems = prev.filter(p => formatDateForAPI(p.production_date) !== date)
+      
+      // Reorder items within the same day
+      const reordered = arrayMove(dayItems, fromIndex, toIndex)
+      
+      return [...otherItems, ...reordered]
+    })
+  }
 
   // ฟังก์ชันสร้าง time slots 30 นาที
   function generateTimeSlots(start = "08:00", end = "17:00", step = 30) {
@@ -2263,7 +2479,7 @@ export default function MedicalAppointmentDashboard() {
       // หางานที่ user นี้ทำ
       const userJobs = jobs.filter(job => {
         if (!job.operators || !job.start_time || !job.end_time) return false;
-        return job.operators.split(", ").includes(user.name);
+        return getOperatorsArray(job.operators).includes(user.name);
       });
       
       // สร้างข้อมูล slot ที่มีการ merge งานต่อเนื่อง
@@ -2353,7 +2569,7 @@ export default function MedicalAppointmentDashboard() {
                   className={`p-2 border text-center font-bold text-base min-w-[80px] ${
                     slot === "12:30-13:15" 
                       ? "bg-orange-200 text-orange-800" 
-                      : "bg-blue-100 text-blue-800"
+                      : "bg-green-100 text-green-800"
                   }`}
                 >
                   {slot === "12:30-13:15" ? "พักเที่ยง" : slot}
@@ -2415,7 +2631,7 @@ export default function MedicalAppointmentDashboard() {
 
   // Debug Modal state
   useEffect(() => {
-    console.log('🔍 Modal state changed:', { editDraftModalOpen, editDraftData: !!editDraftData });
+    debugLog('🔍 Modal state changed:', { editDraftModalOpen, editDraftData: !!editDraftData });
   }, [editDraftModalOpen, editDraftData]);
 
   // โหลดข้อมูลเมื่อ component mount
@@ -2433,7 +2649,7 @@ export default function MedicalAppointmentDashboard() {
         setSyncModeEnabled(data.data.syncModeEnabled || false);
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      debugError('Error loading settings:', error);
     }
   };
 
@@ -2482,8 +2698,18 @@ export default function MedicalAppointmentDashboard() {
 
   return (
     <div className={`min-h-screen bg-gray-200 ${notoSansThai.className} flex flex-col`}>
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-600 shadow-md">
+      {/* แก้ไข hydration error - แสดง loading ถ้ายัง render ใน client ไม่เสร็จ */}
+      {!isClient ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+            <p className="text-gray-600">กำลังโหลดระบบ...</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Header */}
+          <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-600 shadow-md">
         <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
@@ -2532,26 +2758,10 @@ export default function MedicalAppointmentDashboard() {
 
               <div className="flex items-center space-x-1 sm:space-x-2">
                 {(() => {
-                  const roleNameMap: Record<number, string> = {1:'Planner',2:'Admin',4:'Viewer',5:'Operation'};
-                  // Render stable placeholder on server to avoid hydration mismatch
-                  // Then resolve role on client after mount
-                  const [name, setName] = useState<string>('');
-                  useEffect(() => {
-                    try {
-                      const cookieMatch = document.cookie.match(/(?:^|; )userRole=([^;]+)/);
-                      let roleId = cookieMatch ? parseInt(decodeURIComponent(cookieMatch[1])) : undefined;
-                      if (!roleId) {
-                        const segment = window.location.pathname.split('/').filter(Boolean)[0];
-                        const urlRoleMap: Record<string, number> = { planner: 1, admin: 2, viewer: 4, operation: 5 };
-                        roleId = urlRoleMap[segment];
-                      }
-                      if (roleId && roleNameMap[roleId]) setName(roleNameMap[roleId]);
-                    } catch {}
-                  }, []);
                   return (
                     <>
-                      <span className="hidden sm:block text-xs sm:text-sm text-white">ผู้ใช้: {name || ''}</span>
-                      <span className="sm:hidden text-xs text-white">{name || ''}</span>
+                      <span className="hidden sm:block text-xs sm:text-sm text-white">ผู้ใช้: {userName || ''}</span>
+                      <span className="sm:hidden text-xs text-white">{userName || ''}</span>
                     </>
                   );
                 })()}
@@ -2594,35 +2804,37 @@ export default function MedicalAppointmentDashboard() {
                   {/* Date Selection */}
                   <div className="space-y-2">
                     <Label className="text-xs sm:text-sm font-bold text-gray-700">วันที่ผลิต</Label>
-                    <div className="relative">
-                      <Input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="pl-8 sm:pl-10 text-sm"
-                      />
-                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2" />
-                    </div>
+                    <SimpleDatePicker
+                      value={selectedDate}
+                      onChange={setSelectedDate}
+                      placeholder="เลือกวันที่ผลิต"
+                      className="w-full"
+                    />
                   </div>
 
                   {/* Autocomplete Job Name/Code */}
                   <div className="space-y-2 relative">
                     <Label className="text-xs sm:text-sm font-bold text-gray-700">เพิ่มงานผลิต</Label>
                     <div className="relative">
-                      <SearchBox
+                      <JobSearchSelect
                         value={jobQuery}
-                        onChange={setJobQuery}
-                        onSelect={(item: SearchOption) => {
-                          justSelectedFromDropdownRef.current = true;
-                          setJobCode(item.job_code);
-                          setJobName(item.job_name);
-                          setJobQuery(item.job_name);
+                        onChange={(jobCode, jobName) => {
+                          debugLog('🎯 JobSearchSelect selected:', { jobCode, jobName });
+                          setJobCode(jobCode);
+                          setJobName(jobName);
+                          setJobQuery(jobName);
                         }}
-                        cacheRef={searchCacheRef}
-                        onError={(error) => {
-                          console.error('SearchBox error:', error);
-                          setMessage(`ข้อผิดพลาดในการค้นหา: ${error}`);
+                        onAddNew={(jobName) => {
+                          debugLog('➕ Adding new job:', jobName);
+                          // สร้าง job_code ใหม่อัตโนมัติ
+                          const newJobCode = handleAddNewJob();
+                          setJobName(jobName);
+                          setJobQuery(jobName);
+                          setMessage(`✅ เพิ่มงานใหม่: "${jobName}" (รหัสงาน: ${newJobCode})`);
                         }}
+                        placeholder="ค้นหางานผลิต..."
+                        isDisabled={isSubmitting}
+                        allowAddNew={true}
                       />
                     </div>
                   </div>
@@ -2631,9 +2843,6 @@ export default function MedicalAppointmentDashboard() {
                   <div className="space-y-3 sm:space-y-4">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs sm:text-sm font-bold text-gray-700">ผู้ปฏิบัติงาน (1-4 คน)</Label>
-                      <Button variant="link" size="sm" className="text-green-600 p-0 h-auto text-xs">
-                        ล้างข้อมูลทั้งหมด
-                      </Button>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -2727,11 +2936,11 @@ export default function MedicalAppointmentDashboard() {
                   {/* Notes */}
                   <div className="space-y-2">
                     <Label className="text-xs sm:text-sm font-bold text-gray-700">หมายเหตุ</Label>
-                    <Textarea
-                      placeholder="เพิ่มหมายเหตุเพิ่มเติมสำหรับการผลิต..."
-                      className="min-h-[60px] sm:min-h-[80px] resize-none text-sm"
+                    <RichNoteEditor
                       value={note}
-                      onChange={debouncedNoteChange}
+                      onChange={(v: string) => setNote(v)}
+                      className="text-sm"
+                      placeholder="เพิ่มหมายเหตุเพิ่มเติมสำหรับการผลิต..."
                     />
                   </div>
 
@@ -2761,7 +2970,7 @@ export default function MedicalAppointmentDashboard() {
                         variant="outline"
                         className="flex-1 border-2 border-gray-400 text-gray-700 hover:bg-gray-100 bg-white text-sm font-medium py-2 px-4"
                         onClick={() => {
-                          console.log('🔧 Button clicked!');
+                          debugLog('🔧 Button clicked!');
                           handleSaveDraft();
                         }}
                         disabled={isSubmitting}
@@ -2908,7 +3117,7 @@ export default function MedicalAppointmentDashboard() {
                                           alt={worker.name}
                                           className="object-cover object-center"
                                         />
-                                        <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                        <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
                                           {worker.name.substring(0, 2)}
                                         </AvatarFallback>
                                       </Avatar>
@@ -2949,7 +3158,7 @@ export default function MedicalAppointmentDashboard() {
                                             alt={worker.name}
                                             className="object-cover object-center"
                                           />
-                                          <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                          <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
                                             {worker.name.substring(0, 2)}
                                           </AvatarFallback>
                                         </Avatar>
@@ -2990,7 +3199,7 @@ export default function MedicalAppointmentDashboard() {
                                             alt={worker.name}
                                             className="object-cover object-center"
                                           />
-                                          <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                          <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
                                             {worker.name.substring(0, 2)}
                                           </AvatarFallback>
                                         </Avatar>
@@ -3119,191 +3328,20 @@ export default function MedicalAppointmentDashboard() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pb-8">
                 {viewMode === "weekly" ? (
-                  <div className="space-y-2 sm:space-y-3 md:space-y-4">
-                    {/* Week Navigation */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-                      <Button
-                        variant="outline"
-                        size={isFormCollapsed ? "default" : "sm"}
-                        onClick={() => navigateWeek("prev")}
-                        className="flex items-center justify-center space-x-1 text-xs sm:text-sm"
-                      >
-                        <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="hidden sm:inline">สัปดาห์ก่อนหน้า</span>
-                        <span className="sm:hidden">ก่อน</span>
-                      </Button>
-                      <div className="text-center">
-                        <h3
-                          className={`font-medium text-gray-900 ${
-                            isFormCollapsed ? "text-sm sm:text-lg md:text-xl" : "text-xs sm:text-sm md:text-base"
-                          }`}
-                        >
-                          {weekRange}
-                        </h3>
-                        <p className={`text-gray-600 mt-1 ${isFormCollapsed ? "text-sm" : "text-xs"}`}>
-                          รวมงานทั้งสัปดาห์: {weekProduction.length} งาน
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size={isFormCollapsed ? "default" : "sm"}
-                        onClick={() => navigateWeek("next")}
-                        className="flex items-center justify-center space-x-1 text-xs sm:text-sm"
-                      >
-                        <span className="hidden sm:inline">สัปดาห์ถัดไป</span>
-                        <span className="sm:hidden">หน้า</span>
-                        <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
-                      </Button>
-                    </div>
-
-                    {/* Loading Indicator */}
-                    {isLoadingData && (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="text-center">
-                          <RefreshCw className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600">กำลังโหลดข้อมูล...</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Weekly Calendar Table */}
-                    {!isLoadingData && (
-                      <div className="overflow-x-auto">
-                        <div className="min-w-full">
-                          {/* Header Row */}
-                          <div className="grid grid-cols-6 gap-1 mb-2">
-                            {weekDates.map((date, index) => {
-                              const dateStr = formatDateForAPI(date)
-                              const dayProduction = productionData.filter((item) => formatDateForAPI(item.production_date) === dateStr)
-                              const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
-
-                              return (
-                                <div key={index} className={`${getDayBackgroundColor(date)} rounded-lg p-2 text-center`}>
-                                  {/* ชื่อวัน - ขนาดใหญ่ขึ้น */}
-                                  <div
-                                    className={`${isFormCollapsed ? "text-lg sm:text-xl font-bold" : "text-base sm:text-lg font-bold"} ${getDayTextColor(date)} mb-2`}
-                                  >
-                                    {getDayName(date)}
-                                  </div>
-
-                                  {/* วันที่และเดือนในบรรทัดเดียวกัน */}
-                                  <div className="flex items-center justify-center space-x-1 mb-2">
-                                    <div
-                                      className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} font-semibold ${getDayTextColor(date)}`}
-                                    >
-                                      {date.getDate()}
-                                    </div>
-                                    <div
-                                      className={`${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} ${getDayTextColor(date)} opacity-90`}
-                                    >
-                                      {date.toLocaleDateString("th-TH", { month: "short" })}
-                                    </div>
-                                  </div>
-
-                                  <div
-                                    className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} ${getDayTextColor(date)} opacity-75 mt-1`}
-                                  >
-                                    {filteredDayProduction.length} งาน
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-
-                          {/* Production Content Grid */}
-                          <div className="grid grid-cols-6 gap-1">
-                            {weekDates.map((date, index) => {
-                              const dateStr = formatDateForAPI(date)
-                              const dayProduction = productionData.filter((item) => formatDateForAPI(item.production_date) === dateStr)
-                              const filteredDayProduction = getSortedWeeklyProduction(dayProduction)
-
-                              return (
-                                <div
-                                  key={index}
-                                  className="border border-gray-200 rounded-lg p-2 bg-white min-h-[200px] sm:min-h-[400px] flex flex-col"
-                                >
-                                  {filteredDayProduction.length > 0 ? (
-                                    <div className="space-y-2 flex-1">
-                                      {filteredDayProduction.map((item, itemIndex) => (
-                                        <div
-                                          key={item.id}
-                                          className={`p-2 border-l-4 min-h-[140px] flex flex-col ${
-                                            item.status === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
-                                              ? "border-l-red-500 bg-red-50"
-                                              : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
-                                                ? "border-l-green-500 bg-green-50"
-                                                : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
-                                                  ? "border-l-gray-500 bg-gray-50"
-                                                  : "border-l-gray-500 bg-gray-50"
-                                          }`}
-                                        >
-                                          {/* ชื่องานผลิต */}
-                                          <div
-                                            className={`font-medium text-gray-900 ${isFormCollapsed ? "text-sm sm:text-base" : "text-xs sm:text-sm"} mb-1 leading-tight flex-1`}
-                                          >
-                                            <span className="underline">งานที่ {itemIndex + 1} :</span> {item.job_name}
-                                          </div>
-
-                                          {/* เวลา */}
-                                          <div
-                                            className={`flex items-center space-x-1 ${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-gray-600 mb-2`}
-                                          >
-                                            <Clock
-                                              className={`${isFormCollapsed ? "w-3 h-3" : "w-2.5 h-2.5"} flex-shrink-0`}
-                                            />
-                                            <span>{item.start_time?.substring(0, 5) || "08:00"} - {(item.end_time || "17:00:00").substring(0, 5)}</span>
-                                          </div>
-
-                                          {/* หมายเหตุ (ถ้ามี) */}
-                                          {(item.notes || item.note) && (
-                                            <div
-                                              className={`${isFormCollapsed ? "text-xs sm:text-sm" : "text-xs"} text-gray-500 italic mb-2`}
-                                            >
-                                              หมายเหตุ: {item.notes || item.note}
-                                            </div>
-                                          )}
-
-                                          {/* สถานะ */}
-                                          <div className="mt-auto">
-                                            <span
-                                              className={`inline-block px-1.5 py-0.5 rounded text-xs ${
-                                                item.status === "งานผลิตถูกยกเลิก" || item.status_name === "ยกเลิกการผลิต"
-                                                  ? "bg-red-100 text-red-700"
-                                                  : item.status_name === "กำลังดำเนินการ"
-                                                    ? "bg-blue-100 text-blue-700"
-                                                    : item.status_name === "งานผลิตเสร็จสิ้น" || item.status_name === "เสร็จสิ้น"
-                                                      ? "bg-green-100 text-green-700"
-                                                      : (item.status_name && (item.status_name.includes("รอดำเนินการ") || item.status_name.toLowerCase().includes("pending")))
-                                                        ? "bg-gray-100 text-gray-700"
-                                                        : "bg-gray-100 text-gray-700"
-                                              }`}
-                                            >
-                                              {item.status_name || "รอดำเนินการ"}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center justify-center h-full text-gray-400">
-                                      <div className="text-center">
-                                        <Calendar
-                                          className={`${isFormCollapsed ? "w-8 h-8" : "w-6 h-6"} mx-auto mb-2 opacity-50`}
-                                        />
-                                        <p className={`${isFormCollapsed ? "text-xs" : "text-xs"}`}>ไม่มีงานผลิต</p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <WeeklyCalendar
+                    productionData={convertToProductionTasks(productionData)}
+                    currentWeek={currentWeek || new Date()}
+                    onWeekChange={setCurrentWeek}
+                    onTaskMove={handleTaskMove}
+                    onTaskReorder={handleTaskReorder}
+                    onTaskClick={(task) => handleEditClick(convertToProductionItem(task))}
+                    onDateClick={(date) => console.log('Date clicked:', date)}
+                    onAddTask={(date, index) => handleQuickAdd(date)}
+                    showWeekNavigation={true}
+                    showTaskCount={true}
+                  />
                 ) : (
                   <div className="space-y-2 sm:space-y-3">
                     {/* Loading Indicator */}
@@ -3325,11 +3363,11 @@ export default function MedicalAppointmentDashboard() {
                       } text-gray-600`}
                     >
                       <span>รายวัน</span>
-                      <Input
-                        type="date"
+                      <SimpleDatePicker
                         value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full sm:w-auto text-sm"
+                        onChange={setSelectedDate}
+                        placeholder="เลือกวันที่"
+                        className="w-full sm:w-auto"
                       />
                     </div>
 
@@ -3351,7 +3389,7 @@ export default function MedicalAppointmentDashboard() {
                           </h4>
 
                           {getSortedDailyProduction(dailyProduction).map((item) => {
-                            console.log('🎯 [DEBUG] Rendering card for item:', {
+                            debugLog('🎯 [DEBUG] Rendering card for item:', {
                               id: item.id,
                               job_name: item.job_name,
                               operators: item.operators,
@@ -3455,7 +3493,7 @@ export default function MedicalAppointmentDashboard() {
                                               className="object-cover object-center avatar-image"
                                               style={{ imageRendering: "crisp-edges" }}
                                             />
-                                            <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                            <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
                                               จิ
                                             </AvatarFallback>
                                           </Avatar>
@@ -3470,7 +3508,7 @@ export default function MedicalAppointmentDashboard() {
                                                 className="object-cover object-center avatar-image"
                                                 style={{ imageRendering: "crisp-edges" }}
                                               />
-                                              <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                              <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
                                                 จิ
                                               </AvatarFallback>
                                             </Avatar>
@@ -3483,7 +3521,7 @@ export default function MedicalAppointmentDashboard() {
                                                 className="object-cover object-center avatar-image"
                                                 style={{ imageRendering: "crisp-edges" }}
                                               />
-                                              <AvatarFallback className="text-xs font-medium bg-blue-100 text-blue-800">
+                                              <AvatarFallback className="text-xs font-medium bg-green-100 text-green-800">
                                                 จ
                                               </AvatarFallback>
                                             </Avatar>
@@ -3729,11 +3767,11 @@ export default function MedicalAppointmentDashboard() {
               {/* วันที่ผลิต */}
               <div className="space-y-1">
                 <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>วันที่ผลิต</Label>
-                <Input
-                  type="date"
+                <SimpleDatePicker
                   value={editDate}
-                  onChange={e => setEditDate(e.target.value)}
-                  className={`text-sm h-8 ${notoSansThai.className}`}
+                  onChange={setEditDate}
+                  placeholder="เลือกวันที่"
+                  className="w-full"
                 />
               </div>
               {/* ชื่องาน */}
@@ -3860,11 +3898,11 @@ export default function MedicalAppointmentDashboard() {
               {/* หมายเหตุ */}
               <div className="space-y-1">
                 <Label className={`text-xs font-bold text-gray-700 ${notoSansThai.className}`}>หมายเหตุ</Label>
-                <Textarea
-                  placeholder="เพิ่มหมายเหตุเพิ่มเติมสำหรับการผลิต..."
-                  className={`min-h-[60px] resize-none text-sm ${notoSansThai.className}`}
+                <RichNoteEditor
                   value={editNote}
-                  onChange={debouncedEditNoteChange}
+                  onChange={(v: string) => setEditNote(v)}
+                  className={`text-sm ${notoSansThai.className}`}
+                  placeholder="เพิ่มหมายเหตุเพิ่มเติมสำหรับการผลิต..."
                 />
               </div>
             </div>
@@ -3942,6 +3980,8 @@ export default function MedicalAppointmentDashboard() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    )
+        </>
+      )}
+    </div>
+  )
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { config } from '@/lib/config';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://192.168.0.94:3101';
+const BACKEND_URL = process.env.BACKEND_URL || config.api.baseUrl;
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Error fetching new jobs:', error);
+    // console.error('Error fetching new jobs:', error);
     return NextResponse.json(
       { success: false, message: 'เกิดข้อผิดพลาดในการดึงข้อมูล' },
       { status: 500 }
@@ -49,7 +50,7 @@ export async function PUT(request: NextRequest) {
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Error updating new job:', error);
+    // console.error('Error updating new job:', error);
     return NextResponse.json(
       { success: false, message: 'เกิดข้อผิดพลาดในการอัปเดตข้อมูล' },
       { status: 500 }
