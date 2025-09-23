@@ -82,7 +82,7 @@ export const useWeeklyCalendar = (currentWeek: Date, productionData: ProductionT
   const handleDragOver = (e: React.DragEvent, date: string, index: number) => {
     if (dragDrop.draggedItem) {
       // Check if it's the same item
-      if (dragDrop.draggedItem.id === item.id) {
+      if (dragDrop.draggedItem.id === dragDrop.draggedItem.id) {
         e.dataTransfer.dropEffect = "none"
         return
       }

@@ -106,7 +106,7 @@ export interface WeeklySummary {
   dailySummaries: DailySummary[];
 }
 
-export interface ApiResponse<T> {
+export interface ApiResponseInterface<T> {
   success: boolean;
   data: T;
   message?: string;
