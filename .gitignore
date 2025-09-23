@@ -56,7 +56,6 @@ ssl/
 *.crt
 
 # Linux deployment files
-docker-compose.linux.yml
 deploy-linux.sh
 install-docker.sh
 upload-*.bat
