@@ -115,6 +115,9 @@ EOF
 
 #### วิธีที่ 1: ใช้ Docker Compose (แนะนำ)
 ```bash
+# เข้าโฟลเดอร์โปรเจค
+cd /opt/workplanv6
+
 # ตรวจสอบไฟล์ docker-compose.linux.yml
 cat docker-compose.linux.yml
 
@@ -127,6 +130,9 @@ docker compose -f docker-compose.linux.yml ps
 
 #### วิธีที่ 2: ใช้ Script
 ```bash
+# เข้าโฟลเดอร์โปรเจค
+cd /opt/workplanv6
+
 # ใช้ script ที่มีอยู่แล้ว
 chmod +x deploy-from-github.sh
 ./deploy-from-github.sh
