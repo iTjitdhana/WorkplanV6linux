@@ -7,6 +7,7 @@ services:
       - "3012:3011"
     environment:
       - NODE_ENV=production
+      - TZ=Asia/Bangkok
       - NEXT_PUBLIC_API_URL=http://192.168.0.96:3102
       - BACKEND_URL=http://192.168.0.96:3102
     depends_on:
@@ -26,6 +27,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3102
+      - TZ=Asia/Bangkok
       - DB_HOST=192.168.0.94
       - DB_USER=jitdhana
       - DB_PASSWORD=iT12345$
