@@ -244,9 +244,13 @@ export default function MedicalAppointmentDashboard() {
   }, []);
 
   // ===== HELPER FUNCTIONS AFTER HOOKS =====
-  // Helper function for API URL - ใช้ config
+  // Helper function for API URL - use frontend proxy (relative path)
   const getApiUrl = (endpoint: string) => {
-    return config.api.baseUrl + endpoint;
+    if (!endpoint) return '/';
+    // Ensure we always call Next.js API routes (frontend proxy)
+    // so the same code works across environments without CORS/env issues
+    const clean = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return clean;
   };
 
   // Fetch dropdown data on mount
