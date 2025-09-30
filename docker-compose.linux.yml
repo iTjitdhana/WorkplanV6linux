@@ -25,6 +25,7 @@ services:
       - "3102:3102"
     environment:
       - NODE_ENV=production
+      - PORT=3102
       - DB_HOST=192.168.0.94
       - DB_USER=jitdhana
       - DB_PASSWORD=iT12345$
