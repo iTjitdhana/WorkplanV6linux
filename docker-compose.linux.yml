@@ -7,8 +7,8 @@ services:
       - "3012:3011"
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://backend:3101
-      - BACKEND_URL=http://backend:3101
+      - NEXT_PUBLIC_API_URL=http://192.168.0.96:3102
+      - BACKEND_URL=http://192.168.0.96:3102
     depends_on:
       - backend
     restart: unless-stopped
@@ -22,9 +22,15 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3102:3101"
-    env_file:
-      - ./backend/.env
+      - "3102:3102"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=192.168.0.94
+      - DB_USER=jitdhana
+      - DB_PASSWORD=iT12345$
+      - DB_NAME=esp_tracker
+      - DB_PORT=3306
+      - CORS_ORIGIN=http://192.168.0.96:3012
     restart: unless-stopped
     networks:
       - workplan-network
