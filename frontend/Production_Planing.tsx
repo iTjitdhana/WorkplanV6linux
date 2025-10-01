@@ -2747,7 +2747,7 @@ export default function MedicalAppointmentDashboard() {
                 <DropdownMenuContent align="end" className="w-64 bg-white border border-gray-200 shadow-lg">
                   <DropdownMenuItem asChild>
                     <a
-                      href="http://localhost:3014/planner/logs"
+                      href="http://192.168.0.96:3014/planner/logs"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer"
