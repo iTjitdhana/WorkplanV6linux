@@ -2755,6 +2755,16 @@ export default function MedicalAppointmentDashboard() {
                       <span>ระบบประวัติการผลิต</span>
                     </a>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a
+                      href="http://192.168.0.96:3017/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer"
+                    >
+                      <span>ตารางงานการผลิต</span>
+                    </a>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
                   </DropdownMenu>
                 );
