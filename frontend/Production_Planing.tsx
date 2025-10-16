@@ -3011,16 +3011,14 @@ export default function MedicalAppointmentDashboard() {
                     <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                     <span>Dashboard การลงคนลงเวลา</span>
                   </CardTitle>
-                  {false && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowTimeTable(true)}
-                      className="text-xs px-2 py-1 whitespace-nowrap border-blue-300 text-blue-600 hover:bg-blue-50"
-                    >
-                      แสดงตารางเวลาการทำงาน
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowTimeTable(true)}
+                    className="text-xs px-2 py-1 whitespace-nowrap border-blue-300 text-blue-600 hover:bg-blue-50"
+                  >
+                    แสดงตารางเวลาการทำงาน
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {(() => {
