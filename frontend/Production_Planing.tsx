@@ -2762,7 +2762,7 @@ export default function MedicalAppointmentDashboard() {
                       rel="noopener noreferrer"
                       className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer"
                     >
-                      <span>ตารางงานการผลิต</span>
+                      <span>ตารางงานและกระบวนการผลิตสินค้าครัวกลาง</span>
                     </a>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
